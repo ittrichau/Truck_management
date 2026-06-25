@@ -78,12 +78,7 @@ def create_app(config_name=None):
     # Apply any pending migrations (tables created via Alembic, not db.create_all)
     with app.app_context():
         from app import models  # noqa: F401
-        from flask_migrate import upgrade as _migrate_upgrade
-        _migrate_upgrade()
 
-        # Auto-seed only in development
-        if app.config.get('SEED_ON_STARTUP', False):
-            models.seed_default_data()
 
     return app
 

@@ -42,17 +42,14 @@ class ProductionConfig(Config):
     """Production configuration."""
     DEBUG = False
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'WARNING')
-    LOG_FILE = os.environ.get('LOG_FILE', '/var/log/app/app.log')
+    LOG_FILE = os.environ.get('LOG_FILE', '/tmp/app.log')  # Use /tmp for writable temp logs
     PREFERRED_URL_SCHEME = 'https'
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
 
-    # Force PostgreSQL in production
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        'DATABASE_URL',
-        'postgresql://truck_user:truck_pass@localhost:5432/truck_management'
-    )
+    # PostgreSQL in production (Railway provides DATABASE_URL)
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
 
     # PostgreSQL connection pooling
     SQLALCHEMY_ENGINE_OPTIONS = {
