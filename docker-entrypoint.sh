@@ -17,7 +17,7 @@ if [ "$FLASK_ENV" = "production" ] && [ -z "$SECRET_KEY" ]; then
 fi
 
 echo "Running database migrations..."
-flask db upgrade || echo "Warning: db upgrade failed, continuing..."
+flask db upgrade
 
 echo "Starting application..."
 exec gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 2 --timeout 120 --access-logfile - --error-logfile - "run:app"
