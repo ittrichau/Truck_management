@@ -48,14 +48,7 @@ class ProductionConfig(Config):
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
 
-    # Force PostgreSQL in production — SECRET_KEY must be set via env var
-    SECRET_KEY = os.environ.get('SECRET_KEY')
-    if SECRET_KEY is None:
-        raise RuntimeError(
-            'SECRET_KEY environment variable is required in production. '
-            'Generate one with: python -c "import secrets; print(secrets.token_hex(32))"'
-        )
-
+    # Force PostgreSQL in production
     SQLALCHEMY_DATABASE_URI = os.environ.get(
         'DATABASE_URL',
         'postgresql://truck_user:truck_pass@localhost:5432/truck_management'
@@ -91,4 +84,13 @@ config_map = {
 def get_config():
     """Return the appropriate config class based on FLASK_ENV."""
     env = os.environ.get('FLASK_ENV', 'development').lower()
-    return config_map.get(env, config_map['default'])
+    config_class = config_map.get(env, config_map['default'])
+
+    # SECRET_KEY must be set via env var in production
+    if env == 'production' and os.environ.get('SECRET_KEY') is None:
+        raise RuntimeError(
+            'SECRET_KEY environment variable is required in production. '
+            'Generate one with: python -c "import secrets; print(secrets.token_hex(32))"'
+        )
+
+    return config_class
