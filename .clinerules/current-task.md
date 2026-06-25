@@ -150,3 +150,34 @@
   - Do not deploy without WeasyPrint system deps — PDF generation will crash silently.
   - Do not forget to set `FLASK_ENV=production` and `SECRET_KEY` on Railway.
   - Do not forget to add PostgreSQL service on Railway and run `flask seed-data` after first deploy.
+
+## 2026-06-25 - Fix WeasyPrint Package Name For Debian Trixie
+
+- Status: done
+- Goal: Fix Railway build failure caused by incorrect `libgdk-pixbuf2.0-0` package name not existing in Debian Trixie.
+- Root cause: Debian Trixie renamed the package from `libgdk-pixbuf2.0-0` to `libgdk-pixbuf-2.0-0`.
+- Files changed:
+  - `Dockerfile` — Changed `libgdk-pixbuf2.0-0` → `libgdk-pixbuf-2.0-0` in the `apt-get install` line.
+- Key decisions:
+  - No other package changes needed; all other deps exist in Trixie.
+- Constraints handled:
+  - No financial or business logic affected.
+  - No dependencies added or removed.
+- Do-not-repeat notes:
+  - Do not use `libgdk-pixbuf2.0-0` — it does not exist in Debian Trixie. Use `libgdk-pixbuf-2.0-0`.
+
+## 2026-06-25 - Fix WeasyPrint Package Name For Debian Trixie (Round 2)
+
+- Status: done
+- Goal: Fix Railway build failure — `libgdk-pixbuf-2.0-0` also does not exist in Debian Trixie.
+- Root cause: The first fix (libgdk-pixbuf2.0-0 → libgdk-pixbuf-2.0-0) was still incorrect. Debian Trixie replaced `libgdk-pixbuf-2.0-0` with `libgdk-pixbuf-xlib-2.0-0`.
+- Error message: `E: Package 'libgdk-pixbuf-2.0-0' has no installation candidate / However the following packages replace it: libgdk-pixbuf-xlib-2.0-0`
+- Files changed:
+  - `Dockerfile` — Changed `libgdk-pixbuf-2.0-0` → `libgdk-pixbuf-xlib-2.0-0` on line 11.
+- Key decisions:
+  - `libgdk-pixbuf-xlib-2.0-0` is the correct replacement package for Debian Trixie.
+- Constraints handled:
+  - No financial or business logic affected.
+  - No dependencies added or removed.
+- Do-not-repeat notes:
+  - Do not use `libgdk-pixbuf2.0-0` or `libgdk-pixbuf-2.0-0` — neither exists in Debian Trixie. Use `libgdk-pixbuf-xlib-2.0-0`.
