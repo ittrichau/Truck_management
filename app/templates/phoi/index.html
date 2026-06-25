@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Danh sách Phơi{% endblock %}
+{% block content %}
+
+{% if current_user.is_driver() %}
+<a href="{{ url_for('phoi.create') }}" class="btn btn-primary btn-float d-md-none shadow-lg">
+    <i class="bi bi-plus-lg"></i>
+</a>
+{% endif %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 d-none d-md-block"><i class="bi bi-journal-text"></i> Danh sách Phơi</h5>
+    {% if current_user.is_driver() %}
+    <a href="{{ url_for('phoi.create') }}" class="btn btn-primary d-none d-md-inline-block"><i class="bi bi-plus-lg"></i> Tạo Phơi mới</a>
+    {% endif %}
+</div>
+
+{% if phois.items %}
+<div class="row g-3">
+    {% for p in phois.items %}
+    <div class="col-12 col-md-6 col-lg-4">
+        <a href="{{ url_for('phoi.detail', id=p.id) }}" class="text-decoration-none">
+            <div class="card phoi-card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="fw-bold text-dark">{{ p.phoi_number }}</span>
+                        <span class="badge badge-status 
+                            {% if p.status == 'confirmed' %}bg-success
+                            {% elif p.status == 'submitted' %}bg-warning text-dark
+                            {% else %}bg-secondary{% endif %}">
+                            {% if p.status == 'confirmed' %}✅ Đã xác nhận
+                            {% elif p.status == 'submitted' %}📝 Đã tạo
+                            {% else %}📄 Nháp{% endif %}
+                        </span>
+                    </div>
+                    <div class="text-dark small">
+                        <div><i class="bi bi-geo-alt"></i> {{ p.origin }} → {{ p.destination }}</div>
+                        <div><i class="bi bi-calendar"></i> {{ p.departure_date.strftime('%d/%m/%Y') if p.departure_date else '--' }}</div>
+                        <div><i class="bi bi-speedometer2"></i> {{ p.km_total }} km</div>
+                        <div class="mt-1"><strong>Full:</strong> {{ '{:,.0f}'.format(p.revenue_full) }} VNĐ</div>
+                        {% if p.status == 'confirmed' %}
+                        <div class="mt-1">
+                            {% set bal = balances[p.id] %}
+                            <span class="{% if bal >= 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                                {% if bal >= 0 %}Chủ xe trả thêm: {{ '{:,.0f}'.format(bal) }}{% else %}Tài xế nộp lại: {{ '{:,.0f}'.format(-bal) }}{% endif %} VNĐ
+                            </span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+
+{# Pagination #}
+{% if phois.pages > 1 %}
+<nav class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% for page_num in phois.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+            {% if page_num %}
+            <li class="page-item {% if page_num == phois.page %}active{% endif %}">
+                <a class="page-link" href="{{ url_for('phoi.index', page=page_num) }}">{{ page_num }}</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+            {% endif %}
+        {% endfor %}
+    </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-journal-text display-1 text-muted"></i>
+    <p class="text-muted mt-3">Chưa có phơi nào.</p>
+    {% if current_user.is_driver() %}
+    <a href="{{ url_for('phoi.create') }}" class="btn btn-primary btn-lg"><i class="bi bi-plus-circle"></i> Tạo Phơi đầu tiên</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

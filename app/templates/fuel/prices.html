@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Bảng giá xăng{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5><i class="bi bi-graph-up"></i> Bảng giá xăng</h5>
+        {% if current_user.is_admin() %}
+        <a href="{{ url_for('fuel.create_price') }}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-circle"></i> Thêm giá mới
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Giá (VNĐ/lít)</th>
+                        <th>Từ lúc</th>
+                        <th>Đến lúc</th>
+                        <th>Trạng thái</th>
+                        <th>Ghi chú</th>
+                        {% if current_user.is_admin() %}
+                        <th></th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in prices %}
+                    <tr class="{% if p.is_active %}table-success{% else %}table-secondary{% endif %}">
+                        <td><strong>{{ '{:,.0f}'.format(p.price_per_liter) }}</strong></td>
+                        <td>{{ p.effective_from.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td>{{ p.effective_to.strftime('%d/%m/%Y %H:%M') if p.effective_to else 'Không giới hạn' }}</td>
+                        <td>
+                            {% if p.is_active %}
+                            <span class="badge bg-success">Đang áp dụng</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Đã tắt</span>
+                            {% endif %}
+                        </td>
+                        <td class="small">{{ p.notes or '—' }}</td>
+                        {% if current_user.is_admin() %}
+                        <td>
+                            <form action="{{ url_for('fuel.toggle_price', id=p.id) }}" method="POST" style="display:inline;">
+                                <button type="submit" class="btn btn-sm {% if p.is_active %}btn-outline-secondary{% else %}btn-outline-success{% endif %}">
+                                    {{ 'Tắt' if p.is_active else 'Bật' }}
+                                </button>
+                            </form>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="text-center text-muted">Chưa có bảng giá nào</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <a href="{{ url_for('fuel.index') }}" class="btn btn-outline-secondary btn-sm mt-2">← Quay lại đổ xăng</a>
+</div>
+{% endblock %}

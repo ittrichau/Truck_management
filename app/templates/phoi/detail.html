@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}{{ phoi.phoi_number }} - Chi tiết Phơi{% endblock %}
+{% block content %}
+
+<div class="mx-auto" style="max-width: 700px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <a href="{{ url_for('phoi.index') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Quay lại
+        </a>
+        <div>
+            <a href="{{ url_for('phoi.print_view', id=phoi.id) }}" class="btn btn-outline-info btn-sm"><i class="bi bi-printer"></i> In</a>
+            {% if phoi.status != 'confirmed' and (current_user.is_manager_or_admin() or (current_user.is_driver() and phoi.driver_id == current_user.id)) %}
+            <a href="{{ url_for('phoi.edit', id=phoi.id) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i> Sửa</a>
+            {% endif %}
+            {% if current_user.is_manager_or_admin() and phoi.status != 'confirmed' %}
+            <form action="{{ url_for('phoi.confirm', id=phoi.id) }}" method="POST" style="display:inline">
+                <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Xác nhận phơi {{ phoi.phoi_number }}? Sau khi xác nhận sẽ không thể sửa.')">
+                    <i class="bi bi-check-circle"></i> Xác nhận
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Header Card -->
+    <div class="card mb-3">
+        <div class="card-body text-center">
+            <h4 class="mb-1">{{ phoi.phoi_number }}</h4>
+            <span class="badge badge-status fs-6
+                {% if phoi.status == 'confirmed' %}bg-success
+                {% elif phoi.status == 'submitted' %}bg-warning text-dark
+                {% else %}bg-secondary{% endif %}">
+                {% if phoi.status == 'confirmed' %}✅ Đã xác nhận
+                {% elif phoi.status == 'submitted' %}📝 Đã tạo (chờ duyệt)
+                {% else %}📄 Nháp{% endif %}
+            </span>
+            {% if phoi.confirmed_at %}
+            <div class="mt-1"><small class="text-muted">Xác nhận bởi {{ phoi.confirmer.full_name }} lúc {{ phoi.confirmed_at.strftime('%d/%m/%Y %H:%M') }}</small></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Thông tin chính -->
+    <div class="card mb-3">
+        <div class="card-header">📋 Thông tin chuyến</div>
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-6"><small class="text-muted">Tài xế</small><br><strong>{{ phoi.driver.full_name }}</strong></div>
+                <div class="col-6"><small class="text-muted">Xe</small><br><strong>{{ phoi.truck.license_plate }}</strong></div>
+                <div class="col-6"><small class="text-muted">Ngày đi</small><br><strong>{{ phoi.departure_date.strftime('%d/%m/%Y') if phoi.departure_date }}</strong></div>
+                <div class="col-6"><small class="text-muted">Ngày về</small><br><strong>{{ phoi.return_date.strftime('%d/%m/%Y') if phoi.return_date else '--' }}</strong></div>
+                <div class="col-6"><small class="text-muted">Điểm đi</small><br><strong>{{ phoi.origin }}</strong></div>
+                <div class="col-6"><small class="text-muted">Điểm đến</small><br><strong>{{ phoi.destination }}</strong></div>
+                <div class="col-12"><small class="text-muted">Hàng hóa</small><br><strong>{{ phoi.cargo_description or '--' }}</strong></div>
+                {% if phoi.customer %}
+                <div class="col-12"><small class="text-muted">Khách hàng</small><br><strong>{{ phoi.customer.name }}</strong></div>
+                {% endif %}
+            </div>
+            <hr>
+            <div class="row g-2">
+                <div class="col-4"><small class="text-muted">KM đầu</small><br><strong>{{ phoi.km_start }}</strong></div>
+                <div class="col-4"><small class="text-muted">KM cuối</small><br><strong>{{ phoi.km_end }}</strong></div>
+                <div class="col-4"><small class="text-muted">Tổng KM</small><br><strong class="text-primary">{{ phoi.km_total }}</strong></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tài chính -->
+    <div class="card mb-3">
+        <div class="card-header">💰 Tài chính</div>
+        <div class="card-body">
+            <table class="table table-sm table-borderless mb-0">
+                <tr><td>Doanh thu full chuyến</td><td class="text-end fw-bold">{{ '{:,.0f}'.format(phoi.revenue_full) }} VNĐ</td></tr>
+                <tr><td>Tiền tạm thu (tài xế giữ)</td><td class="text-end">{{ '{:,.0f}'.format(phoi.revenue_collected) }} VNĐ</td></tr>
+                <tr><td colspan="2"><hr class="my-1"></td></tr>
+                <tr class="text-muted"><td colspan="2"><strong>Chi phí chuyến:</strong></td></tr>
+                {% for exp in phoi.expenses.all() %}
+                <tr><td class="ps-3">{{ exp.category_label() }}</td><td class="text-end">{{ '{:,.0f}'.format(exp.amount) }} VNĐ</td></tr>
+                {% else %}
+                <tr><td class="ps-3 text-muted">Không có chi phí</td><td></td></tr>
+                {% endfor %}
+                <tr><td><strong>Tổng chi</strong></td><td class="text-end fw-bold">{{ '{:,.0f}'.format(phoi.total_expenses()) }} VNĐ</td></tr>
+                <tr><td colspan="2"><hr class="my-1"></td></tr>
+                <tr><td><strong>Phí công tài xế</strong></td><td class="text-end fw-bold text-primary">{{ '{:,.0f}'.format(phoi.driver_wage) }} VNĐ</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- Kết quả đối chiếu -->
+    <div class="card mb-3 {% if phoi.balance() >= 0 %}border-success{% else %}border-danger{% endif %}">
+        <div class="card-body">
+            <div class="row g-2 text-center">
+                <div class="col-6">
+                    <small class="text-muted">Tài xế đã ứng + Công</small><br>
+                    <span class="fs-5 fw-bold">{{ '{:,.0f}'.format(phoi.total_expenses() + phoi.driver_wage) }} VNĐ</span>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted">Tài xế đã giữ</small><br>
+                    <span class="fs-5 fw-bold">{{ '{:,.0f}'.format(phoi.revenue_collected) }} VNĐ</span>
+                </div>
+            </div>
+            <hr>
+            <div class="text-center">
+                {% set bal = phoi.balance() %}
+                {% if bal >= 0 %}
+                <small class="text-muted">👉 Chủ xe cần trả thêm cho tài xế</small><br>
+                <span class="fs-4 fw-bold amount-positive">{{ '{:,.0f}'.format(bal) }} VNĐ</span>
+                {% else %}
+                <small class="text-muted">👉 Tài xế cần nộp lại cho chủ xe</small><br>
+                <span class="fs-4 fw-bold amount-negative">{{ '{:,.0f}'.format(-bal) }} VNĐ</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Lợi nhuận chủ xe -->
+    <div class="card mb-3 bg-light">
+        <div class="card-body text-center">
+            <small class="text-muted">Lợi nhuận chủ xe (Full - Chi - Công)</small><br>
+            <span class="fs-5 fw-bold {% if phoi.owner_profit() >= 0 %}text-success{% else %}text-danger{% endif %}">
+                {{ '{:,.0f}'.format(phoi.owner_profit()) }} VNĐ
+            </span>
+        </div>
+    </div>
+
+    {% if phoi.notes %}
+    <div class="card mb-3">
+        <div class="card-header">📝 Ghi chú</div>
+        <div class="card-body"><p class="mb-0">{{ phoi.notes }}</p></div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

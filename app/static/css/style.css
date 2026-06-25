@@ -1,0 +1,54 @@
+/* Mobile-First adjustments */
+@media (max-width: 767px) {
+    .container {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+    h5 {
+        font-size: 1.15rem;
+    }
+    .table {
+        font-size: 0.85rem;
+    }
+    .table td, .table th {
+        padding: 8px 6px;
+    }
+}
+
+/* Fix for flash messages on mobile */
+.alert {
+    border-radius: 10px;
+    padding: 10px 14px;
+}
+
+/* Card hover on desktop */
+@media (min-width: 768px) {
+    .phoi-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+}
+
+/* Button active */
+.btn:active {
+    transform: scale(0.97);
+}
+
+/* Fix select arrow on iOS */
+.form-select {
+    -webkit-appearance: none;
+}
+
+/* Print styles */
+@media print {
+    .mobile-nav, .btn-float, .navbar, .btn {
+        display: none !important;
+    }
+    body {
+        padding-bottom: 0;
+    }
+    .card {
+        box-shadow: none;
+        border: 1px solid #ddd;
+    }
+}

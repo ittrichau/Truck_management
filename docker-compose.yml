@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data
+      - ./instance:/app/instance
+      - ./logs:/var/log/app
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY:?err}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///instance/truck_management.db}
+    restart: unless-stopped

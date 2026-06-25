@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Ghi nhận đổ xăng{% endblock %}
+{% block content %}
+<div class="mx-auto" style="max-width: 600px;">
+    <h5 class="mb-3"><i class="bi bi-fuel-pump"></i> Ghi nhận đổ xăng</h5>
+    {% if current_price %}
+    <div class="alert alert-info py-2 small">
+        💡 Giá xăng hiện tại: <strong>{{ '{:,.0f}'.format(current_price.price_per_liter) }} VNĐ/lít</strong>
+        ({{ current_price.effective_from.strftime('%d/%m') }} → {{ current_price.effective_to.strftime('%d/%m') }})
+    </div>
+    {% endif %}
+    <div class="card"><div class="card-body">
+    <form method="POST">
+        <div class="mb-3">
+            <label class="form-label">Xe *</label>
+            <select name="truck_id" id="truck_select" class="form-select" required onchange="filterPhoiByTruck(); toggleSubstituteNote(this);">
+                <option value="">-- Chọn xe --</option>
+                {% for t in trucks %}
+                <option value="{{ t.id }}"
+                    {% if current_user.is_driver() and current_user.current_truck_id == t.id %}selected{% endif %}>
+                    {{ t.license_plate }} ({{ t.current_km }} km)
+                    {% if current_user.is_driver() and current_user.current_truck_id == t.id %} ← Xe của bạn{% endif %}
+                </option>
+                {% endfor %}
+            </select>
+            <div id="substitute-note" class="mt-2" style="display:none;">
+                <div class="alert alert-info py-2 mb-0">
+                    <i class="bi bi-info-circle"></i> 
+                    <strong>Chạy giùm:</strong> Bạn đang đổ xăng cho xe khác với xe mặc định của bạn.
+                    <input type="hidden" name="is_substitute" value="1">
+                </div>
+            </div>
+            <small id="phoi-count-hint" class="text-muted" style="display:none;"></small>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Gắn với Phơi * <small class="text-danger">(bắt buộc chọn ít nhất 1)</small></label>
+            <div id="phoi-list" class="border rounded p-2" style="max-height: 180px; overflow-y: auto;">
+                <p id="phoi-select-truck-hint" class="text-muted small mb-0">Vui lòng chọn xe trước</p>
+                {% for p in phois %}
+                <div class="form-check phoi-checkbox" data-truck-id="{{ p.truck_id }}" style="display:none;">
+                    <input class="form-check-input" type="checkbox" name="phoi_ids" value="{{ p.id }}" id="phoi_{{ p.id }}"
+                           data-truck-id="{{ p.truck_id }}">
+                    <label class="form-check-label small" for="phoi_{{ p.id }}"
+                           data-truck-id="{{ p.truck_id }}">
+                        {{ p.phoi_number }} — {{ p.origin }}→{{ p.destination }} ({{ p.truck.license_plate }})
+                    </label>
+                </div>
+                {% endfor %}
+                <p id="no-phoi-message" class="text-muted small mb-0" style="display:none;">Không có phơi đang tiến hành cho xe này</p>
+            </div>
+            <small class="text-warning">⚠️ Mỗi lần đổ xăng bắt buộc phải gắn vào ít nhất 1 phơi đang tiến hành của cùng xe.</small>
+        </div>
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                <label class="form-label">Số lít *</label>
+                <input type="number" step="0.1" name="liters" class="form-control" required placeholder="0.0">
+            </div>
+            <div class="col-6">
+                <label class="form-label">Đơn giá (VNĐ/lít) *</label>
+                <input type="number" name="price_per_liter" class="form-control" required placeholder="25000" step="100"
+                    value="{{ current_price.price_per_liter if current_price else '' }}">
+                {% if not current_price %}
+                <small class="text-warning">Chưa có giá xăng cho hôm nay, vui lòng nhập tay</small>
+                {% endif %}
+            </div>
+        </div>
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                <label class="form-label">Ngày đổ *</label>
+                <input type="date" name="refuel_date" class="form-control" required>
+            </div>
+            <div class="col-6">
+                <label class="form-label">KM lúc đổ</label>
+                <input type="number" name="km_at_refuel" class="form-control" placeholder="0">
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Ghi chú</label>
+            <textarea name="notes" class="form-control" rows="2"></textarea>
+        </div>
+        <button type="submit" class="btn btn-warning w-100 btn-lg-mobile"><i class="bi bi-fuel-pump"></i> Ghi nhận</button>
+        <a href="{{ url_for('fuel.index') }}" class="btn btn-outline-secondary w-100 mt-2 btn-lg-mobile">Quay lại</a>
+    </form>
+    </div></div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dateInput = document.querySelector('input[type="date"]');
+    if (dateInput && !dateInput.value) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
+    // Nếu đã có xe được chọn (ví dụ từ lỗi validation), lọc lại phơi
+    const truckSelect = document.getElementById('truck_select');
+    if (truckSelect.value) {
+        filterPhoiByTruck();
+    }
+    // Kiểm tra chạy giùm ban đầu
+    toggleSubstituteNote(truckSelect);
+});
+
+function filterPhoiByTruck() {
+    const truckId = document.getElementById('truck_select').value;
+    const checkboxes = document.querySelectorAll('.phoi-checkbox');
+    const hint = document.getElementById('phoi-count-hint');
+    const selectHint = document.getElementById('phoi-select-truck-hint');
+    const noPhoiMsg = document.getElementById('no-phoi-message');
+    let count = 0;
+    checkboxes.forEach(cb => {
+        const show = !truckId || cb.dataset.truckId === truckId;
+        cb.style.display = show ? '' : 'none';
+        if (show) count++;
+    });
+    hint.style.display = truckId ? '' : 'none';
+    hint.textContent = `Có ${count} phơi đang tiến hành cho xe này`;
+    selectHint.style.display = truckId ? 'none' : '';
+    noPhoiMsg.style.display = (truckId && count === 0) ? '' : 'none';
+}
+
+// Hiển thị ghi chú khi chọn xe khác xe mặc định (chạy giùm)
+function toggleSubstituteNote(selectEl) {
+    const defaultTruckId = '{{ current_user.current_truck_id or '' }}';
+    const substituteNote = document.getElementById('substitute-note');
+    
+    if (!substituteNote) return;
+    
+    if (defaultTruckId && selectEl.value && selectEl.value !== defaultTruckId) {
+        substituteNote.style.display = 'block';
+    } else {
+        substituteNote.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}
+

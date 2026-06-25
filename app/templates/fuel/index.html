@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Lịch sử đổ xăng{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0"><i class="bi bi-fuel-pump"></i> Lịch sử đổ xăng</h5>
+    <div>
+      {% if current_user.is_manager_or_admin() %}
+      <a href="{{ url_for('fuel.price_list') }}" class="btn btn-outline-primary btn-sm me-1"><i class="bi bi-graph-up"></i> Bảng giá xăng</a>
+      {% endif %}
+      <a href="{{ url_for('fuel.create') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Ghi đổ xăng</a>
+    </div>
+</div>
+
+{% if truck_stats %}
+<div class="row g-2 mb-3">
+    {% for truck_id, stats in truck_stats.items() %}
+        {% if stats.needs_refuel %}
+            {% for t in trucks %}{% if t.id == truck_id %}
+            <div class="col-12">
+                <div class="alert alert-warning py-2 mb-0 d-flex align-items-center">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <strong>{{ t.license_plate }}</strong> đã chạy <strong>{{ stats.trip_count }}</strong> chuyến, cần đổ xăng!
+                    <a href="{{ url_for('fuel.create') }}" class="btn btn-warning btn-sm ms-auto">Đổ xăng ngay</a>
+                </div>
+            </div>
+            {% endif %}{% endfor %}
+        {% endif %}
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="table-responsive">
+    <table class="table table-hover bg-white rounded-3 overflow-hidden shadow-sm">
+        <thead class="table-light">
+            <tr>
+                <th>Ngày</th>
+                <th>Xe</th>
+                <th>Số lít</th>
+                <th>Đơn giá</th>
+                <th>Tổng tiền</th>
+                <th>KM lúc đổ</th>
+                <th>Phơi</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs.items %}
+            <tr>
+                <td>{{ log.refuel_date.strftime('%d/%m/%Y') }}</td>
+                <td><strong>{{ log.truck.license_plate }}</strong></td>
+                <td>{{ log.liters }}</td>
+                <td>{{ '{:,.0f}'.format(log.price_per_liter) }}</td>
+                <td><strong>{{ '{:,.0f}'.format(log.total_cost) }} VNĐ</strong></td>
+                <td>{{ log.km_at_refuel or '-' }}</td>
+                <td>
+                    {% set phoi_list = log.phois.all() %}
+                    {% if phoi_list %}
+                        <span class="badge bg-info">{{ phoi_list|length }} phơi</span>
+                        <small class="d-block text-muted">
+                        {% for p in phoi_list %}
+                            {{ p.phoi_number }}{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                        </small>
+                    {% else %}
+                        <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if current_user.is_manager_or_admin() %}
+                    <form action="{{ url_for('fuel.delete', id=log.id) }}" method="POST">
+                        <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Xóa bản ghi này?')"><i class="bi bi-trash"></i></button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="text-center text-muted py-4">Chưa có bản ghi đổ xăng nào.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if logs.pages > 1 %}
+<nav class="mt-3">
+    <ul class="pagination justify-content-center">
+        {% for page_num in logs.iter_pages() %}
+            {% if page_num %}
+            <li class="page-item {% if page_num == logs.page %}active{% endif %}">
+                <a class="page-link" href="{{ url_for('fuel.index', page=page_num) }}">{{ page_num }}</a>
+            </li>
+            {% endif %}
+        {% endfor %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

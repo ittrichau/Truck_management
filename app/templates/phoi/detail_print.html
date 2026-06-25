@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+{% block title %}{{ phoi.phoi_number }} - In Phơi{% endblock %}
+
+{% block extra_head %}
+<style>
+/* Layout in ấn – gói gọn trong 1 trang A4 */
+.phoi-print-wrapper {
+    max-width: 1000px;
+    margin: 0 auto;
+    font-size: 0.9rem;
+    line-height: 1.3;
+}
+.phoi-print-wrapper .no-print { display: none !important; }
+
+.phoi-print-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #000;
+    padding-bottom: 4px;
+    margin-bottom: 12px;
+}
+
+.phoi-print-header h3 {
+    margin: 0;
+    font-weight: bold;
+}
+
+.print-badge {
+    font-size: 0.75rem;
+    font-weight: bold;
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.badge-confirmed { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+.badge-submitted { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+.badge-draft    { background: #e2e3e5; color: #383d41; border: 1px solid #d6d8db; }
+
+/* Grid layout 2 cột chính */
+.phoi-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+/* Các block con */
+.phoi-block {
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 10px 12px;
+}
+
+.phoi-block h5 {
+    font-size: 0.9rem;
+    font-weight: bold;
+    margin: 0 0 8px 0;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #eee;
+}
+
+/* Block full-width */
+.phoi-block-full {
+    grid-column: 1 / -1;
+}
+
+/* Bảng dữ liệu 2 cột bên trong block */
+.phoi-info-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.phoi-info-table td {
+    padding: 2px 4px;
+    font-size: 0.85rem;
+}
+.phoi-info-table td:first-child {
+    width: 50%;
+}
+.phoi-info-table .label {
+    color: #6c757d;
+    font-size: 0.75rem;
+}
+.phoi-info-table .value {
+    font-weight: 600;
+}
+
+/* Bảng tài chính */
+.phoi-financial-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+.phoi-financial-table td {
+    padding: 2px 4px;
+}
+.phoi-financial-table .amount {
+    text-align: right;
+    font-weight: 600;
+}
+.phoi-financial-table .total-row td {
+    border-top: 1px solid #adb5bd;
+    padding-top: 6px;
+    margin-top: 4px;
+    font-weight: bold;
+}
+.phoi-financial-table .sub-row td {
+    padding-left: 16px;
+    color: #555;
+    font-size: 0.82rem;
+}
+
+/* Kết quả đối chiếu */
+.balance-summary {
+    text-align: center;
+    padding: 8px;
+    border-radius: 6px;
+}
+.balance-positive { background: #d4edda; color: #155724; }
+.balance-negative { background: #f8d7da; color: #721c24; }
+
+/* Profit block */
+.profit-block {
+    text-align: center;
+    padding: 10px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    margin-bottom: 12px;
+}
+
+/* Notes */
+.notes-block {
+    border: 1px dashed #ccc;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-top: 8px;
+    font-size: 0.85rem;
+}
+
+/* Print styles */
+@media print {
+    body {
+        margin: 0;
+        padding: 0;
+    }
+    .phoi-print-wrapper {
+        max-width: 100%;
+        padding: 0.5cm;
+    }
+    .phoi-print-header {
+        border-bottom-color: #000;
+    }
+    .no-print {
+        display: none !important;
+    }
+    /* Force background colors */
+    .balance-positive, .balance-negative, .badge-confirmed, .badge-submitted, .badge-draft {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    /* Loại bỏ navigation bar mặc định (nếu có từ base.html) */
+    nav, .navbar, footer {
+        display: none !important;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="phoi-print-wrapper">
+
+    <!-- Header -->
+    <div class="phoi-print-header">
+        <div>
+            <h3>📄 PHIẾU PHƠI</h3>
+            <div style="font-size:0.85rem; color:#6c757d;">{{ phoi.phoi_number }}</div>
+        </div>
+        <div style="text-align:right;">
+            {% if phoi.status == 'confirmed' %}
+                <span class="print-badge badge-confirmed">✅ Đã xác nhận</span>
+            {% elif phoi.status == 'submitted' %}
+                <span class="print-badge badge-submitted">📝 Đã tạo (chờ duyệt)</span>
+            {% else %}
+                <span class="print-badge badge-draft">📄 Nháp</span>
+            {% endif %}
+            {% if phoi.confirmed_at %}
+                <div style="font-size:0.75rem; color:#6c757d; margin-top:2px;">
+                    Xác nhận bởi {{ phoi.confirmer.full_name }} lúc {{ phoi.confirmed_at.strftime('%d/%m/%Y %H:%M') }}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- GRID: Thông tin chuyến + Doanh thu -->
+    <div class="phoi-grid">
+        <!-- Block 1: Thông tin chuyến -->
+        <div class="phoi-block">
+            <h5>📋 Thông tin chuyến</h5>
+            <table class="phoi-info-table">
+                <tr><td class="label">Tài xế</td><td class="value">{{ phoi.driver.full_name }}</td></tr>
+                <tr><td class="label">Xe</td><td class="value">{{ phoi.truck.license_plate }}</td></tr>
+                <tr><td class="label">Ngày đi</td><td class="value">{{ phoi.departure_date.strftime('%d/%m/%Y') if phoi.departure_date }}</td></tr>
+                <tr><td class="label">Ngày về</td><td class="value">{{ phoi.return_date.strftime('%d/%m/%Y') if phoi.return_date else '--' }}</td></tr>
+                <tr><td class="label">Điểm đi</td><td class="value">{{ phoi.origin }}</td></tr>
+                <tr><td class="label">Điểm đến</td><td class="value">{{ phoi.destination }}</td></tr>
+                <tr><td class="label">Hàng hóa</td><td class="value">{{ phoi.cargo_description or '--' }}</td></tr>
+                {% if phoi.customer %}
+                <tr><td class="label">Khách hàng</td><td class="value">{{ phoi.customer.name }}</td></tr>
+                {% endif %}
+            </table>
+            <hr style="margin: 6px 0;">
+            <table class="phoi-info-table">
+                <tr>
+                    <td class="label">KM đầu</td><td class="value">{{ phoi.km_start }}</td>
+                    <td class="label">KM cuối</td><td class="value">{{ phoi.km_end }}</td>
+                    <td class="label">Tổng KM</td><td class="value" style="color:#0d6efd;">{{ phoi.km_total }}</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Block 2: Tài chính -->
+        <div class="phoi-block">
+            <h5>💰 Tài chính</h5>
+            <table class="phoi-financial-table">
+                <tr><td>Doanh thu full chuyến</td><td class="amount">{{ '{:,.0f}'.format(phoi.revenue_full) }} VNĐ</td></tr>
+                <tr><td>Tiền tạm thu (tài xế giữ)</td><td class="amount">{{ '{:,.0f}'.format(phoi.revenue_collected) }} VNĐ</td></tr>
+                <tr><td colspan="2"><hr style="margin:4px 0;"></td></tr>
+                <tr style="font-weight:600; color:#555;"><td>Chi phí chuyến:</td><td></td></tr>
+                {% for exp in phoi.expenses.all() %}
+                <tr class="sub-row"><td>{{ exp.category_label() }}</td><td class="amount">{{ '{:,.0f}'.format(exp.amount) }} VNĐ</td></tr>
+                {% else %}
+                <tr class="sub-row"><td style="color:#aaa;">Không có chi phí</td><td></td></tr>
+                {% endfor %}
+                <tr class="total-row"><td><strong>Tổng chi</strong></td><td class="amount">{{ '{:,.0f}'.format(phoi.total_expenses()) }} VNĐ</td></tr>
+                <tr><td colspan="2"><hr style="margin:4px 0;"></td></tr>
+                <tr class="total-row"><td><strong>Phí công tài xế</strong></td><td class="amount" style="color:#0d6efd;">{{ '{:,.0f}'.format(phoi.driver_wage) }} VNĐ</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- GRID: Kết quả đối chiếu + Kết luận -->
+    <div class="phoi-grid">
+        <!-- Block 3: Đối chiếu -->
+        <div class="phoi-block balance-summary {% if phoi.balance() >= 0 %}balance-positive{% else %}balance-negative{% endif %}">
+            {% set bal = phoi.balance() %}
+            {% if bal >= 0 %}
+                <div style="font-size:0.8rem; margin-bottom:4px;">👉 Chủ xe cần trả thêm cho tài xế</div>
+                <div style="font-size:1.2rem; font-weight:bold;">{{ '{:,.0f}'.format(bal) }} VNĐ</div>
+            {% else %}
+                <div style="font-size:0.8rem; margin-bottom:4px;">👉 Tài xế cần nộp lại cho chủ xe</div>
+                <div style="font-size:1.2rem; font-weight:bold;">{{ '{:,.0f}'.format(-bal) }} VNĐ</div>
+            {% endif %}
+            <div style="font-size:0.75rem; margin-top:6px; opacity:0.8;">
+                Tài xế đã ứng + Công: {{ '{:,.0f}'.format(phoi.total_expenses() + phoi.driver_wage) }} VNĐ
+                &nbsp;|&nbsp;
+                Tài xế đã giữ: {{ '{:,.0f}'.format(phoi.revenue_collected) }} VNĐ
+            </div>
+        </div>
+
+        <!-- Block 4: Lợi nhuận chủ xe -->
+        <div class="phoi-block" style="text-align:center; background:#f8f9fa;">
+            <div style="font-size:0.8rem; color:#6c757d; margin-bottom:4px;">Lợi nhuận chủ xe (Full - Chi - Công)</div>
+            <div style="font-size:1.2rem; font-weight:bold; {% if phoi.owner_profit() >= 0 %}color:#198754{% else %}color:#dc3545{% endif %};">
+                {{ '{:,.0f}'.format(phoi.owner_profit()) }} VNĐ
+            </div>
+        </div>
+    </div>
+
+    {% if phoi.notes %}
+    <!-- Ghi chú -->
+    <div class="notes-block">
+        <strong style="font-size:0.8rem;">📝 Ghi chú:</strong>
+        <span style="font-size:0.85rem;">{{ phoi.notes }}</span>
+    </div>
+    {% endif %}
+
+    <!-- Nút in (ẩn khi in) -->
+    <div class="no-print" style="margin-top: 16px; display:flex; gap:8px; justify-content:center;">
+        <button onclick="window.print()" class="btn btn-primary" style="padding: 6px 20px;">
+            <i class="bi bi-printer"></i> In phiếu phơi
+        </button>
+        <a href="{{ url_for('phoi.detail', id=phoi.id) }}" class="btn btn-outline-secondary" style="padding: 6px 20px;">
+            ← Quay lại
+        </a>
+    </div>
+
+</div>
+{% endblock %}

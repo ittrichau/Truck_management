@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Sửa tài xế: {{ driver.full_name }}{% endblock %}
+{% block content %}
+<div class="mx-auto" style="max-width: 500px;">
+    <h5 class="mb-3"><i class="bi bi-person-gear"></i> Sửa tài xế: {{ driver.full_name }}</h5>
+    <div class="card"><div class="card-body">
+    <form method="POST">
+        <div class="mb-3">
+            <label class="form-label">Tên đăng nhập</label>
+            <input type="text" class="form-control" value="{{ driver.username }}" disabled>
+            <small class="text-muted">Không thể đổi tên đăng nhập</small>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Họ tên đầy đủ *</label>
+            <input type="text" name="full_name" class="form-control" required value="{{ driver.full_name }}">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Số điện thoại</label>
+            <input type="tel" name="phone" class="form-control" value="{{ driver.phone or '' }}">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Xe mặc định</label>
+            <select name="current_truck_id" class="form-select">
+                <option value="">-- Không gán xe --</option>
+                {% for t in trucks %}
+                <option value="{{ t.id }}" {% if driver.current_truck_id == t.id %}selected{% endif %}>
+                    {{ t.license_plate }}
+                </option>
+                {% endfor %}
+            </select>
+            <small class="text-muted">Chỉ hiển thị xe chưa bị tài xế khác giữ (trừ xe hiện tại của tài xế này)</small>
+        </div>
+        <hr>
+        <p class="text-muted small">Để trống nếu không muốn đổi mật khẩu</p>
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                <label class="form-label">Mật khẩu mới</label>
+                <input type="password" name="password" class="form-control" minlength="6">
+            </div>
+            <div class="col-6">
+                <label class="form-label">Xác nhận mật khẩu mới</label>
+                <input type="password" name="confirm_password" class="form-control">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary w-100 btn-lg-mobile"><i class="bi bi-check-lg"></i> Cập nhật</button>
+        <a href="{{ url_for('drivers.index') }}" class="btn btn-outline-secondary w-100 mt-2 btn-lg-mobile">Quay lại</a>
+    </form>
+    </div></div>
+</div>
+{% endblock %}

@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}Tạo Phơi Mới{% endblock %}
+{% block extra_head %}
+<script>
+// Auto-fill từ khách hàng được chọn
+async function onCustomerChange(select) {
+    const customerId = select.value;
+    if (!customerId) {
+        document.getElementById('origin').value = '';
+        document.getElementById('destination').value = '';
+        document.getElementById('cargo_description').value = '';
+        return;
+    }
+    try {
+        const resp = await fetch('/api/customers/' + customerId);
+        const data = await resp.json();
+        document.getElementById('origin').value = data.default_origin || '';
+        document.getElementById('destination').value = data.default_destination || '';
+        document.getElementById('cargo_description').value = data.cargo_type || '';
+    } catch(e) { console.error(e); }
+}
+
+// Tự động tính km_total
+function calcKm() {
+    const kmStart = parseInt(document.getElementById('km_start').value) || 0;
+    const kmEnd = parseInt(document.getElementById('km_end').value) || 0;
+    if (kmEnd > kmStart) {
+        document.getElementById('km_total_display').textContent = (kmEnd - kmStart).toLocaleString() + ' km';
+    } else {
+        document.getElementById('km_total_display').textContent = '0 km';
+    }
+}
+</script>
+{% endblock %}
+{% block content %}
+
+{% if not current_user.is_driver() %}
+<div class="text-center py-5">
+    <i class="bi bi-exclamation-triangle display-1 text-warning"></i>
+    <p class="mt-3">Chỉ tài xế mới có thể tạo phơi.</p>
+    <a href="{{ url_for('phoi.index') }}" class="btn btn-outline-secondary">Quay lại</a>
+</div>
+{% else %}
+
+<div class="mx-auto" style="max-width: 600px;">
+    <h5 class="mb-3"><i class="bi bi-plus-circle"></i> Tạo Phơi Mới</h5>
+    
+    <form method="POST" id="phoi-form">
+        <!-- 📋 CHỌN HÀNG -->
+        <span class="section-title"><i class="bi bi-box-seam"></i> Chọn hàng</span>
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="mb-2">
+                    <label class="form-label">Khách hàng / Hàng hóa</label>
+                    <select class="form-select" name="customer_id" onchange="onCustomerChange(this)">
+                        <option value="">-- Chọn (nếu có) --</option>
+                        {% for c in customers %}
+                        <option value="{{ c.id }}">{{ c.name }} ({{ c.cargo_type or '...' }})</option>
+                        {% endfor %}
+                    </select>
+                    <small class="text-muted">Chọn hàng sẽ tự điền điểm đi/đến</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- 📍 TUYẾN ĐƯỜNG -->
+        <span class="section-title"><i class="bi bi-geo-alt"></i> Tuyến đường</span>
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label class="form-label">Điểm đi *</label>
+                        <input type="text" name="origin" id="origin" class="form-control" required placeholder="Ví dụ: Bến Tre">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Điểm đến *</label>
+                        <input type="text" name="destination" id="destination" class="form-control" required placeholder="Ví dụ: Tây Ninh">
+                    </div>
+                </div>
+                <div>
+                    <label class="form-label">Mô tả hàng hóa</label>
+                    <input type="text" name="cargo_description" id="cargo_description" class="form-control" placeholder="Dừa, Lúa, Thép...">
+                </div>
+            </div>
+        </div>
+
+        <!-- 🚛 THÔNG TIN CHUYẾN -->
+        <span class="section-title"><i class="bi bi-truck"></i> Thông tin chuyến</span>
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="mb-2">
+                    <label class="form-label">Xe *</label>
+                    <select name="truck_id" class="form-select" required onchange="toggleSubstituteNote(this)">
+                        <option value="">-- Chọn xe --</option>
+                        {% for t in trucks %}
+                        <option value="{{ t.id }}" {% if current_user.current_truck_id == t.id %}selected{% endif %}>
+                            {{ t.license_plate }} ({{ t.current_km }} km)
+                            {% if current_user.current_truck_id == t.id %} ← Xe của bạn{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div id="substitute-note" class="mt-2" style="display:none;">
+                        <div class="alert alert-info py-2 mb-0">
+                            <i class="bi bi-info-circle"></i> 
+                            <strong>Chạy giùm:</strong> Bạn đang chọn xe khác với xe mặc định.
+                            <input type="hidden" name="is_substitute" id="is_substitute" value="0">
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label class="form-label">Ngày đi *</label>
+                        <input type="date" name="departure_date" class="form-control" required>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Ngày về</label>
+                        <input type="date" name="return_date" class="form-control">
+                    </div>
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label class="form-label">KM đầu</label>
+                        <input type="number" name="km_start" id="km_start" class="form-control" placeholder="0" oninput="calcKm()">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">KM cuối</label>
+                        <input type="number" name="km_end" id="km_end" class="form-control" placeholder="0" oninput="calcKm()">
+                    </div>
+                </div>
+                <div class="text-end">
+                    <small class="text-muted">Tổng KM: <strong id="km_total_display">0 km</strong></small>
+                </div>
+            </div>
+        </div>
+
+        <!-- 💰 DOANH THU -->
+        <span class="section-title"><i class="bi bi-cash-stack"></i> Doanh thu</span>
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label">Full chuyến (VNĐ)</label>
+                        <input type="number" name="revenue_full" class="form-control" placeholder="Tổng tiền khách trả" step="1000">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Đã thu tạm (VNĐ)</label>
+                        <input type="number" name="revenue_collected" class="form-control" placeholder="Tiền mặt đã giữ" step="1000">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 💸 CHI PHÍ -->
+        <span class="section-title"><i class="bi bi-receipt"></i> Chi phí chuyến</span>
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label class="form-label">Bồi dưỡng bốc vác</label>
+                        <input type="number" name="expense_porter_fee" class="form-control" value="0" step="1000">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Phí đường</label>
+                        <input type="number" name="expense_toll_fee" class="form-control" value="0" step="1000">
+                    </div>
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label class="form-label">Sửa xe</label>
+                        <input type="number" name="expense_repair" class="form-control" value="0" step="1000">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Chi phí khác</label>
+                        <input type="number" name="expense_other" class="form-control" value="0" step="1000">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- GHI CHÚ -->
+        <div class="mb-3">
+            <label class="form-label">Ghi chú thêm</label>
+            <textarea name="notes" class="form-control" rows="2" placeholder="Ghi chú nếu có..."></textarea>
+        </div>
+
+        <!-- SUBMIT -->
+        <div class="d-grid gap-2 mb-5">
+            <button type="submit" class="btn btn-success btn-lg" style="border-radius:12px; padding:14px;">
+                <i class="bi bi-check-circle"></i> LƯU PHƠI
+            </button>
+            <a href="{{ url_for('phoi.index') }}" class="btn btn-outline-secondary" style="border-radius:12px;">Hủy</a>
+        </div>
+    </form>
+</div>
+
+{% endif %}
+{% endblock %}
+{% block extra_scripts %}
+<script>
+// Set default date to today
+document.addEventListener('DOMContentLoaded', function() {
+    const dateInputs = document.querySelectorAll('input[type="date"]');
+    dateInputs.forEach(input => {
+        if (!input.value) {
+            const today = new Date().toISOString().split('T')[0];
+            input.value = today;
+        }
+    });
+    // Kiểm tra xe mặc định ban đầu
+    toggleSubstituteNote(document.querySelector('select[name="truck_id"]'));
+});
+
+// Hiển thị ghi chú khi chọn xe khác xe mặc định
+function toggleSubstituteNote(selectEl) {
+    const defaultTruckId = '{{ current_user.current_truck_id or '' }}';
+    const substituteNote = document.getElementById('substitute-note');
+    const isSubstitute = document.getElementById('is_substitute');
+    
+    if (defaultTruckId && selectEl.value && selectEl.value !== defaultTruckId) {
+        substituteNote.style.display = 'block';
+        isSubstitute.value = '1';
+    } else {
+        substituteNote.style.display = 'none';
+        isSubstitute.value = '0';
+    }
+}
+</script>
+{% endblock %}

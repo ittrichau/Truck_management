@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Đổi mật khẩu - {{ current_user.full_name }}{% endblock %}
+{% block content %}
+<div class="mx-auto" style="max-width: 450px;">
+    <h4 class="mb-3"><i class="bi bi-person-gear"></i> Đổi mật khẩu</h4>
+    <div class="card">
+        <div class="card-body">
+            <p class="text-muted">Xin chào <strong>{{ current_user.full_name }}</strong> ({{ current_user.role }})</p>
+            <form method="POST">
+                <div class="mb-3">
+                    <label class="form-label">Mật khẩu hiện tại</label>
+                    <input type="password" name="current_password" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Mật khẩu mới</label>
+                    <input type="password" name="new_password" class="form-control" required minlength="6">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Xác nhận mật khẩu mới</label>
+                    <input type="password" name="confirm_password" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 btn-lg-mobile">
+                    <i class="bi bi-check-lg"></i> Cập nhật mật khẩu
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

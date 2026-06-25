@@ -1,0 +1,69 @@
+{% extends "base.html" %} {% block title %}Quản lý Tài xế{% endblock %} {% block
+content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0"><i class="bi bi-person-badge"></i> Danh sách tài xế</h5>
+  <a href="{{ url_for('drivers.create') }}" class="btn btn-primary btn-sm"
+    ><i class="bi bi-plus-lg"></i> Thêm tài xế</a
+  >
+</div>
+
+{% if drivers %}
+<div class="table-responsive">
+  <table
+    class="table table-hover align-middle bg-white rounded-3 overflow-hidden shadow-sm"
+  >
+    <thead class="table-light">
+      <tr>
+        <th>Họ tên</th>
+        <th>Tên đăng nhập</th>
+        <th>Xe mặc định</th>
+        <th>SĐT</th>
+        <th>Ngày tạo</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in drivers %}
+      <tr>
+        <td><strong>{{ d.full_name }}</strong></td>
+        <td><code>{{ d.username }}</code></td>
+        <td>
+          {% if d.current_truck %} {{ d.current_truck.license_plate }} {% else
+          %}
+          <span class="text-muted">Chưa gán</span>
+          {% endif %}
+        </td>
+        <td>{{ d.phone or '-' }}</td>
+        <td><small>{{ d.created_at.strftime('%d/%m/%Y') }}</small></td>
+        <td>
+          <a
+            href="{{ url_for('drivers.edit', id=d.id) }}"
+            class="btn btn-outline-primary btn-sm"
+            ><i class="bi bi-pencil"></i
+          ></a>
+          <form
+            action="{{ url_for('drivers.delete', id=d.id) }}"
+            method="POST"
+            style="display: inline"
+          >
+            <button
+              class="btn btn-outline-danger btn-sm"
+              onclick="return confirm('Xóa tài xế {{ d.full_name }}?')"
+            >
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-people display-4"></i>
+  <p class="mt-2">
+    Chưa có tài xế nào. <a href="{{ url_for('drivers.create') }}">Thêm ngay</a>
+  </p>
+</div>
+{% endif %} {% endblock %}

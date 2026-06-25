@@ -1,0 +1,38 @@
+# Git
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Documentation & rules (not needed at runtime)
+.clinerules/
+
+# Logs
+logs/*.log
+
+# Environment
+.env
+
+# Database files (handled via volume)
+*.db
+*.sqlite
+instance/
+
+# OS files
+.DS_Store
+Thumbs.db

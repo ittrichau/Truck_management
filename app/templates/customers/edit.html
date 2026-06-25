@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Sửa: {{ customer.name }}{% endblock %}
+{% block content %}
+<div class="mx-auto" style="max-width: 550px;">
+    <h5 class="mb-3"><i class="bi bi-pencil-square"></i> Sửa: {{ customer.name }}</h5>
+    <div class="card"><div class="card-body">
+    <form method="POST">
+        <div class="mb-3">
+            <label class="form-label">Tên hàng / khách hàng *</label>
+            <input type="text" name="name" class="form-control" required value="{{ customer.name }}">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Loại hàng hóa</label>
+            <input type="text" name="cargo_type" class="form-control" value="{{ customer.cargo_type or '' }}">
+        </div>
+        <div class="row g-2 mb-3">
+            <div class="col-6"><label class="form-label">Điểm đi mặc định</label><input type="text" name="default_origin" class="form-control" value="{{ customer.default_origin or '' }}"></div>
+            <div class="col-6"><label class="form-label">Điểm đến mặc định</label><input type="text" name="default_destination" class="form-control" value="{{ customer.default_destination or '' }}"></div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Số điện thoại</label>
+            <input type="tel" name="contact_phone" class="form-control" value="{{ customer.contact_phone or '' }}">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Ghi chú</label>
+            <textarea name="notes" class="form-control" rows="2">{{ customer.notes or '' }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary w-100 btn-lg-mobile"><i class="bi bi-check-lg"></i> Cập nhật</button>
+        <a href="{{ url_for('customers.index') }}" class="btn btn-outline-secondary w-100 mt-2 btn-lg-mobile">Quay lại</a>
+    </form>
+    </div></div>
+</div>
+{% endblock %}

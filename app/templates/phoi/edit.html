@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Sửa: {{ phoi.phoi_number }}{% endblock %}
+{% block extra_head %}
+<script>
+async function onCustomerChange(select) {
+    const customerId = select.value;
+    if (!customerId) return;
+    try {
+        const resp = await fetch('/api/customers/' + customerId);
+        const data = await resp.json();
+        if (!document.getElementById('origin').value)
+            document.getElementById('origin').value = data.default_origin || '';
+        if (!document.getElementById('destination').value)
+            document.getElementById('destination').value = data.default_destination || '';
+        if (!document.getElementById('cargo_description').value)
+            document.getElementById('cargo_description').value = data.cargo_type || '';
+    } catch(e) { console.error(e); }
+}
+</script>
+{% endblock %}
+{% block content %}
+
+<div class="mx-auto" style="max-width: 600px;">
+    <h5 class="mb-3"><i class="bi bi-pencil-square"></i> Sửa Phơi {{ phoi.phoi_number }}</h5>
+
+    <form method="POST">
+        <span class="section-title"><i class="bi bi-box-seam"></i> Chọn hàng</span>
+        <div class="card mb-3"><div class="card-body">
+            <select class="form-select" name="customer_id" onchange="onCustomerChange(this)">
+                <option value="">-- Chọn (nếu có) --</option>
+                {% for c in customers %}
+                <option value="{{ c.id }}" {% if phoi.customer_id == c.id %}selected{% endif %}>{{ c.name }} ({{ c.cargo_type or '...' }})</option>
+                {% endfor %}
+            </select>
+        </div></div>
+
+        <span class="section-title"><i class="bi bi-geo-alt"></i> Tuyến đường</span>
+        <div class="card mb-3"><div class="card-body">
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="form-label">Điểm đi *</label><input type="text" name="origin" id="origin" class="form-control" required value="{{ phoi.origin }}"></div>
+                <div class="col-6"><label class="form-label">Điểm đến *</label><input type="text" name="destination" id="destination" class="form-control" required value="{{ phoi.destination }}"></div>
+            </div>
+            <div><label class="form-label">Mô tả hàng hóa</label><input type="text" name="cargo_description" id="cargo_description" class="form-control" value="{{ phoi.cargo_description or '' }}"></div>
+        </div></div>
+
+        <span class="section-title"><i class="bi bi-truck"></i> Thông tin chuyến</span>
+        <div class="card mb-3"><div class="card-body">
+            <div class="mb-2"><label class="form-label">Xe *</label>
+                <select name="truck_id" class="form-select" required>
+                    {% for t in trucks %}
+                    <option value="{{ t.id }}" {% if phoi.truck_id == t.id %}selected{% endif %}>{{ t.license_plate }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="form-label">Ngày đi</label><input type="date" name="departure_date" class="form-control" value="{{ phoi.departure_date.strftime('%Y-%m-%d') if phoi.departure_date }}"></div>
+                <div class="col-6"><label class="form-label">Ngày về</label><input type="date" name="return_date" class="form-control" value="{{ phoi.return_date.strftime('%Y-%m-%d') if phoi.return_date }}"></div>
+            </div>
+            <div class="row g-2">
+                <div class="col-6"><label class="form-label">KM đầu</label><input type="number" name="km_start" class="form-control" value="{{ phoi.km_start }}"></div>
+                <div class="col-6"><label class="form-label">KM cuối</label><input type="number" name="km_end" class="form-control" value="{{ phoi.km_end }}"></div>
+            </div>
+        </div></div>
+
+        <span class="section-title"><i class="bi bi-cash-stack"></i> Doanh thu</span>
+        <div class="card mb-3"><div class="card-body">
+            <div class="row g-2">
+                <div class="col-6"><label class="form-label">Full chuyến (VNĐ)</label><input type="number" name="revenue_full" class="form-control" value="{{ phoi.revenue_full }}" step="1000"></div>
+                <div class="col-6"><label class="form-label">Đã thu tạm (VNĐ)</label><input type="number" name="revenue_collected" class="form-control" value="{{ phoi.revenue_collected }}" step="1000"></div>
+            </div>
+        </div></div>
+
+        <span class="section-title"><i class="bi bi-receipt"></i> Chi phí chuyến</span>
+        <div class="card mb-3"><div class="card-body">
+            {% set expenses = {} %}
+            {% for exp in phoi.expenses.all() %}
+                {% set _ = expenses.update({exp.category: exp.amount}) %}
+            {% endfor %}
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="form-label">Bồi dưỡng bốc vác</label><input type="number" name="expense_porter_fee" class="form-control" value="{{ expenses.get('porter_fee', 0) }}" step="1000"></div>
+                <div class="col-6"><label class="form-label">Phí đường</label><input type="number" name="expense_toll_fee" class="form-control" value="{{ expenses.get('toll_fee', 0) }}" step="1000"></div>
+            </div>
+            <div class="row g-2">
+                <div class="col-6"><label class="form-label">Sửa xe</label><input type="number" name="expense_repair" class="form-control" value="{{ expenses.get('repair', 0) }}" step="1000"></div>
+                <div class="col-6"><label class="form-label">Chi phí khác</label><input type="number" name="expense_other" class="form-control" value="{{ expenses.get('other', 0) }}" step="1000"></div>
+            </div>
+        </div></div>
+
+        {% if current_user.is_manager_or_admin() %}
+        <span class="section-title"><i class="bi bi-person-badge"></i> Phí công tài xế (Manager nhập)</span>
+        <div class="card mb-3"><div class="card-body">
+            <input type="number" name="driver_wage" class="form-control" value="{{ phoi.driver_wage }}" step="1000" placeholder="Tiền công tài xế">
+        </div></div>
+        {% endif %}
+
+        <div class="mb-3">
+            <label class="form-label">Ghi chú</label>
+            <textarea name="notes" class="form-control" rows="2">{{ phoi.notes or '' }}</textarea>
+        </div>
+
+        <div class="d-grid gap-2 mb-5">
+            <button type="submit" class="btn btn-primary btn-lg" style="border-radius:12px; padding:14px;">
+                <i class="bi bi-check-lg"></i> CẬP NHẬT PHƠI
+            </button>
+            <a href="{{ url_for('phoi.detail', id=phoi.id) }}" class="btn btn-outline-secondary" style="border-radius:12px;">Hủy</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
