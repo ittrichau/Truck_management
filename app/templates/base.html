@@ -240,6 +240,12 @@
     </nav>
     {% endif %}
 
+    <!-- ⏳ Loading Overlay -->
+    <div id="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Đang xử lý...</div>
+    </div>
+
     <div class="container py-3">
       {% with messages = get_flashed_messages(with_categories=true) %} {% if
       messages %} {% for category, message in messages %}
@@ -266,14 +272,7 @@
       >
         <i class="bi bi-journal-text"></i> Phơi
       </a>
-      {% if current_user.is_driver() or current_user.is_manager_or_admin() %}
-      <a
-        href="{{ url_for('phoi.create') }}"
-        class="{% if request.endpoint == 'phoi.create' %}active{% endif %}"
-      >
-        <i class="bi bi-plus-circle"></i> Tạo mới
-      </a>
-      {% endif %} {% if current_user.is_manager_or_admin() %}
+      {% if current_user.is_manager_or_admin() %}
       <a
         href="{{ url_for('trucks.index') }}"
         class="{% if request.endpoint and 'trucks' in request.endpoint %}active{% endif %}"
@@ -291,6 +290,12 @@
         class="{% if request.endpoint and 'fuel' in request.endpoint %}active{% endif %}"
       >
         <i class="bi bi-fuel-pump"></i> Xăng
+      </a>
+      <a
+        href="{{ url_for('drivers.index') }}"
+        class="{% if request.endpoint and 'drivers' in request.endpoint %}active{% endif %}"
+      >
+        <i class="bi bi-person-badge"></i> Tài xế
       </a>
       {% endif %}
     </nav>
