@@ -31,19 +31,36 @@ def index():
 @bp.route('/phoi/create', methods=['GET', 'POST'])
 @login_required
 def create():
-    """Tài xế tạo phơi – giao diện tối ưu mobile"""
-    if not current_user.is_driver():
-        flash('Chỉ tài xế mới có thể tạo phơi.', 'danger')
+    """Tạo phơi – driver tự tạo cho mình, manager/admin tạo cho tài xế"""
+    if current_user.is_driver():
+        # Driver chỉ tạo cho chính mình
+        pass
+    elif current_user.is_manager_or_admin():
+        # Manager/admin có thể tạo cho bất kỳ tài xế nào
+        pass
+    else:
+        flash('Bạn không có quyền tạo phơi.', 'danger')
         return redirect(url_for('phoi.index'))
 
-    trucks = Truck.query.filter_by(is_active=True, status='available').all()
+    trucks = Truck.query.filter_by(is_active=True).all()
     customers = Customer.query.filter_by(is_active=True).order_by(Customer.name).all()
+    drivers = User.query.filter_by(role='driver', is_active=True).order_by(User.full_name).all()
 
     if request.method == 'POST':
         try:
             phoi = Phoi()
             phoi.phoi_number = generate_phoi_number()
-            phoi.driver_id = current_user.id
+
+            if current_user.is_manager_or_admin():
+                # Manager/admin chọn tài xế từ dropdown
+                driver_id = request.form.get('driver_id', type=int)
+                if not driver_id:
+                    flash('Vui lòng chọn tài xế.', 'danger')
+                    return render_template('phoi/create.html', trucks=trucks, customers=customers, drivers=drivers)
+                phoi.driver_id = driver_id
+            else:
+                phoi.driver_id = current_user.id
+
             phoi.created_by_id = current_user.id
             phoi.truck_id = int(request.form.get('truck_id', 0))
             phoi.customer_id = request.form.get('customer_id') or None
@@ -102,7 +119,7 @@ def create():
             db.session.rollback()
             flash(f'Lỗi khi tạo phơi: {str(e)}', 'danger')
 
-    return render_template('phoi/create.html', trucks=trucks, customers=customers)
+    return render_template('phoi/create.html', trucks=trucks, customers=customers, drivers=drivers)
 
 
 @bp.route('/phoi/<int:id>')
