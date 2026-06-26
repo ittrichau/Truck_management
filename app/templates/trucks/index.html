@@ -3,18 +3,22 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h5 class="mb-0"><i class="bi bi-truck"></i> Danh sách xe</h5>
-    <a href="{{ url_for('trucks.create') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Thêm xe</a>
+    <div class="d-flex gap-2">
+        <div style="width:240px">
+            <input type="text" id="searchInput" class="form-control form-control-sm" placeholder="🔍 Tìm biển số..." oninput="filterTable()">
+        </div>
+        <a href="{{ url_for('trucks.create') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Thêm xe</a>
+    </div>
 </div>
 
 <div class="table-container" style="overflow-x: auto;">
-    <table class="table table-hover align-middle bg-white rounded-3 overflow-hidden shadow-sm" style="min-width: 900px;">
+    <table class="table table-hover align-middle bg-white rounded-3 overflow-hidden shadow-sm" id="truckTable">
         <thead class="table-light">
             <tr>
                 <th>Biển số</th>
                 <th>Tài xế</th>
-                <th>Đang chạy</th>
-                <th>Đăng kiểm</th>
-                <th>Phù hiệu</th>
+                <th class="text-center" style="width:70px">Đăng kiểm</th>
+                <th class="text-center" style="width:70px">Phù hiệu</th>
                 <th style="width:90px"></th>
             </tr>
         </thead>
@@ -22,7 +26,12 @@
             {% for item in truck_data %}
             {% set truck = item.truck %}
             <tr>
-                <td><strong>{{ truck.license_plate }}</strong></td>
+                <td>
+                    <strong>{{ truck.license_plate }}</strong>
+                    {% if item.has_active_phoi %}
+                    <span class="badge bg-warning ms-1" title="Đang vận chuyển">&#9654;</span>
+                    {% endif %}
+                </td>
                 <td>
                     {% if item.current_driver %}
                     <a href="{{ url_for('drivers.edit', id=item.current_driver.id) }}">{{ item.current_driver.full_name }}</a>
@@ -30,33 +39,28 @@
                     <span class="text-muted">Chưa gán</span>
                     {% endif %}
                 </td>
-                <td>
-                    {% if item.has_active_phoi %}
-                    <span class="badge bg-warning">Có</span>
-                    {% else %}
-                    <span class="badge bg-secondary">Không</span>
-                    {% endif %}
-                </td>
-                <td>
+                <td class="text-center">
                     {% if truck.inspection_date %}
-                        {{ truck.inspection_expiry_date().strftime('%d/%m/%Y') if truck.inspection_expiry_date() else '' }}
                         {% set days = truck.inspection_days_until_expiry() %}
                         {% if days is not none and days <= 15 %}
-                            <span class="badge bg-danger ms-1">{{ days }} ngày</span>
+                            <span class="badge bg-danger">{{ days }} ngày</span>
+                        {% else %}
+                            <small class="text-muted">{{ truck.inspection_expiry_date().strftime('%d/%m/%Y') if truck.inspection_expiry_date() else '' }}</small>
                         {% endif %}
                     {% else %}
-                        <span class="text-muted">--</span>
+                        <span class="text-muted small">--</span>
                     {% endif %}
                 </td>
-                <td>
+                <td class="text-center">
                     {% if truck.permit_date %}
-                        {{ truck.permit_expiry_date().strftime('%d/%m/%Y') if truck.permit_expiry_date() else '' }}
                         {% set days = truck.permit_days_until_expiry() %}
                         {% if days is not none and days <= 15 %}
-                            <span class="badge bg-danger ms-1">{{ days }} ngày</span>
+                            <span class="badge bg-danger">{{ days }} ngày</span>
+                        {% else %}
+                            <small class="text-muted">{{ truck.permit_expiry_date().strftime('%d/%m/%Y') if truck.permit_expiry_date() else '' }}</small>
                         {% endif %}
                     {% else %}
-                        <span class="text-muted">--</span>
+                        <span class="text-muted small">--</span>
                     {% endif %}
                 </td>
                 <td>
@@ -70,9 +74,23 @@
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="6" class="text-center text-muted py-4">Chưa có xe nào.</td></tr>
+            <tr><td colspan="5" class="text-center text-muted py-4">Chưa có xe nào.</td></tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+<script>
+function filterTable() {
+    const input = document.getElementById('searchInput');
+    const filter = input.value.toLowerCase().trim();
+    const table = document.getElementById('truckTable');
+    const rows = table.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+        if (row.querySelectorAll('td').length < 5) return;
+        const plate = row.cells[0].textContent.toLowerCase();
+        row.style.display = (!filter || plate.includes(filter)) ? '' : 'none';
+    });
+}
+</script>
 {% endblock %}
