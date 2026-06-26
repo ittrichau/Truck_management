@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 from app import db
-from app.models import Truck
+from app.models import Truck, User, Phoi
 
 bp = Blueprint('trucks', __name__)
 
@@ -13,7 +13,30 @@ def index():
         return redirect(url_for('phoi.index'))
     
     trucks = Truck.query.filter_by(is_active=True).order_by(Truck.license_plate).all()
-    return render_template('trucks/index.html', trucks=trucks)
+    
+    # Prepare data: current driver + active phoi status per truck
+    truck_data = []
+    for truck in trucks:
+        # Find current driver assigned to this truck
+        current_driver = User.query.filter_by(
+            current_truck_id=truck.id,
+            role='driver',
+            is_active=True
+        ).first()
+        
+        # Check if truck has any active phoi (draft or submitted = đang vận chuyển)
+        active_phoi = Phoi.query.filter(
+            Phoi.truck_id == truck.id,
+            Phoi.status.in_(['draft', 'submitted'])
+        ).first()
+        
+        truck_data.append({
+            'truck': truck,
+            'current_driver': current_driver,
+            'has_active_phoi': active_phoi is not None
+        })
+    
+    return render_template('trucks/index.html', truck_data=truck_data)
 
 @bp.route('/trucks/create', methods=['GET', 'POST'])
 @login_required
