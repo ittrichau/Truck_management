@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Sửa tài xế: {{ driver.full_name }}{% endblock %}
+{% block title %}Sửa người dùng: {{ driver.full_name }}{% endblock %}
 {% block content %}
 <div class="mx-auto" style="max-width: 500px;">
-    <h5 class="mb-3"><i class="bi bi-person-gear"></i> Sửa tài xế: {{ driver.full_name }}</h5>
+    <h5 class="mb-3"><i class="bi bi-person-gear"></i> Sửa người dùng: {{ driver.full_name }}</h5>
     <div class="card"><div class="card-body">
     <form method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -11,6 +11,15 @@
             <input type="text" class="form-control" value="{{ driver.username }}" disabled>
             <small class="text-muted">Không thể đổi tên đăng nhập</small>
         </div>
+        {% if is_admin %}
+        <div class="mb-3">
+            <label class="form-label">Vai trò *</label>
+            <select name="role" class="form-select" id="role-select">
+                <option value="driver" {% if driver.role == 'driver' %}selected{% endif %}>Tài xế</option>
+                <option value="manager" {% if driver.role == 'manager' %}selected{% endif %}>Quản lý</option>
+            </select>
+        </div>
+        {% endif %}
         <div class="mb-3">
             <label class="form-label">Họ tên đầy đủ *</label>
             <input type="text" name="full_name" class="form-control" required value="{{ driver.full_name }}">
@@ -19,7 +28,7 @@
             <label class="form-label">Số điện thoại</label>
             <input type="tel" name="phone" class="form-control" value="{{ driver.phone or '' }}">
         </div>
-        <div class="mb-3">
+        <div class="mb-3" id="truck-section" {% if driver.role == 'manager' %}style="display:none"{% endif %}>
             <label class="form-label">Xe mặc định</label>
             <select name="current_truck_id" class="form-select">
                 <option value="">-- Không gán xe --</option>
@@ -48,4 +57,20 @@
     </form>
     </div></div>
 </div>
+{% if is_admin %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const roleSelect = document.getElementById('role-select');
+    const truckSection = document.getElementById('truck-section');
+    function toggleTruckSection() {
+        if (roleSelect.value === 'manager') {
+            truckSection.style.display = 'none';
+        } else {
+            truckSection.style.display = 'block';
+        }
+    }
+    roleSelect.addEventListener('change', toggleTruckSection);
+});
+</script>
+{% endif %}
 {% endblock %}

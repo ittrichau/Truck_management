@@ -206,7 +206,7 @@
             </li>
             <li class="nav-item">
               <a class="nav-link" href="{{ url_for('drivers.index') }}"
-                ><i class="bi bi-person-badge"></i> Tài xế</a
+                ><i class="bi bi-person-badge"></i> Người dùng</a
               >
             </li>
             {% endif %}
@@ -295,7 +295,7 @@
         href="{{ url_for('drivers.index') }}"
         class="{% if request.endpoint and 'drivers' in request.endpoint %}active{% endif %}"
       >
-        <i class="bi bi-person-badge"></i> Tài xế
+        <i class="bi bi-person-badge"></i> Người dùng
       </a>
       {% endif %}
     </nav>

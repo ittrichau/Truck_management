@@ -1,11 +1,20 @@
-{% extends "base.html" %} {% block title %}Thêm tài xế mới{% endblock %} {%
+{% extends "base.html" %} {% block title %}Thêm người dùng mới{% endblock %} {%
 block content %}
 <div class="mx-auto" style="max-width: 500px">
-  <h5 class="mb-3"><i class="bi bi-person-plus"></i> Thêm tài xế mới</h5>
+  <h5 class="mb-3"><i class="bi bi-person-plus"></i> Thêm người dùng mới</h5>
   <div class="card">
     <div class="card-body">
       <form method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if is_admin %}
+        <div class="mb-3">
+          <label class="form-label">Vai trò *</label>
+          <select name="role" class="form-select" id="role-select">
+            <option value="driver" selected>Tài xế</option>
+            <option value="manager">Quản lý</option>
+          </select>
+        </div>
+        {% endif %}
         <div class="mb-3">
           <label class="form-label">Tên đăng nhập *</label>
           <input
@@ -35,7 +44,7 @@ block content %}
             placeholder="09xx..."
           />
         </div>
-        <div class="mb-3">
+        <div class="mb-3" id="truck-section">
           <label class="form-label">Xe mặc định (gán cứng)</label>
           <select name="current_truck_id" class="form-select">
             <option value="">-- Chưa gán xe --</option>
@@ -69,7 +78,7 @@ block content %}
           </div>
         </div>
         <button type="submit" class="btn btn-success w-100 btn-lg-mobile">
-          <i class="bi bi-check-lg"></i> Thêm tài xế
+          <i class="bi bi-check-lg"></i> Thêm người dùng
         </button>
         <a
           href="{{ url_for('drivers.index') }}"
@@ -80,4 +89,21 @@ block content %}
     </div>
   </div>
 </div>
+{% if is_admin %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const roleSelect = document.getElementById('role-select');
+    const truckSection = document.getElementById('truck-section');
+    function toggleTruckSection() {
+        if (roleSelect.value === 'manager') {
+            truckSection.style.display = 'none';
+        } else {
+            truckSection.style.display = 'block';
+        }
+    }
+    toggleTruckSection();
+    roleSelect.addEventListener('change', toggleTruckSection);
+});
+</script>
+{% endif %}
 {% endblock %}

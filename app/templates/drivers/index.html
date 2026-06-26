@@ -1,9 +1,9 @@
-{% extends "base.html" %} {% block title %}Quản lý Tài xế{% endblock %} {% block
+{% extends "base.html" %} {% block title %}Quản lý Người dùng{% endblock %} {% block
 content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h5 class="mb-0"><i class="bi bi-person-badge"></i> Danh sách tài xế</h5>
+  <h5 class="mb-0"><i class="bi bi-person-badge"></i> Danh sách người dùng</h5>
   <a href="{{ url_for('drivers.create') }}" class="btn btn-primary btn-sm"
-    ><i class="bi bi-plus-lg"></i> Thêm tài xế</a
+    ><i class="bi bi-plus-lg"></i> Thêm người dùng</a
   >
 </div>
 
@@ -14,6 +14,9 @@ content %}
   >
     <thead class="table-light">
       <tr>
+        {% if is_admin %}
+        <th>Vai trò</th>
+        {% endif %}
         <th>Họ tên</th>
         <th>Tên đăng nhập</th>
         <th>Xe mặc định</th>
@@ -25,12 +28,21 @@ content %}
     <tbody>
       {% for d in drivers %}
       <tr>
+        {% if is_admin %}
+        <td>
+          {% if d.role == 'manager' %}
+          <span class="badge bg-warning text-dark">Quản lý</span>
+          {% else %}
+          <span class="badge bg-info">Tài xế</span>
+          {% endif %}
+        </td>
+        {% endif %}
         <td><strong>{{ d.full_name }}</strong></td>
         <td><code>{{ d.username }}</code></td>
         <td>
-          {% if d.current_truck %} {{ d.current_truck.license_plate }} {% else
+          {% if d.role == 'driver' and d.current_truck %} {{ d.current_truck.license_plate }} {% else
           %}
-          <span class="text-muted">Chưa gán</span>
+          <span class="text-muted">--</span>
           {% endif %}
         </td>
         <td>{{ d.phone or '-' }}</td>
@@ -49,7 +61,7 @@ content %}
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button
               class="btn btn-outline-danger btn-sm"
-              onclick="return confirm('Xóa tài xế {{ d.full_name }}?')"
+              onclick="return confirm('Xóa người dùng {{ d.full_name }}?')"
             >
               <i class="bi bi-trash"></i>
             </button>
@@ -64,7 +76,7 @@ content %}
 <div class="text-center py-5 text-muted">
   <i class="bi bi-people display-4"></i>
   <p class="mt-2">
-    Chưa có tài xế nào. <a href="{{ url_for('drivers.create') }}">Thêm ngay</a>
+    Chưa có người dùng nào. <a href="{{ url_for('drivers.create') }}">Thêm ngay</a>
   </p>
 </div>
 {% endif %} {% endblock %}
