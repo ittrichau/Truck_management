@@ -40,6 +40,11 @@
     }
 }
 
+/* Prevent nav link text from wrapping */
+.navbar .nav-link {
+    white-space: nowrap;
+}
+
 /* Button active */
 .btn:active {
     transform: scale(0.97);
