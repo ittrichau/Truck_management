@@ -19,6 +19,7 @@
                 <div>
                     <a href="{{ url_for('customers.edit', id=c.id) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i></a>
                     <form action="{{ url_for('customers.delete', id=c.id) }}" method="POST" style="display:inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Xóa {{ c.name }}?')"><i class="bi bi-trash"></i></button>
                     </form>
                 </div>

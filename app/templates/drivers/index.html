@@ -46,6 +46,7 @@ content %}
             method="POST"
             style="display: inline"
           >
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button
               class="btn btn-outline-danger btn-sm"
               onclick="return confirm('Xóa tài xế {{ d.full_name }}?')"

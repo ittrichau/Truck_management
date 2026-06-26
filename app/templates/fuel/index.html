@@ -68,6 +68,7 @@
                 <td>
                     {% if current_user.is_manager_or_admin() %}
                     <form action="{{ url_for('fuel.delete', id=log.id) }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Xóa bản ghi này?')"><i class="bi bi-trash"></i></button>
                     </form>
                     {% endif %}

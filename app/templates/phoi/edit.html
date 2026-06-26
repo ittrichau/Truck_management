@@ -24,6 +24,7 @@ async function onCustomerChange(select) {
     <h5 class="mb-3"><i class="bi bi-pencil-square"></i> Sửa Phơi {{ phoi.phoi_number }}</h5>
 
     <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <span class="section-title"><i class="bi bi-box-seam"></i> Chọn hàng</span>
         <div class="card mb-3"><div class="card-body">
             <select class="form-select" name="customer_id" onchange="onCustomerChange(this)">

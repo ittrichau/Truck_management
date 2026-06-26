@@ -5,6 +5,7 @@
     <h5 class="mb-3"><i class="bi bi-plus-circle"></i> Thêm giá xăng mới</h5>
     <div class="card"><div class="card-body">
     <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
             <label class="form-label">Giá (VNĐ/lít) *</label>
             <input type="number" name="price_per_liter" class="form-control" required placeholder="25000" step="1">

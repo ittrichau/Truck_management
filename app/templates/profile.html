@@ -7,6 +7,7 @@
         <div class="card-body">
             <p class="text-muted">Xin chào <strong>{{ current_user.full_name }}</strong> ({{ current_user.role }})</p>
             <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="mb-3">
                     <label class="form-label">Mật khẩu hiện tại</label>
                     <input type="password" name="current_password" class="form-control" required>

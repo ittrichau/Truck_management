@@ -5,6 +5,7 @@
     <h5 class="mb-3"><i class="bi bi-truck"></i> Thêm xe mới</h5>
     <div class="card"><div class="card-body">
     <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
             <label class="form-label">Biển số xe *</label>
             <input type="text" name="license_plate" class="form-control" required placeholder="Ví dụ: 51C-123.45">

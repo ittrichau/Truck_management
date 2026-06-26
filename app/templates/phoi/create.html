@@ -46,6 +46,7 @@ function calcKm() {
     <h5 class="mb-3"><i class="bi bi-plus-circle"></i> Tạo Phơi Mới</h5>
     
     <form method="POST" id="phoi-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <!-- 📋 CHỌN HÀNG -->
         <span class="section-title"><i class="bi bi-box-seam"></i> Chọn hàng</span>
         <div class="card mb-3">

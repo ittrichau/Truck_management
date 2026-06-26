@@ -37,6 +37,7 @@
                 <td>
                     <a href="{{ url_for('trucks.edit', id=truck.id) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i></a>
                     <form action="{{ url_for('trucks.delete', id=truck.id) }}" method="POST" style="display:inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Xóa xe {{ truck.license_plate }}?')"><i class="bi bi-trash"></i></button>
                     </form>
                 </td>

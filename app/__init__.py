@@ -10,6 +10,7 @@ from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from werkzeug.middleware.proxy_fix import ProxyFix
 from config import get_config
 
 db = SQLAlchemy()
@@ -28,11 +29,29 @@ def create_app(config_name=None):
     app.config.from_object(get_config())
     app.config['ENV'] = config_name
 
+    # --------------------------------------------------------------
+    # Trust reverse‑proxy headers (Railway, Heroku, Render, etc.)
+    # This makes request.is_secure True when the request arrives
+    # via HTTPS behind the proxy, allowing Secure cookies to be sent.
+    # --------------------------------------------------------------
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app,
+        x_for=1,      # trust first proxy for remote addr
+        x_proto=1,    # trust X-Forwarded-Proto (HTTPS detection)
+        x_host=1,     # trust X-Forwarded-Host
+        x_prefix=1    # trust X-Forwarded-Prefix if any
+    )
+
     db.init_app(app)
     login_manager.init_app(app)
     migrate.init_app(app, db)
     csrf.init_app(app)
     limiter.init_app(app)
+
+    # Ensure CSRF cookie is sent only over HTTPS
+    app.config.setdefault('WTF_CSRF_SSL_STRICT', True)
+    # Also make the "remember me" cookie secure
+    app.config.setdefault('REMEMBER_COOKIE_SECURE', True)
 
     login_manager.login_view = 'auth.login'
     login_manager.login_message = 'Vui lòng đăng nhập để tiếp tục.'

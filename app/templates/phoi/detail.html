@@ -14,6 +14,7 @@
             {% endif %}
             {% if current_user.is_manager_or_admin() and phoi.status != 'confirmed' %}
             <form action="{{ url_for('phoi.confirm', id=phoi.id) }}" method="POST" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Xác nhận phơi {{ phoi.phoi_number }}? Sau khi xác nhận sẽ không thể sửa.')">
                     <i class="bi bi-check-circle"></i> Xác nhận
                 </button>
