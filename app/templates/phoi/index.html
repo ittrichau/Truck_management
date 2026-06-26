@@ -10,9 +10,14 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h5 class="mb-0 d-none d-md-block"><i class="bi bi-journal-text"></i> Danh sách Phơi</h5>
-    {% if current_user.is_driver() or current_user.is_manager_or_admin() %}
-    <a href="{{ url_for('phoi.create') }}" class="btn btn-primary d-none d-md-inline-block"><i class="bi bi-plus-lg"></i> Tạo Phơi mới</a>
-    {% endif %}
+    <div class="d-flex align-items-center gap-2">
+        {% if current_user.is_driver() or current_user.is_manager_or_admin() %}
+        <a href="{{ url_for('phoi.create') }}" class="btn btn-primary d-none d-md-inline-block"><i class="bi bi-plus-lg"></i> Tạo Phơi mới</a>
+        {% endif %}
+        <a href="#" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#logoutModal" title="Đăng xuất">
+            <i class="bi bi-box-arrow-right"></i> <span class="d-none d-md-inline">Đăng xuất</span>
+        </a>
+    </div>
 </div>
 
 {% if phois.items %}
@@ -80,4 +85,25 @@
     {% endif %}
 </div>
 {% endif %}
+
+<!-- Logout Confirmation Modal -->
+<div class="modal fade" id="logoutModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title"><i class="bi bi-box-arrow-right"></i> Đăng xuất</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Bạn có chắc chắn muốn đăng xuất khỏi hệ thống?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Huỷ</button>
+                <form method="POST" action="{{ url_for('auth.logout') }}">
+                    <button type="submit" class="btn btn-danger"><i class="bi bi-box-arrow-right"></i> Đăng xuất</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
