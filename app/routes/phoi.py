@@ -25,7 +25,31 @@ def index():
     for p in phois.items:
         balances[p.id] = p.balance()
 
-    return render_template('phoi/index.html', phois=phois, balances=balances)
+    # Lấy cảnh báo hết hạn đăng kiểm/phù hiệu (chỉ hiện khi đã quá 2 ngày kể từ lần thông báo cuối)
+    warnings = []
+    notified_truck_ids = set()
+    notified_types = {}
+    for truck in Truck.query.filter_by(is_active=True).all():
+        insp_days = truck.inspection_days_until_expiry()
+        if insp_days is not None and insp_days <= 15 and truck.inspection_should_notify():
+            label = 'Đăng kiểm' if insp_days >= 0 else 'Đăng kiểm (quá hạn)'
+            warnings.append((truck.license_plate, label, abs(insp_days)))
+            notified_truck_ids.add(truck.id)
+            notified_types.setdefault(truck.id, []).append('inspection')
+
+        perm_days = truck.permit_days_until_expiry()
+        if perm_days is not None and perm_days <= 15 and truck.permit_should_notify():
+            label = 'Phù hiệu' if perm_days >= 0 else 'Phù hiệu (quá hạn)'
+            warnings.append((truck.license_plate, label, abs(perm_days)))
+            notified_truck_ids.add(truck.id)
+            notified_types.setdefault(truck.id, []).append('permit')
+
+    # Mark notified trucks so we don't notify again for 2 days
+    if warnings:
+        Truck.mark_expiry_notified(notified_truck_ids, notified_types)
+        db.session.commit()
+
+    return render_template('phoi/index.html', phois=phois, balances=balances, expiry_warnings=warnings)
 
 
 @bp.route('/phoi/create', methods=['GET', 'POST'])

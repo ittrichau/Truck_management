@@ -22,6 +22,29 @@
             <label class="form-label">Số KM hiện tại</label>
             <input type="number" name="current_km" class="form-control" placeholder="0">
         </div>
+        <hr>
+        <h6 class="text-primary"><i class="bi bi-shield-check"></i> Đăng kiểm & Phù hiệu</h6>
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                <label class="form-label">Ngày đăng kiểm</label>
+                <input type="date" name="inspection_date" class="form-control">
+            </div>
+            <div class="col-6">
+                <label class="form-label">Hạn đăng kiểm (tháng)</label>
+                <input type="number" name="inspection_expiry_months" class="form-control" value="6" min="1" max="36">
+            </div>
+        </div>
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                <label class="form-label">Ngày cấp phù hiệu</label>
+                <input type="date" name="permit_date" class="form-control">
+            </div>
+            <div class="col-6">
+                <label class="form-label">Hạn phù hiệu (tháng)</label>
+                <input type="number" name="permit_expiry_months" class="form-control" value="12" min="1" max="36">
+            </div>
+        </div>
+        <hr>
         <div class="mb-3">
             <label class="form-label">Trạng thái</label>
             <select name="status" class="form-select">

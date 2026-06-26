@@ -6,20 +6,23 @@
     <a href="{{ url_for('trucks.create') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Thêm xe</a>
 </div>
 
-<div class="table-container">
-    <table class="table table-hover align-middle bg-white rounded-3 overflow-hidden shadow-sm">
+<div class="table-container" style="overflow-x: auto;">
+    <table class="table table-hover align-middle bg-white rounded-3 overflow-hidden shadow-sm" style="min-width: 900px;">
         <thead class="table-light">
             <tr>
                 <th>Biển số</th>
-                <th>Tài xế hiện tại</th>
-                <th>Đang vận chuyển</th>
+                <th>Tài xế</th>
+                <th>Đang chạy</th>
+                <th>Đăng kiểm</th>
+                <th>Phù hiệu</th>
                 <th style="width:90px"></th>
             </tr>
         </thead>
         <tbody>
             {% for item in truck_data %}
+            {% set truck = item.truck %}
             <tr>
-                <td><strong>{{ item.truck.license_plate }}</strong></td>
+                <td><strong>{{ truck.license_plate }}</strong></td>
                 <td>
                     {% if item.current_driver %}
                     <a href="{{ url_for('drivers.edit', id=item.current_driver.id) }}">{{ item.current_driver.full_name }}</a>
@@ -35,17 +38,39 @@
                     {% endif %}
                 </td>
                 <td>
+                    {% if truck.inspection_date %}
+                        {{ truck.inspection_expiry_date().strftime('%d/%m/%Y') if truck.inspection_expiry_date() else '' }}
+                        {% set days = truck.inspection_days_until_expiry() %}
+                        {% if days is not none and days <= 15 %}
+                            <span class="badge bg-danger ms-1">{{ days }} ngày</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="text-muted">--</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if truck.permit_date %}
+                        {{ truck.permit_expiry_date().strftime('%d/%m/%Y') if truck.permit_expiry_date() else '' }}
+                        {% set days = truck.permit_days_until_expiry() %}
+                        {% if days is not none and days <= 15 %}
+                            <span class="badge bg-danger ms-1">{{ days }} ngày</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="text-muted">--</span>
+                    {% endif %}
+                </td>
+                <td>
                     <div class="d-flex gap-1">
-                        <a href="{{ url_for('trucks.edit', id=item.truck.id) }}" class="btn btn-outline-primary btn-sm py-0 px-1"><i class="bi bi-pencil"></i></a>
-                        <form action="{{ url_for('trucks.delete', id=item.truck.id) }}" method="POST" style="display:inline">
+                        <a href="{{ url_for('trucks.edit', id=truck.id) }}" class="btn btn-outline-primary btn-sm py-0 px-1"><i class="bi bi-pencil"></i></a>
+                        <form action="{{ url_for('trucks.delete', id=truck.id) }}" method="POST" style="display:inline">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="return confirm('Xóa xe {{ item.truck.license_plate }}?')"><i class="bi bi-trash"></i></button>
+                            <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="return confirm('Xóa xe {{ truck.license_plate }}?')"><i class="bi bi-trash"></i></button>
                         </form>
                     </div>
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="4" class="text-center text-muted py-4">Chưa có xe nào.</td></tr>
+            <tr><td colspan="6" class="text-center text-muted py-4">Chưa có xe nào.</td></tr>
             {% endfor %}
         </tbody>
     </table>

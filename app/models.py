@@ -66,6 +66,18 @@ class Truck(db.Model):
     year = db.Column(db.Integer)
     fuel_rate = db.Column(db.Float, comment='Liters per 100km')
     current_km = db.Column(db.Integer, default=0)
+    
+    # Ngày đăng kiểm & hạn (tháng)
+    inspection_date = db.Column(db.Date, nullable=True, comment='Ngày đăng kiểm gần nhất')
+    inspection_expiry_months = db.Column(db.Integer, nullable=True, default=6, comment='Hạn đăng kiểm (tháng)')
+    # Ngày cấp phù hiệu & hạn (tháng)
+    permit_date = db.Column(db.Date, nullable=True, comment='Ngày cấp phù hiệu gần nhất')
+    permit_expiry_months = db.Column(db.Integer, nullable=True, default=12, comment='Hạn phù hiệu (tháng)')
+    
+    # Notification tracking (cách 2 ngày nhắc lại)
+    last_inspection_notified_at = db.Column(db.DateTime, nullable=True, comment='Lần cuối thông báo đăng kiểm sắp hết hạn')
+    last_permit_notified_at = db.Column(db.DateTime, nullable=True, comment='Lần cuối thông báo phù hiệu sắp hết hạn')
+    
     status = db.Column(db.String(20), default='available')  # available, in_trip, maintenance
     is_active = db.Column(db.Boolean, default=True)
     notes = db.Column(db.Text)
@@ -78,6 +90,95 @@ class Truck(db.Model):
     def trip_count(self):
         return self.phois.filter(Phoi.status == 'confirmed').count()
     
+    def inspection_expiry_date(self):
+        """Calculate the expiry date of inspection (date + months)."""
+        if not self.inspection_date or not self.inspection_expiry_months:
+            return None
+        month = self.inspection_date.month + self.inspection_expiry_months
+        year = self.inspection_date.year + (month - 1) // 12
+        month = ((month - 1) % 12) + 1
+        from calendar import monthrange
+        last_day = monthrange(year, month)[1]
+        day = min(self.inspection_date.day, last_day)
+        return date(year, month, day)
+
+    def inspection_days_until_expiry(self):
+        """Days until inspection expires. Returns None if no data."""
+        expiry = self.inspection_expiry_date()
+        if not expiry:
+            return None
+        return (expiry - date.today()).days
+
+    def permit_expiry_date(self):
+        """Calculate the expiry date of permit (date + months)."""
+        if not self.permit_date or not self.permit_expiry_months:
+            return None
+        month = self.permit_date.month + self.permit_expiry_months
+        year = self.permit_date.year + (month - 1) // 12
+        month = ((month - 1) % 12) + 1
+        from calendar import monthrange
+        last_day = monthrange(year, month)[1]
+        day = min(self.permit_date.day, last_day)
+        return date(year, month, day)
+
+    def permit_days_until_expiry(self):
+        """Days until permit expires. Returns None if no data."""
+        expiry = self.permit_expiry_date()
+        if not expiry:
+            return None
+        return (expiry - date.today()).days
+
+    def inspection_should_notify(self):
+        """Check if should notify about inspection expiry (within 15 days + every 2 days)."""
+        days = self.inspection_days_until_expiry()
+        if days is None or days > 15:
+            return False
+        if days < 0:
+            return True
+        if not self.last_inspection_notified_at:
+            return True
+        return (datetime.utcnow() - self.last_inspection_notified_at).days >= 2
+
+    def permit_should_notify(self):
+        """Check if should notify about permit expiry (within 15 days + every 2 days)."""
+        days = self.permit_days_until_expiry()
+        if days is None or days > 15:
+            return False
+        if days < 0:
+            return True
+        if not self.last_permit_notified_at:
+            return True
+        return (datetime.utcnow() - self.last_permit_notified_at).days >= 2
+
+    @staticmethod
+    def get_expiry_warnings():
+        """Return list of (truck, type, days_left) for trucks with expiring docs."""
+        from datetime import datetime as dt
+        warnings = []
+        trucks = Truck.query.filter_by(is_active=True).all()
+        for t in trucks:
+            insp_days = t.inspection_days_until_expiry()
+            if insp_days is not None and insp_days <= 15 and t.inspection_should_notify():
+                warnings.append((t, 'inspection', insp_days))
+            perm_days = t.permit_days_until_expiry()
+            if perm_days is not None and perm_days <= 15 and t.permit_should_notify():
+                warnings.append((t, 'permit', perm_days))
+        return warnings
+
+    @staticmethod
+    def mark_expiry_notified(notified_truck_ids, notified_types):
+        """Update last_notified timestamps for sent notifications."""
+        from datetime import datetime as dt
+        now = dt.utcnow()
+        for tid in notified_truck_ids:
+            truck = Truck.query.get(tid)
+            if not truck:
+                continue
+            if 'inspection' in notified_types.get(tid, []):
+                truck.last_inspection_notified_at = now
+            if 'permit' in notified_types.get(tid, []):
+                truck.last_permit_notified_at = now
+
     def needs_refuel_warning(self):
         """Check if truck needs refuel (every 2 trips)"""
         trip_count = self.trip_count()

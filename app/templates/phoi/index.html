@@ -8,6 +8,22 @@
 </a>
 {% endif %}
 
+{% if expiry_warnings %}
+<div class="alert alert-danger alert-dismissible fade show mx-auto mb-3" style="max-width: 600px;" role="alert">
+    <strong><i class="bi bi-exclamation-triangle-fill"></i> Cảnh báo hết hạn:</strong>
+    <ul class="mb-0 mt-1">
+        {% for plate, doc_type, days in expiry_warnings %}
+        <li>
+            Xe <strong>{{ plate }}</strong> – {{ doc_type }}
+            {% if days == 0 %}hết hạn hôm nay
+            {% else %}còn <strong>{{ days }}</strong> ngày{% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h5 class="mb-0 d-none d-md-block"><i class="bi bi-journal-text"></i> Danh sách Phơi</h5>
     <div class="d-flex align-items-center gap-2">

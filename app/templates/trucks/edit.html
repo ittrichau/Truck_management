@@ -22,6 +22,61 @@
             <label class="form-label">Số KM hiện tại</label>
             <input type="number" name="current_km" class="form-control" value="{{ truck.current_km or 0 }}">
         </div>
+        <hr>
+        <h6 class="text-primary"><i class="bi bi-shield-check"></i> Đăng kiểm & Phù hiệu</h6>
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                <label class="form-label">Ngày đăng kiểm</label>
+                <input type="date" name="inspection_date" class="form-control" value="{{ truck.inspection_date.strftime('%Y-%m-%d') if truck.inspection_date else '' }}">
+            </div>
+            <div class="col-6">
+                <label class="form-label">Hạn đăng kiểm (tháng)</label>
+                <input type="number" name="inspection_expiry_months" class="form-control" value="{{ truck.inspection_expiry_months or 6 }}" min="1" max="36">
+            </div>
+        </div>
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                <label class="form-label">Ngày cấp phù hiệu</label>
+                <input type="date" name="permit_date" class="form-control" value="{{ truck.permit_date.strftime('%Y-%m-%d') if truck.permit_date else '' }}">
+            </div>
+            <div class="col-6">
+                <label class="form-label">Hạn phù hiệu (tháng)</label>
+                <input type="number" name="permit_expiry_months" class="form-control" value="{{ truck.permit_expiry_months or 12 }}" min="1" max="36">
+            </div>
+        </div>
+        {% if truck.inspection_date or truck.permit_date %}
+        <div class="mb-3">
+            {% if truck.inspection_date %}
+            {% set insp_days = truck.inspection_days_until_expiry() %}
+            {% if insp_days is not none and insp_days <= 15 %}
+            <span class="badge bg-danger me-2">Đăng kiểm: còn {{ insp_days }} ngày</span>
+            {% elif insp_days is not none and insp_days <= 30 %}
+            <span class="badge bg-warning text-dark me-2">Đăng kiểm: còn {{ insp_days }} ngày</span>
+            {% endif %}
+            {% endif %}
+            {% if truck.permit_date %}
+            {% set perm_days = truck.permit_days_until_expiry() %}
+            {% if perm_days is not none and perm_days <= 15 %}
+            <span class="badge bg-danger me-2">Phù hiệu: còn {{ perm_days }} ngày</span>
+            {% elif perm_days is not none and perm_days <= 30 %}
+            <span class="badge bg-warning text-dark me-2">Phù hiệu: còn {{ perm_days }} ngày</span>
+            {% endif %}
+            {% endif %}
+        </div>
+        {% endif %}
+        <hr>
+        <div class="mb-3">
+            <label class="form-label">Tài xế mặc định</label>
+            <select name="current_driver_id" class="form-select">
+                <option value="">-- Không gán tài xế --</option>
+                {% for d in available_drivers %}
+                <option value="{{ d.id }}" {% if current_driver and current_driver.id == d.id %}selected{% endif %}>
+                    {{ d.full_name }}
+                </option>
+                {% endfor %}
+            </select>
+            <small class="text-muted">Chỉ hiển thị tài xế chưa gán xe khác (trừ tài xế hiện tại của xe này)</small>
+        </div>
         <div class="mb-3">
             <label class="form-label">Trạng thái</label>
             <select name="status" class="form-select">

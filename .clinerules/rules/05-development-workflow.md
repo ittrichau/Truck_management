@@ -10,6 +10,7 @@
 6. Test: run key and edge scenarios.
 7. Summarize: list changed files and verification result.
 8. Update Current Task Record: write the final task state to avoid repeating work.
+9. Skip Server Launch: after task completion, do NOT start the development server. Confirm task is done via code review and verification checks only.
 
 ## Required Output Format
 
