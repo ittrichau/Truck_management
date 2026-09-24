@@ -210,6 +210,13 @@
               >
             </li>
             {% endif %}
+            {% if current_user.is_admin() %}
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('activity_logs.index') }}"
+                ><i class="bi bi-journal-code"></i> Nhật ký</a
+              >
+            </li>
+            {% endif %}
           </ul>
           <ul class="navbar-nav">
             <li class="nav-item dropdown">
@@ -296,6 +303,14 @@
         class="{% if request.endpoint and 'drivers' in request.endpoint %}active{% endif %}"
       >
         <i class="bi bi-person-badge"></i> Người dùng
+      </a>
+      {% endif %}
+      {% if current_user.is_admin() %}
+      <a
+        href="{{ url_for('activity_logs.index') }}"
+        class="{% if request.endpoint and 'activity_logs' in request.endpoint %}active{% endif %}"
+      >
+        <i class="bi bi-journal-code"></i> Nhật ký
       </a>
       {% endif %}
     </nav>

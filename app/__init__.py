@@ -67,6 +67,7 @@ def create_app(config_name=None):
     from app.routes.phoi import bp as phoi_bp
     from app.routes.fuel import bp as fuel_bp
     from app.routes.drivers import bp as drivers_bp
+    from app.routes.activity_logs import bp as activity_logs_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(trucks_bp)
@@ -74,6 +75,7 @@ def create_app(config_name=None):
     app.register_blueprint(phoi_bp)
     app.register_blueprint(fuel_bp)
     app.register_blueprint(drivers_bp)
+    app.register_blueprint(activity_logs_bp)
 
     # Register CLI commands
     from app.cli import register_cli_commands
@@ -140,3 +142,71 @@ def _configure_logging(app):
 
     app.logger.setLevel(log_level)
     app.logger.info(f'App started (env={app.config.get("ENV", "unknown")})')
+
+    # -------------------------------------------------------------
+    # Activity logging hook — ghi log mọi POST/PUT/DELETE request
+    # -------------------------------------------------------------
+    @app.after_request
+    def log_activity(response):
+        from flask import request
+        from flask_login import current_user
+        from app.models import ActivityLog
+        import json as json_module
+
+        # Chỉ log request có phương thức thay đổi dữ liệu từ user đã xác thực
+        if request.method not in ('POST', 'PUT', 'DELETE', 'PATCH'):
+            return response
+        if not current_user.is_authenticated:
+            return response
+
+        try:
+            # Suy ra action từ endpoint name
+            endpoint = request.endpoint or ''
+            action = 'UPDATE'
+            if 'delete' in endpoint:
+                action = 'DELETE'
+            elif 'create' in endpoint or 'add' in endpoint:
+                action = 'CREATE'
+            elif 'login' in endpoint:
+                action = 'LOGIN'
+            elif 'logout' in endpoint:
+                action = 'LOGOUT'
+
+            # Xác định resource_type từ blueprint name
+            resource_type = endpoint.split('.')[0] if '.' in endpoint else endpoint
+
+            # Lấy form data, loại bỏ password fields
+            form_data = {}
+            for key in request.form:
+                if 'password' not in key.lower():
+                    form_data[key] = request.form[key]
+
+            details = json_module.dumps(form_data, ensure_ascii=False) if form_data else None
+
+            # Xác định resource_id ưu tiên: form trước, args sau
+            resource_id = None
+            if hasattr(request, 'view_args') and request.view_args:
+                for val in request.view_args.values():
+                    resource_id = str(val)
+                    break
+
+            log_entry = ActivityLog(
+                user_id=current_user.id,
+                username=current_user.username,
+                action=action,
+                resource_type=resource_type,
+                resource_id=resource_id,
+                details=details,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', '')[:200],
+                method=request.method,
+                endpoint=endpoint,
+                status_code=response.status_code
+            )
+            db.session.add(log_entry)
+            db.session.commit()
+        except Exception:
+            # Không để lỗi log ảnh hưởng đến response chính
+            db.session.rollback()
+
+        return response

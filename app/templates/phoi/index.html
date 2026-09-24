@@ -50,15 +50,19 @@
                             {% elif p.status == 'submitted' %}bg-warning text-dark
                             {% else %}bg-secondary{% endif %}">
                             {% if p.status == 'confirmed' %}✅ Đã xác nhận
-                            {% elif p.status == 'submitted' %}📝 Đã tạo
-                            {% else %}📄 Nháp{% endif %}
+                            {% elif p.status == 'submitted' %}� Đã chốt
+                            {% else %}🚚 Đang thực hiện{% endif %}
                         </span>
                     </div>
+                    {% if p.is_substitute %}
+                    <div class="mb-2"><span class="badge bg-info text-dark"><i class="bi bi-arrow-left-right"></i> Chạy giùm</span></div>
+                    {% endif %}
                     <div class="text-dark small">
                         <div><i class="bi bi-geo-alt"></i> {{ p.origin }} → {{ p.destination }}</div>
                         <div><i class="bi bi-calendar"></i> {{ p.departure_date.strftime('%d/%m/%Y') if p.departure_date else '--' }}</div>
-                        <div><i class="bi bi-speedometer2"></i> {{ p.km_total }} km</div>
-                        <div class="mt-1"><strong>Full:</strong> {{ '{:,.0f}'.format(p.revenue_full) }} VNĐ</div>
+                        <div><i class="bi bi-arrow-return-left"></i> 1 chuyến đi + {{ p.return_trips.count() }} chuyến về</div>
+                        <div><i class="bi bi-speedometer2"></i> {{ p.total_km_all_trips() }} km</div>
+                        <div class="mt-1"><strong>Tổng full:</strong> {{ '{:,.0f}'.format(p.total_revenue_full()) }} VNĐ</div>
                         {% if p.status == 'confirmed' %}
                         <div class="mt-1">
                             {% set bal = balances[p.id] %}

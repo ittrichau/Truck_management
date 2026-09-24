@@ -2,6 +2,7 @@ from app import db, login_manager
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, date
+import json
 
 def generate_phoi_number():
     """Generate phoi number: P-YYYYMMDD-NNN"""
@@ -220,6 +221,12 @@ class Phoi(db.Model):
     driver_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     truck_id = db.Column(db.Integer, db.ForeignKey('trucks.id'), nullable=False)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'))
+    is_substitute = db.Column(
+        db.Boolean,
+        nullable=False,
+        default=False,
+        comment='Chuyến chạy giùm, dùng cặp xe-tài xế khác với gán mặc định'
+    )
     
     # Thông tin chuyến
     departure_date = db.Column(db.Date, nullable=False)
@@ -253,6 +260,13 @@ class Phoi(db.Model):
     
     # Relations
     expenses = db.relationship('PhoiExpense', backref='phoi', lazy='dynamic', cascade='all, delete-orphan')
+    return_trips = db.relationship(
+        'PhoiReturnTrip',
+        backref='phoi',
+        lazy='dynamic',
+        cascade='all, delete-orphan',
+        order_by='PhoiReturnTrip.trip_order'
+    )
     
     def calculate_km_total(self):
         if self.km_end and self.km_start:
@@ -260,31 +274,63 @@ class Phoi(db.Model):
         return self.km_total
     
     def total_expenses(self):
-        """Tổng chi phí chuyến (bốc vác, phí đường, sửa xe...)"""
+        """Tổng chi phí của toàn bộ phơi (bốc vác, phí đường, sửa xe...)."""
         return sum(exp.amount for exp in self.expenses.all())
+
+    def total_km_all_trips(self):
+        """Tổng kilomet của chuyến đi và tất cả chuyến về."""
+        return self.km_total + sum(trip.km_total for trip in self.return_trips.all())
+
+    def total_revenue_full(self):
+        """Tổng doanh thu của chuyến đi và tất cả chuyến về."""
+        return self.revenue_full + sum(trip.revenue_full for trip in self.return_trips.all())
+
+    def total_revenue_collected(self):
+        """Tổng tiền tài xế đã thu của chuyến đi và tất cả chuyến về."""
+        return self.revenue_collected + sum(trip.revenue_collected for trip in self.return_trips.all())
     
     def balance(self):
         """
-        Tính balance:
+        Tính balance toàn phơi:
         - Dương: Chủ xe phải trả thêm cho tài xế
         - Âm: Tài xế phải nộp lại cho chủ xe
         """
-        total_exp = self.total_expenses()
-        driver_paid = total_exp  # Tài xế đã ứng chi
-        driver_held = self.revenue_collected  # Tiền mặt tài xế đang giữ
-        driver_wage = self.driver_wage  # Tiền công
-        
-        owner_owes = driver_paid + driver_wage
-        driver_owes = driver_held
-        
+        owner_owes = self.total_expenses() + self.driver_wage
+        driver_owes = self.total_revenue_collected()
         return owner_owes - driver_owes
     
     def owner_profit(self):
-        """Lợi nhuận của chủ xe"""
-        return self.revenue_full - self.total_expenses() - self.driver_wage
+        """Lợi nhuận chủ xe của toàn bộ phơi."""
+        return self.total_revenue_full() - self.total_expenses() - self.driver_wage
     
     def __repr__(self):
         return f'<Phoi {self.phoi_number} [{self.status}]>'
+
+class PhoiReturnTrip(db.Model):
+    """Một chuyến về thuộc một phơi; mỗi phơi có thể có nhiều chuyến về."""
+    __tablename__ = 'phoi_return_trips'
+    id = db.Column(db.Integer, primary_key=True)
+    phoi_id = db.Column(db.Integer, db.ForeignKey('phoi.id', ondelete='CASCADE'), nullable=False, index=True)
+    trip_order = db.Column(db.Integer, nullable=False, default=1)
+    return_date = db.Column(db.Date)
+    origin = db.Column(db.String(200), nullable=False)
+    destination = db.Column(db.String(200), nullable=False)
+    cargo_description = db.Column(db.String(300))
+    km_start = db.Column(db.Integer)
+    km_end = db.Column(db.Integer)
+    km_total = db.Column(db.Integer, nullable=False, default=0)
+    revenue_full = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    revenue_collected = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def calculate_km_total(self):
+        if self.km_start is not None and self.km_end is not None and self.km_end >= self.km_start:
+            self.km_total = self.km_end - self.km_start
+        return self.km_total
+
+    def __repr__(self):
+        return f'<PhoiReturnTrip #{self.trip_order} of phoi {self.phoi_id}>'
 
 class PhoiExpense(db.Model):
     __tablename__ = 'phoi_expenses'
@@ -382,6 +428,28 @@ class FuelLog(db.Model):
     
     def __repr__(self):
         return f'<FuelLog {self.liters}L on {self.refuel_date}>'
+
+class ActivityLog(db.Model):
+    """Ghi log mọi hành động thay đổi dữ liệu trên hệ thống."""
+    __tablename__ = 'activity_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    username = db.Column(db.String(50), nullable=True)
+    action = db.Column(db.String(20), nullable=False)  # CREATE, UPDATE, DELETE, LOGIN, LOGOUT
+    resource_type = db.Column(db.String(50), nullable=True)
+    resource_id = db.Column(db.String(50), nullable=True)
+    details = db.Column(db.Text, nullable=True)
+    ip_address = db.Column(db.String(45), nullable=True)
+    user_agent = db.Column(db.String(200), nullable=True)
+    method = db.Column(db.String(10), nullable=True)
+    endpoint = db.Column(db.String(100), nullable=True)
+    status_code = db.Column(db.Integer, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    user = db.relationship('User', backref='activity_logs')
+
+    def __repr__(self):
+        return f'<ActivityLog {self.action} {self.resource_type} by {self.username}>'
 
 import logging
 

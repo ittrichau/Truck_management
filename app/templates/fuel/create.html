@@ -6,19 +6,22 @@
     {% if current_price %}
     <div class="alert alert-info py-2 small">
         💡 Giá xăng hiện tại: <strong>{{ '{:,.0f}'.format(current_price.price_per_liter) }} VNĐ/lít</strong>
-        ({{ current_price.effective_from.strftime('%d/%m') }} → {{ current_price.effective_to.strftime('%d/%m') }})
+        ({{ current_price.effective_from.strftime('%d/%m') }} → {{ current_price.effective_to.strftime('%d/%m') if current_price.effective_to else 'hiện tại' }})
     </div>
     {% endif %}
     <div class="card"><div class="card-body">
     <form method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if selected_phoi_id %}
+        <input type="hidden" name="return_to_phoi_id" value="{{ selected_phoi_id }}">
+        {% endif %}
         <div class="mb-3">
             <label class="form-label">Xe *</label>
             <select name="truck_id" id="truck_select" class="form-select" required onchange="filterPhoiByTruck(); toggleSubstituteNote(this);">
                 <option value="">-- Chọn xe --</option>
                 {% for t in trucks %}
                 <option value="{{ t.id }}"
-                    {% if current_user.is_driver() and current_user.current_truck_id == t.id %}selected{% endif %}>
+                    {% if selected_truck_id == t.id or (not selected_truck_id and current_user.is_driver() and current_user.current_truck_id == t.id) %}selected{% endif %}>
                     {{ t.license_plate }} ({{ t.current_km }} km)
                     {% if current_user.is_driver() and current_user.current_truck_id == t.id %} ← Xe của bạn{% endif %}
                 </option>
@@ -40,7 +43,7 @@
                 {% for p in phois %}
                 <div class="form-check phoi-checkbox" data-truck-id="{{ p.truck_id }}" style="display:none;">
                     <input class="form-check-input" type="checkbox" name="phoi_ids" value="{{ p.id }}" id="phoi_{{ p.id }}"
-                           data-truck-id="{{ p.truck_id }}">
+                           data-truck-id="{{ p.truck_id }}" {% if selected_phoi_id == p.id %}checked{% endif %}>
                     <label class="form-check-label small" for="phoi_{{ p.id }}"
                            data-truck-id="{{ p.truck_id }}">
                         {{ p.phoi_number }} — {{ p.origin }}→{{ p.destination }} ({{ p.truck.license_plate }})
@@ -80,7 +83,7 @@
             <textarea name="notes" class="form-control" rows="2"></textarea>
         </div>
         <button type="submit" class="btn btn-warning w-100 btn-lg-mobile"><i class="bi bi-fuel-pump"></i> Ghi nhận</button>
-        <a href="{{ url_for('fuel.index') }}" class="btn btn-outline-secondary w-100 mt-2 btn-lg-mobile">Quay lại</a>
+        <a href="{{ url_for('phoi.detail', id=selected_phoi_id) if selected_phoi_id else url_for('fuel.index') }}" class="btn btn-outline-secondary w-100 mt-2 btn-lg-mobile">Quay lại</a>
     </form>
     </div></div>
 </div>
@@ -109,7 +112,7 @@ function filterPhoiByTruck() {
     const noPhoiMsg = document.getElementById('no-phoi-message');
     let count = 0;
     checkboxes.forEach(cb => {
-        const show = !truckId || cb.dataset.truckId === truckId;
+        const show = Boolean(truckId) && cb.dataset.truckId === truckId;
         cb.style.display = show ? '' : 'none';
         if (show) count++;
     });

@@ -182,9 +182,12 @@
             {% if phoi.status == 'confirmed' %}
                 <span class="print-badge badge-confirmed">✅ Đã xác nhận</span>
             {% elif phoi.status == 'submitted' %}
-                <span class="print-badge badge-submitted">📝 Đã tạo (chờ duyệt)</span>
+                <span class="print-badge badge-submitted">� Đã chốt – chờ xác nhận</span>
             {% else %}
-                <span class="print-badge badge-draft">📄 Nháp</span>
+                <span class="print-badge badge-draft">🚚 Đang thực hiện</span>
+            {% endif %}
+            {% if phoi.is_substitute %}
+                <span class="print-badge" style="background:#cff4fc; color:#055160; border:1px solid #b6effb;">↔ Chạy giùm</span>
             {% endif %}
             {% if phoi.confirmed_at %}
                 <div style="font-size:0.75rem; color:#6c757d; margin-top:2px;">
@@ -225,8 +228,10 @@
         <div class="phoi-block">
             <h5>💰 Tài chính</h5>
             <table class="phoi-financial-table">
-                <tr><td>Doanh thu full chuyến</td><td class="amount">{{ '{:,.0f}'.format(phoi.revenue_full) }} VNĐ</td></tr>
-                <tr><td>Tiền tạm thu (tài xế giữ)</td><td class="amount">{{ '{:,.0f}'.format(phoi.revenue_collected) }} VNĐ</td></tr>
+                <tr><td>Doanh thu chuyến đi</td><td class="amount">{{ '{:,.0f}'.format(phoi.revenue_full) }} VNĐ</td></tr>
+                <tr><td>Doanh thu chuyến về ({{ phoi.return_trips.count() }})</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full() - phoi.revenue_full) }} VNĐ</td></tr>
+                <tr class="total-row"><td>Tổng doanh thu full</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full()) }} VNĐ</td></tr>
+                <tr><td>Tiền tạm thu (tài xế giữ)</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ</td></tr>
                 <tr><td colspan="2"><hr style="margin:4px 0;"></td></tr>
                 <tr style="font-weight:600; color:#555;"><td>Chi phí chuyến:</td><td></td></tr>
                 {% for exp in phoi.expenses.all() %}
@@ -256,7 +261,7 @@
             <div style="font-size:0.75rem; margin-top:6px; opacity:0.8;">
                 Tài xế đã ứng + Công: {{ '{:,.0f}'.format(phoi.total_expenses() + phoi.driver_wage) }} VNĐ
                 &nbsp;|&nbsp;
-                Tài xế đã giữ: {{ '{:,.0f}'.format(phoi.revenue_collected) }} VNĐ
+                Tài xế đã giữ: {{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ
             </div>
         </div>
 

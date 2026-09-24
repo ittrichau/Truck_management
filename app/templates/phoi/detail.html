@@ -9,15 +9,18 @@
         </a>
         <div>
             <a href="{{ url_for('phoi.print_view', id=phoi.id) }}" class="btn btn-outline-info btn-sm"><i class="bi bi-printer"></i> In</a>
-            {% if phoi.status != 'confirmed' and (current_user.is_manager_or_admin() or (current_user.is_driver() and phoi.driver_id == current_user.id)) %}
-            <a href="{{ url_for('phoi.edit', id=phoi.id) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i> Sửa</a>
+            {% if phoi.status == 'draft' and (current_user.is_manager_or_admin() or (current_user.is_driver() and phoi.driver_id == current_user.id)) %}
+            <a href="{{ url_for('phoi.edit', id=phoi.id) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i> Sửa / Thêm chuyến về</a>
+            <a href="{{ url_for('fuel.create', phoi_id=phoi.id, truck_id=phoi.truck_id) }}" class="btn btn-outline-warning btn-sm"><i class="bi bi-fuel-pump"></i> Ghi nhận đổ xăng</a>
+            <form action="{{ url_for('phoi.submit', id=phoi.id) }}" method="POST" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Chốt phơi {{ phoi.phoi_number }}? Sau khi chốt tài xế không thể sửa.')"><i class="bi bi-send-check"></i> Chốt phơi</button>
+            </form>
             {% endif %}
-            {% if current_user.is_manager_or_admin() and phoi.status != 'confirmed' %}
+            {% if current_user.is_manager_or_admin() and phoi.status == 'submitted' %}
             <form action="{{ url_for('phoi.confirm', id=phoi.id) }}" method="POST" style="display:inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Xác nhận phơi {{ phoi.phoi_number }}? Sau khi xác nhận sẽ không thể sửa.')">
-                    <i class="bi bi-check-circle"></i> Xác nhận
-                </button>
+                <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Xác nhận phơi {{ phoi.phoi_number }}? Sau khi xác nhận sẽ không thể sửa.')"><i class="bi bi-check-circle"></i> Xác nhận</button>
             </form>
             {% endif %}
         </div>
@@ -32,14 +35,29 @@
                 {% elif phoi.status == 'submitted' %}bg-warning text-dark
                 {% else %}bg-secondary{% endif %}">
                 {% if phoi.status == 'confirmed' %}✅ Đã xác nhận
-                {% elif phoi.status == 'submitted' %}📝 Đã tạo (chờ duyệt)
-                {% else %}📄 Nháp{% endif %}
+                {% elif phoi.status == 'submitted' %}� Đã chốt – chờ xác nhận
+                {% else %}🚚 Đang thực hiện{% endif %}
             </span>
+            {% if phoi.is_substitute %}
+            <span class="badge bg-info text-dark fs-6 ms-1"><i class="bi bi-arrow-left-right"></i> Chạy giùm</span>
+            {% endif %}
             {% if phoi.confirmed_at %}
             <div class="mt-1"><small class="text-muted">Xác nhận bởi {{ phoi.confirmer.full_name }} lúc {{ phoi.confirmed_at.strftime('%d/%m/%Y %H:%M') }}</small></div>
             {% endif %}
         </div>
     </div>
+
+    {% if phoi.status == 'draft' %}
+    <div class="card mb-3 border-primary">
+        <div class="card-header bg-primary text-white">✅ Điều kiện để chốt phơi</div>
+        <div class="card-body py-2">
+            <div class="d-flex justify-content-between"><span>{% if phoi.return_trips.count() %}✅{% else %}❌{% endif %} Ít nhất một chuyến về</span><strong>{{ phoi.return_trips.count() }}</strong></div>
+            <div class="d-flex justify-content-between"><span>{% if phoi.fuel_logs.count() %}✅{% else %}❌{% endif %} Ít nhất một lần đổ xăng</span><strong>{{ phoi.fuel_logs.count() }}</strong></div>
+        </div>
+    </div>
+    {% elif phoi.status == 'submitted' %}
+    <div class="alert alert-warning">📬 Phơi đã chốt và đang chờ quản lý xác nhận. Dữ liệu hiện không thể chỉnh sửa.</div>
+    {% endif %}
 
     <!-- Thông tin chính -->
     <div class="card mb-3">
@@ -66,13 +84,44 @@
         </div>
     </div>
 
+    <!-- Các chuyến về -->
+    <div class="card mb-3">
+        <div class="card-header">🔁 Các chuyến về ({{ phoi.return_trips.count() }})</div>
+        <div class="card-body p-0">
+            {% for trip in phoi.return_trips.all() %}
+            <div class="p-3 {% if not loop.last %}border-bottom{% endif %}">
+                <div class="d-flex justify-content-between"><strong>Chuyến về #{{ trip.trip_order }}</strong><small class="text-muted">{{ trip.return_date.strftime('%d/%m/%Y') if trip.return_date else 'Chưa có ngày' }}</small></div>
+                <div><i class="bi bi-geo-alt"></i> {{ trip.origin }} → {{ trip.destination }}</div>
+                <div class="small text-muted">Hàng: {{ trip.cargo_description or '--' }} · {{ trip.km_total }} km · Full: {{ '{:,.0f}'.format(trip.revenue_full) }} VNĐ</div>
+                {% if trip.notes %}<div class="small text-muted">Ghi chú: {{ trip.notes }}</div>{% endif %}
+            </div>
+            {% else %}
+            <div class="p-3 text-muted">Chưa có chuyến về nào được ghi nhận.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">⛽ Lần đổ xăng đã gắn ({{ phoi.fuel_logs.count() }})</div>
+        <div class="card-body p-0">
+            {% for fuel in phoi.fuel_logs.all() %}
+            <div class="p-3 {% if not loop.last %}border-bottom{% endif %}">
+                <div class="d-flex justify-content-between"><strong>{{ fuel.refuel_date.strftime('%d/%m/%Y') }}</strong><strong>{{ '{:,.0f}'.format(fuel.total_cost) }} VNĐ</strong></div>
+                <div class="small text-muted">{{ fuel.liters }} lít · {{ '{:,.0f}'.format(fuel.price_per_liter) }} VNĐ/lít · {{ fuel.truck.license_plate }}</div>
+            </div>
+            {% else %}<div class="p-3 text-muted">Chưa có lần đổ xăng nào được gắn.</div>{% endfor %}
+        </div>
+    </div>
+
     <!-- Tài chính -->
     <div class="card mb-3">
-        <div class="card-header">💰 Tài chính</div>
+        <div class="card-header">💰 Tài chính chuyến đi</div>
         <div class="card-body">
             <table class="table table-sm table-borderless mb-0">
-                <tr><td>Doanh thu full chuyến</td><td class="text-end fw-bold">{{ '{:,.0f}'.format(phoi.revenue_full) }} VNĐ</td></tr>
-                <tr><td>Tiền tạm thu (tài xế giữ)</td><td class="text-end">{{ '{:,.0f}'.format(phoi.revenue_collected) }} VNĐ</td></tr>
+                <tr><td>Doanh thu chuyến đi</td><td class="text-end fw-bold">{{ '{:,.0f}'.format(phoi.revenue_full) }} VNĐ</td></tr>
+                <tr><td>Doanh thu các chuyến về</td><td class="text-end">{{ '{:,.0f}'.format(phoi.total_revenue_full() - phoi.revenue_full) }} VNĐ</td></tr>
+                <tr><td><strong>Tổng doanh thu phơi</strong></td><td class="text-end fw-bold">{{ '{:,.0f}'.format(phoi.total_revenue_full()) }} VNĐ</td></tr>
+                <tr><td>Tiền tài xế đã giữ</td><td class="text-end">{{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ</td></tr>
                 <tr><td colspan="2"><hr class="my-1"></td></tr>
                 <tr class="text-muted"><td colspan="2"><strong>Chi phí chuyến:</strong></td></tr>
                 {% for exp in phoi.expenses.all() %}
@@ -97,7 +146,7 @@
                 </div>
                 <div class="col-6">
                     <small class="text-muted">Tài xế đã giữ</small><br>
-                    <span class="fs-5 fw-bold">{{ '{:,.0f}'.format(phoi.revenue_collected) }} VNĐ</span>
+                    <span class="fs-5 fw-bold">{{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ</span>
                 </div>
             </div>
             <hr>

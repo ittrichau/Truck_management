@@ -37,28 +37,11 @@ function calcKm() {
 {% if current_user.is_driver() or current_user.is_manager_or_admin() %}
 
 <div class="mx-auto" style="max-width: 600px;">
-    <h5 class="mb-3"><i class="bi bi-plus-circle"></i> Tạo Phơi Mới</h5>
+    <h5 class="mb-1"><i class="bi bi-plus-circle"></i> Tạo Phơi Đang Thực Hiện</h5>
+    <p class="text-muted small mb-3">Chuyến về và lần đổ xăng có thể ghi nhận ngay hoặc bổ sung sau trước khi chốt phơi.</p>
     
     <form method="POST" id="phoi-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-        {% if current_user.is_manager_or_admin() %}
-        <!-- 👤 CHỌN TÀI XẾ -->
-        <span class="section-title"><i class="bi bi-person"></i> Tài xế</span>
-        <div class="card mb-3">
-            <div class="card-body">
-                <div class="mb-2">
-                    <label class="form-label">Chọn tài xế *</label>
-                    <select name="driver_id" class="form-select" required>
-                        <option value="">-- Chọn tài xế --</option>
-                        {% for d in drivers %}
-                        <option value="{{ d.id }}">{{ d.full_name }} ({{ d.username }})</option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-        </div>
-        {% endif %}
 
         <!-- 📋 CHỌN HÀNG -->
         <span class="section-title"><i class="bi bi-box-seam"></i> Chọn hàng</span>
@@ -102,24 +85,37 @@ function calcKm() {
         <span class="section-title"><i class="bi bi-truck"></i> Thông tin chuyến</span>
         <div class="card mb-3">
             <div class="card-body">
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="substitute-mode" name="is_substitute" value="1">
+                    <label class="form-check-label" for="substitute-mode"><strong>Chạy giùm</strong></label>
+                    <div class="form-text">Chỉ bật khi dùng cặp xe – tài xế khác với gán mặc định.</div>
+                </div>
                 <div class="mb-2">
                     <label class="form-label">Xe *</label>
-                    <select name="truck_id" class="form-select" required onchange="toggleSubstituteNote(this)">
+                    <input type="hidden" name="locked_truck_id" id="locked_truck_id" value="{{ current_user.current_truck_id or '' }}">
+                    <select name="truck_id" id="truck_id" class="form-select" required>
                         <option value="">-- Chọn xe --</option>
                         {% for t in trucks %}
                         <option value="{{ t.id }}" {% if current_user.current_truck_id == t.id %}selected{% endif %}>
                             {{ t.license_plate }} ({{ t.current_km }} km)
-                            {% if current_user.current_truck_id == t.id %} ← Xe của bạn{% endif %}
                         </option>
                         {% endfor %}
                     </select>
-                    <div id="substitute-note" class="mt-2" style="display:none;">
-                        <div class="alert alert-info py-2 mb-0">
-                            <i class="bi bi-info-circle"></i> 
-                            <strong>Chạy giùm:</strong> Bạn đang chọn xe khác với xe mặc định.
-                            <input type="hidden" name="is_substitute" id="is_substitute" value="0">
-                        </div>
-                    </div>
+                </div>
+                {% if current_user.is_manager_or_admin() %}
+                <div class="mb-2">
+                    <label class="form-label">Tài xế thực hiện *</label>
+                    <select name="driver_id" id="driver_id" class="form-select" required disabled>
+                        <option value="">-- Chọn xe để xác định tài xế --</option>
+                        {% for d in drivers %}
+                        <option value="{{ d.id }}">{{ d.full_name }} ({{ d.username }})</option>
+                        {% endfor %}
+                    </select>
+                    <small id="driver-help" class="text-muted">Tài xế được tự chọn theo xe mặc định.</small>
+                </div>
+                {% endif %}
+                <div id="substitute-note" class="mt-2" style="display:none;">
+                    <div class="alert alert-info py-2 mb-0"><i class="bi bi-info-circle"></i> <strong>Chạy giùm:</strong> phơi sẽ được lưu theo xe và tài xế đang chọn.</div>
                 </div>
                 <div class="row g-2 mb-2">
                     <div class="col-6">
@@ -147,8 +143,18 @@ function calcKm() {
             </div>
         </div>
 
-        <!-- 💰 DOANH THU -->
-        <span class="section-title"><i class="bi bi-cash-stack"></i> Doanh thu</span>
+        <!-- � CÁC CHUYẾN VỀ -->
+        <span class="section-title"><i class="bi bi-arrow-return-left"></i> Các chuyến về</span>
+        <div class="card mb-3">
+            <div class="card-body">
+                <p class="small text-muted">Một phơi có một chuyến đi ở trên và có thể thêm nhiều chuyến về.</p>
+                <div id="return-trips"></div>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="addReturnTrip()"><i class="bi bi-plus-lg"></i> Thêm chuyến về</button>
+            </div>
+        </div>
+
+        <!-- 💰 DOANH THU CHUYẾN ĐI -->
+        <span class="section-title"><i class="bi bi-cash-stack"></i> Doanh thu chuyến đi</span>
         <div class="card mb-3">
             <div class="card-body">
                 <div class="row g-2">
@@ -220,23 +226,79 @@ document.addEventListener('DOMContentLoaded', function() {
             input.value = today;
         }
     });
-    // Kiểm tra xe mặc định ban đầu
-    toggleSubstituteNote(document.querySelector('select[name="truck_id"]'));
+    const truckSelect = document.getElementById('truck_id');
+    const substituteMode = document.getElementById('substitute-mode');
+    truckSelect.addEventListener('change', syncAssignmentControls);
+    substituteMode.addEventListener('change', syncAssignmentControls);
+    syncAssignmentControls();
 });
 
-// Hiển thị ghi chú khi chọn xe khác xe mặc định
-function toggleSubstituteNote(selectEl) {
-    const defaultTruckId = '{{ current_user.current_truck_id or "0" }}';
+const defaultDriverByTruck = {
+    {% for truck_id, driver in driver_by_truck_id.items() %}
+    "{{ truck_id }}": "{{ driver.id }}"{% if not loop.last %},{% endif %}
+    {% endfor %}
+};
+const isManagerOrAdmin = {{ current_user.is_manager_or_admin()|tojson }};
+const defaultTruckId = '{{ current_user.current_truck_id or "" }}';
+
+function syncAssignmentControls() {
+    const truckSelect = document.getElementById('truck_id');
+    const substituteMode = document.getElementById('substitute-mode');
+    const driverSelect = document.getElementById('driver_id');
     const substituteNote = document.getElementById('substitute-note');
-    const isSubstitute = document.getElementById('is_substitute');
-    
-    if (defaultTruckId && selectEl.value && selectEl.value !== defaultTruckId) {
-        substituteNote.style.display = 'block';
-        isSubstitute.value = '1';
+    const driverHelp = document.getElementById('driver-help');
+    const isSubstitute = substituteMode.checked;
+
+    substituteNote.style.display = isSubstitute ? 'block' : 'none';
+
+    if (isManagerOrAdmin) {
+        driverSelect.disabled = !isSubstitute;
+        if (!isSubstitute) {
+            const driverId = defaultDriverByTruck[truckSelect.value] || '';
+            driverSelect.value = driverId;
+            driverHelp.textContent = driverId
+                ? 'Tài xế mặc định của xe đã được chọn tự động.'
+                : 'Xe này chưa có tài xế mặc định; hãy bật chạy giùm để chọn tài xế.';
+        } else {
+            driverHelp.textContent = 'Chọn tài xế thực hiện chuyến chạy giùm.';
+        }
     } else {
-        substituteNote.style.display = 'none';
-        isSubstitute.value = '0';
+        truckSelect.disabled = !isSubstitute;
+        if (!isSubstitute && defaultTruckId) {
+            truckSelect.value = defaultTruckId;
+        }
+        document.getElementById('locked_truck_id').value = !isSubstitute ? defaultTruckId : '';
     }
+}
+
+function addReturnTrip(values = {}) {
+    const number = document.querySelectorAll('.return-trip').length + 1;
+    const today = new Date().toISOString().split('T')[0];
+    const html = `
+        <div class="return-trip border rounded p-2 mb-3 bg-light">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <strong class="small"><i class="bi bi-arrow-return-left"></i> Chuyến về #${number}</strong>
+                <button type="button" class="btn btn-outline-danger btn-sm py-0" onclick="this.closest('.return-trip').remove(); renumberReturnTrips()">Xóa</button>
+            </div>
+            <div class="row g-2">
+                <div class="col-12"><input type="date" name="return_trip_date[]" class="form-control form-control-sm" value="${values.date || today}"></div>
+                <div class="col-6"><input type="text" name="return_trip_origin[]" class="form-control form-control-sm" required placeholder="Điểm đi" value="${values.origin || ''}"></div>
+                <div class="col-6"><input type="text" name="return_trip_destination[]" class="form-control form-control-sm" required placeholder="Điểm đến" value="${values.destination || ''}"></div>
+                <div class="col-12"><input type="text" name="return_trip_cargo[]" class="form-control form-control-sm" placeholder="Hàng hóa chuyến về" value="${values.cargo || ''}"></div>
+                <div class="col-6"><input type="number" name="return_trip_km_start[]" class="form-control form-control-sm" placeholder="KM đầu" value="${values.kmStart || ''}"></div>
+                <div class="col-6"><input type="number" name="return_trip_km_end[]" class="form-control form-control-sm" placeholder="KM cuối" value="${values.kmEnd || ''}"></div>
+                <div class="col-6"><input type="number" name="return_trip_revenue_full[]" class="form-control form-control-sm" step="1000" placeholder="Full chuyến về" value="${values.revenueFull || ''}"></div>
+                <div class="col-6"><input type="number" name="return_trip_revenue_collected[]" class="form-control form-control-sm" step="1000" placeholder="Đã thu" value="${values.revenueCollected || ''}"></div>
+                <div class="col-12"><input type="text" name="return_trip_notes[]" class="form-control form-control-sm" placeholder="Ghi chú chuyến về" value="${values.notes || ''}"></div>
+            </div>
+        </div>`;
+    document.getElementById('return-trips').insertAdjacentHTML('beforeend', html);
+}
+
+function renumberReturnTrips() {
+    document.querySelectorAll('.return-trip strong').forEach((element, index) => {
+        element.innerHTML = `<i class="bi bi-arrow-return-left"></i> Chuyến về #${index + 1}`;
+    });
 }
 </script>
 {% endblock %}
