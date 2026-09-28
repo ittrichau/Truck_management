@@ -220,7 +220,8 @@ def create():
             phoi.destination = request.form.get('destination', '').strip()
             phoi.cargo_description = request.form.get('cargo_description', '').strip()
 
-            phoi.km_start = truck.current_km
+            # Dữ liệu xe cũ có thể chưa có current_km; xem là 0 để vẫn tạo được phơi.
+            phoi.km_start = truck.current_km or 0
             phoi.km_end = int(request.form.get('km_end', 0) or 0)
             if phoi.km_end and phoi.km_end < phoi.km_start:
                 raise ValueError('KM cuối không thể nhỏ hơn KM đầu.')
