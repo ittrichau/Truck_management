@@ -1,0 +1,68 @@
+<div class="form-check form-switch mb-3">
+    <input class="form-check-input" type="checkbox" id="has-repair" name="has_repair" value="1" {% if phoi is defined and phoi.expenses.filter_by(category='repair').count() %}checked{% endif %}>
+    <label class="form-check-label" for="has-repair"><strong>Có sửa xe</strong></label>
+</div>
+<div id="repair-items" {% if not (phoi is defined and phoi.expenses.filter_by(category='repair').count()) %}class="d-none"{% endif %}></div>
+<button type="button" id="add-repair" class="btn btn-outline-warning btn-sm {% if not (phoi is defined and phoi.expenses.filter_by(category='repair').count()) %}d-none{% endif %}"><i class="bi bi-plus-lg"></i> Thêm hạng mục sửa xe</button>
+<template id="repair-template">
+    <div class="repair-item border rounded p-3 mt-3 bg-light">
+        <input type="hidden" name="repair_id[]" value="">
+        <div class="d-flex justify-content-between mb-2"><strong>Hạng mục sửa xe</strong><button type="button" class="btn btn-outline-danger btn-sm py-0 remove-repair">Xóa</button></div>
+        <div class="mb-2"><label class="form-label">Nội dung sửa *</label><input type="text" name="repair_description[]" class="form-control repair-description" maxlength="200"></div>
+        <div class="row g-2"><div class="col-6"><label class="form-label">Số tiền (VNĐ) *</label><input type="number" name="repair_amount[]" class="form-control repair-amount" min="1" step="1000"></div><div class="col-6 d-flex align-items-end"><div class="form-check mb-2"><input class="form-check-input repair-home" type="checkbox" name="repair_home_index[]" value="__INDEX__"><label class="form-check-label">Sửa tại nhà</label></div></div></div>
+        <div class="repair-external mt-2"><label class="form-label">Nơi sửa / Garage *</label><input type="text" name="repair_location[]" class="form-control repair-location" maxlength="200"><label class="form-label mt-2">Ảnh hóa đơn *</label><input type="file" class="form-control repair-receipts" accept="image/jpeg,image/png,image/webp" capture="environment" name="repair_receipts___INDEX__" multiple><small class="text-muted">Sửa bên ngoài bắt buộc tối thiểu 1 ảnh, tối đa 5 ảnh.</small></div>
+    </div>
+</template>
+<script>
+(function () {
+    const checkbox = document.getElementById('has-repair');
+    const items = document.getElementById('repair-items');
+    const addButton = document.getElementById('add-repair');
+    const template = document.getElementById('repair-template');
+    function toggleCard(card) {
+        const home = card.querySelector('.repair-home').checked;
+        const external = card.querySelector('.repair-external');
+        const location = card.querySelector('.repair-location');
+        const receipts = card.querySelector('.repair-receipts');
+        external.classList.toggle('d-none', home);
+        location.required = !home;
+        receipts.required = !home && !card.dataset.hasReceipt;
+    }
+    function refresh() {
+        const enabled = checkbox.checked;
+        items.classList.toggle('d-none', !enabled);
+        addButton.classList.toggle('d-none', !enabled);
+        if (enabled && !items.children.length) addRepair();
+    }
+    function addRepair(values = {}) {
+        const index = items.children.length;
+        const node = template.content.cloneNode(true);
+        const card = node.querySelector('.repair-item');
+        card.querySelector('[name="repair_id[]"]').value = values.id || '';
+        card.querySelector('.repair-description').value = values.description || '';
+        card.querySelector('.repair-amount').value = values.amount || '';
+        card.querySelector('.repair-home').checked = !!values.isHome;
+        card.querySelector('.repair-home').value = index;
+        card.querySelector('.repair-location').value = values.location || '';
+        card.querySelector('.repair-receipts').name = `repair_receipts_${index}`;
+        card.dataset.hasReceipt = values.hasReceipt ? '1' : '';
+        if (values.hasReceipt) card.querySelector('.repair-external').insertAdjacentHTML('beforeend', '<div class="small text-success mt-1">Đã có hóa đơn đính kèm.</div>');
+        card.querySelector('.repair-home').addEventListener('change', () => toggleCard(card));
+        card.querySelector('.remove-repair').addEventListener('click', () => { card.remove(); if (!items.children.length) checkbox.checked = false; refresh(); });
+        items.appendChild(node);
+        toggleCard(items.lastElementChild);
+    }
+    function reindex() {
+        items.querySelectorAll('.repair-item').forEach((card, index) => {
+            card.querySelector('.repair-home').value = index;
+            card.querySelector('.repair-receipts').name = `repair_receipts_${index}`;
+        });
+    }
+    checkbox.addEventListener('change', refresh);
+    addButton.addEventListener('click', () => addRepair());
+    document.getElementById('phoi-form').addEventListener('submit', reindex);
+    window.addRepair = addRepair;
+    {% if phoi is defined %}{% for expense in phoi.expenses.filter_by(category='repair').all() %}addRepair({id: '{{ expense.id }}', description: {{ expense.description|tojson }}, amount: '{{ expense.amount }}', isHome: {{ expense.is_home_repair|tojson }}, location: {{ expense.repair_location|default('', true)|tojson }}, hasReceipt: {{ (expense.attachments.filter_by(attachment_type='repair_receipt').count() > 0)|tojson }}});{% endfor %}{% endif %}
+    refresh();
+})();
+</script>

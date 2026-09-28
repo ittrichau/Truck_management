@@ -9,7 +9,13 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     ITEMS_PER_PAGE = 20
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max upload
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max request body
+    PHOI_ATTACHMENT_UPLOAD_FOLDER = os.environ.get(
+        'PHOI_ATTACHMENT_UPLOAD_FOLDER',
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance', 'uploads')
+    )
+    PHOI_ATTACHMENT_MAX_DIMENSION = int(os.environ.get('PHOI_ATTACHMENT_MAX_DIMENSION', '2000'))
+    PHOI_ATTACHMENT_JPEG_QUALITY = int(os.environ.get('PHOI_ATTACHMENT_JPEG_QUALITY', '82'))
 
     # CSRF Protection
     WTF_CSRF_ENABLED = True

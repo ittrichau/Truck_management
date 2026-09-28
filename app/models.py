@@ -234,6 +234,8 @@ class Phoi(db.Model):
     origin = db.Column(db.String(200), nullable=False)
     destination = db.Column(db.String(200), nullable=False)
     cargo_description = db.Column(db.String(300))
+    cargo_weight_tons = db.Column(db.Numeric(10, 3), nullable=True, comment='Khối lượng hàng theo phiếu cân (tấn)')
+    weigh_ticket_number = db.Column(db.String(100), nullable=True, comment='Số phiếu cân')
     
     # Số km
     km_start = db.Column(db.Integer, default=0)
@@ -267,7 +269,17 @@ class Phoi(db.Model):
         cascade='all, delete-orphan',
         order_by='PhoiReturnTrip.trip_order'
     )
+    attachments = db.relationship(
+        'PhoiAttachment',
+        backref='phoi',
+        lazy='dynamic',
+        cascade='all, delete-orphan',
+        order_by='PhoiAttachment.created_at'
+    )
     
+    def attachment_count(self, attachment_type):
+        return self.attachments.filter_by(attachment_type=attachment_type).count()
+
     def calculate_km_total(self):
         if self.km_end and self.km_start:
             self.km_total = self.km_end - self.km_start
@@ -311,6 +323,7 @@ class PhoiReturnTrip(db.Model):
     __tablename__ = 'phoi_return_trips'
     id = db.Column(db.Integer, primary_key=True)
     phoi_id = db.Column(db.Integer, db.ForeignKey('phoi.id', ondelete='CASCADE'), nullable=False, index=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=True)
     trip_order = db.Column(db.Integer, nullable=False, default=1)
     return_date = db.Column(db.Date)
     origin = db.Column(db.String(200), nullable=False)
@@ -324,6 +337,8 @@ class PhoiReturnTrip(db.Model):
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    customer = db.relationship('Customer', backref=db.backref('return_trips', lazy='dynamic'))
+
     def calculate_km_total(self):
         if self.km_start is not None and self.km_end is not None and self.km_end >= self.km_start:
             self.km_total = self.km_end - self.km_start
@@ -332,6 +347,39 @@ class PhoiReturnTrip(db.Model):
     def __repr__(self):
         return f'<PhoiReturnTrip #{self.trip_order} of phoi {self.phoi_id}>'
 
+class PhoiAttachment(db.Model):
+    """Compressed image evidence attached to a phơi or a specific repair expense."""
+    __tablename__ = 'phoi_attachments'
+    id = db.Column(db.Integer, primary_key=True)
+    phoi_id = db.Column(db.Integer, db.ForeignKey('phoi.id', ondelete='CASCADE'), nullable=False, index=True)
+    expense_id = db.Column(db.Integer, db.ForeignKey('phoi_expenses.id', ondelete='CASCADE'), nullable=True, index=True)
+    attachment_type = db.Column(db.String(30), nullable=False, index=True)
+    original_filename = db.Column(db.String(255), nullable=False)
+    storage_key = db.Column(db.String(500), nullable=False, unique=True)
+    mime_type = db.Column(db.String(100), nullable=False, default='image/jpeg')
+    file_size = db.Column(db.Integer, nullable=False)
+    width = db.Column(db.Integer, nullable=False)
+    height = db.Column(db.Integer, nullable=False)
+    notes = db.Column(db.String(500))
+    uploaded_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    uploaded_by = db.relationship('User', backref='phoi_attachments')
+
+    TYPES = {
+        'km_start': 'Ảnh KM đầu',
+        'km_end': 'Ảnh KM cuối',
+        'weigh_ticket': 'Phiếu cân',
+        'repair_receipt': 'Hóa đơn sửa xe',
+        'other': 'Chứng từ khác',
+    }
+
+    def type_label(self):
+        return self.TYPES.get(self.attachment_type, self.attachment_type)
+
+    def __repr__(self):
+        return f'<PhoiAttachment {self.attachment_type} for phoi {self.phoi_id}>'
+
 class PhoiExpense(db.Model):
     __tablename__ = 'phoi_expenses'
     id = db.Column(db.Integer, primary_key=True)
@@ -339,7 +387,17 @@ class PhoiExpense(db.Model):
     category = db.Column(db.String(30), nullable=False)  # porter_fee, toll_fee, repair, other
     description = db.Column(db.String(200))
     amount = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    is_home_repair = db.Column(db.Boolean, nullable=False, default=False)
+    repair_location = db.Column(db.String(200))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    attachments = db.relationship(
+        'PhoiAttachment',
+        backref='expense',
+        lazy='dynamic',
+        cascade='all, delete-orphan',
+        foreign_keys='PhoiAttachment.expense_id'
+    )
     
     CATEGORIES = {
         'porter_fee': 'Bồi dưỡng bốc vác',

@@ -1,8 +1,11 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file
 from flask_login import login_required, current_user
 from app import db
-from app.models import Phoi, PhoiExpense, PhoiReturnTrip, FuelLog, Customer, Truck, User, generate_phoi_number
+from app.models import Phoi, PhoiAttachment, PhoiExpense, PhoiReturnTrip, FuelLog, Customer, Truck, User, generate_phoi_number
+from app.phoi_attachments import attachment_path, delete_attachment_file, save_phoi_attachment
+from app.phoi_repair_expenses import _sync_standard_expenses, _sync_repair_expenses, _save_repair_receipts
 from datetime import datetime, date
+from decimal import Decimal, InvalidOperation
 
 bp = Blueprint('phoi', __name__)
 
@@ -16,6 +19,16 @@ def submission_error(phoi):
         return 'Phơi chưa có chuyến về. Vui lòng thêm ít nhất một chuyến về trước khi chốt.'
     if phoi.fuel_logs.count() == 0:
         return 'Phơi chưa được gắn lần đổ xăng nào. Vui lòng ghi nhận đổ xăng trước khi chốt.'
+    if not phoi.km_start or not phoi.km_end or phoi.km_end < phoi.km_start:
+        return 'Vui lòng nhập KM đầu và KM cuối hợp lệ trước khi chốt phơi.'
+    required_attachments = {
+        'km_start': 'ảnh đồng hồ KM đầu',
+        'km_end': 'ảnh đồng hồ KM cuối',
+        'weigh_ticket': 'ít nhất một ảnh phiếu cân',
+    }
+    for attachment_type, label in required_attachments.items():
+        if phoi.attachment_count(attachment_type) == 0:
+            return f'Phơi chưa có {label}. Vui lòng tải ảnh lên trước khi chốt.'
     return None
 
 
@@ -85,6 +98,7 @@ def _sync_return_trips(phoi):
     PhoiReturnTrip.query.filter_by(phoi_id=phoi.id).delete()
 
     dates = request.form.getlist('return_trip_date[]')
+    customer_ids = request.form.getlist('return_trip_customer_id[]')
     origins = request.form.getlist('return_trip_origin[]')
     destinations = request.form.getlist('return_trip_destination[]')
     cargoes = request.form.getlist('return_trip_cargo[]')
@@ -102,8 +116,10 @@ def _sync_return_trips(phoi):
         if not origin or not destination:
             raise ValueError(f'Chuyến về #{index + 1} phải có đủ điểm đi và điểm đến.')
 
+        customer_id = customer_ids[index] if index < len(customer_ids) else ''
         trip = PhoiReturnTrip(
             phoi_id=phoi.id,
+            customer_id=int(customer_id) if customer_id else None,
             trip_order=index + 1,
             return_date=datetime.strptime(dates[index], '%Y-%m-%d').date() if index < len(dates) and dates[index] else None,
             origin=origin,
@@ -182,6 +198,7 @@ def create():
     customers = Customer.query.filter_by(is_active=True).order_by(Customer.name).all()
 
     if request.method == 'POST':
+        saved_keys = []
         try:
             driver, truck, is_substitute = _selected_driver_and_truck()
             phoi = Phoi()
@@ -203,9 +220,13 @@ def create():
             phoi.destination = request.form.get('destination', '').strip()
             phoi.cargo_description = request.form.get('cargo_description', '').strip()
 
-            phoi.km_start = int(request.form.get('km_start', 0) or 0)
+            phoi.km_start = truck.current_km
             phoi.km_end = int(request.form.get('km_end', 0) or 0)
+            if phoi.km_end and phoi.km_end < phoi.km_start:
+                raise ValueError('KM cuối không thể nhỏ hơn KM đầu.')
             phoi.calculate_km_total()
+            phoi.cargo_weight_tons = float(request.form.get('cargo_weight_tons', 0) or 0) or None
+            phoi.weigh_ticket_number = request.form.get('weigh_ticket_number', '').strip() or None
 
             phoi.revenue_full = float(request.form.get('revenue_full', 0) or 0)
             phoi.revenue_collected = float(request.form.get('revenue_collected', 0) or 0)
@@ -218,24 +239,33 @@ def create():
             db.session.flush()
             _sync_return_trips(phoi)
 
-            expense_categories = [
-                ('porter_fee', 'Bồi dưỡng bốc vác'),
-                ('toll_fee', 'Phí đường'),
-                ('repair', 'Sửa xe'),
-                ('other', 'Chi phí khác'),
-            ]
-            for cat_key, cat_label in expense_categories:
-                amount = float(request.form.get(f'expense_{cat_key}', 0) or 0)
-                if amount > 0:
-                    exp = PhoiExpense(
-                        phoi_id=phoi.id,
-                        category=cat_key,
-                        description=cat_label,
-                        amount=amount
+            for attachment_type, field_name, maximum_files in (
+                ('km_start', 'km_start_images', 1),
+                ('weigh_ticket', 'weigh_ticket_images', 5),
+            ):
+                files = [file for file in request.files.getlist(field_name) if file and file.filename]
+                if len(files) > maximum_files:
+                    raise ValueError(
+                        'Ảnh đồng hồ KM đầu chỉ được tải 1 ảnh.'
+                        if attachment_type == 'km_start'
+                        else 'Ảnh phiếu cân chỉ được tải tối đa 5 ảnh khi tạo phơi.'
                     )
-                    db.session.add(exp)
+                for file in files:
+                    metadata = save_phoi_attachment(file, phoi.id)
+                    saved_keys.append(metadata['storage_key'])
+                    db.session.add(PhoiAttachment(
+                        phoi_id=phoi.id,
+                        attachment_type=attachment_type,
+                        uploaded_by_id=current_user.id,
+                        **metadata,
+                    ))
 
-            truck.current_km = max(truck.current_km, phoi.km_end)
+            _sync_standard_expenses(phoi)
+            repairs = _sync_repair_expenses(phoi)
+            _save_repair_receipts(phoi, repairs, saved_keys)
+
+            if phoi.km_end:
+                truck.current_km = max(truck.current_km, phoi.km_end)
             truck.status = 'in_trip'
 
             db.session.commit()
@@ -244,9 +274,13 @@ def create():
 
         except (ValueError, TypeError) as e:
             db.session.rollback()
+            for storage_key in saved_keys:
+                delete_attachment_file(storage_key)
             flash(f'Lỗi khi tạo phơi: {str(e)}', 'danger')
         except Exception as e:
             db.session.rollback()
+            for storage_key in saved_keys:
+                delete_attachment_file(storage_key)
             flash(f'Lỗi khi tạo phơi: {str(e)}', 'danger')
 
     return render_template(
@@ -269,6 +303,83 @@ def detail(id):
 
     return render_template('phoi/detail.html', phoi=phoi)
 
+
+@bp.route('/phoi/<int:id>/attachments', methods=['POST'])
+@login_required
+def upload_attachment(id):
+    phoi = Phoi.query.get_or_404(id)
+    if phoi.status != 'draft' or not can_manage_phoi(current_user, phoi):
+        flash('Chỉ có thể tải chứng từ cho phơi đang thực hiện của bạn.', 'danger')
+        return redirect(url_for('phoi.detail', id=id))
+
+    attachment_type = request.form.get('attachment_type', '')
+    if attachment_type not in PhoiAttachment.TYPES:
+        flash('Loại chứng từ không hợp lệ.', 'danger')
+        return redirect(url_for('phoi.detail', id=id))
+    files = [file for file in request.files.getlist('images') if file and file.filename]
+    if not files or len(files) > 5:
+        flash('Mỗi lần cần tải từ 1 đến 5 ảnh.', 'danger')
+        return redirect(url_for('phoi.detail', id=id))
+
+    saved_keys = []
+    try:
+        for file in files:
+            metadata = save_phoi_attachment(file, phoi.id)
+            saved_keys.append(metadata['storage_key'])
+            db.session.add(PhoiAttachment(
+                phoi_id=phoi.id, attachment_type=attachment_type,
+                notes=request.form.get('notes', '').strip() or None,
+                uploaded_by_id=current_user.id, **metadata
+            ))
+        db.session.commit()
+        flash(f'Đã tải {len(files)} ảnh {PhoiAttachment.TYPES[attachment_type].lower()}.', 'success')
+    except ValueError as exc:
+        db.session.rollback()
+        for storage_key in saved_keys:
+            delete_attachment_file(storage_key)
+        flash(str(exc), 'danger')
+    except Exception:
+        db.session.rollback()
+        for storage_key in saved_keys:
+            delete_attachment_file(storage_key)
+        flash('Không thể xử lý ảnh. Vui lòng thử lại.', 'danger')
+    return redirect(url_for('phoi.detail', id=id))
+
+@bp.route('/phoi/<int:id>/attachments/<int:attachment_id>')
+@login_required
+def view_attachment(id, attachment_id):
+    phoi = Phoi.query.get_or_404(id)
+    if not can_manage_phoi(current_user, phoi):
+        flash('Bạn không có quyền xem chứng từ này.', 'danger')
+        return redirect(url_for('phoi.index'))
+    attachment = PhoiAttachment.query.filter_by(id=attachment_id, phoi_id=phoi.id).first_or_404()
+    try:
+        path = attachment_path(attachment.storage_key)
+        if not path.is_file():
+            raise FileNotFoundError
+        return send_file(path, mimetype=attachment.mime_type, conditional=True)
+    except (FileNotFoundError, ValueError):
+        flash('Không tìm thấy tệp ảnh.', 'warning')
+        return redirect(url_for('phoi.detail', id=id))
+
+@bp.route('/phoi/<int:id>/attachments/<int:attachment_id>/delete', methods=['POST'])
+@login_required
+def delete_attachment(id, attachment_id):
+    phoi = Phoi.query.get_or_404(id)
+    if phoi.status != 'draft' or not can_manage_phoi(current_user, phoi):
+        flash('Chỉ có thể xóa chứng từ của phơi đang thực hiện.', 'danger')
+        return redirect(url_for('phoi.detail', id=id))
+    attachment = PhoiAttachment.query.filter_by(id=attachment_id, phoi_id=phoi.id).first_or_404()
+    if attachment.attachment_type == 'repair_receipt' and attachment.expense and not attachment.expense.is_home_repair:
+        if attachment.expense.attachments.filter_by(attachment_type='repair_receipt').count() <= 1:
+            flash('Không thể xóa hóa đơn cuối cùng của hạng mục sửa xe bên ngoài.', 'danger')
+            return redirect(url_for('phoi.detail', id=id))
+    storage_key = attachment.storage_key
+    db.session.delete(attachment)
+    db.session.commit()
+    delete_attachment_file(storage_key)
+    flash('Đã xóa ảnh đính kèm.', 'success')
+    return redirect(url_for('phoi.detail', id=id))
 
 @bp.route('/phoi/<int:id>/print')
 @login_required
@@ -298,6 +409,7 @@ def edit(id):
     customers = Customer.query.filter_by(is_active=True).order_by(Customer.name).all()
 
     if request.method == 'POST':
+        saved_keys = []
         try:
             old_truck = phoi.truck
             driver, truck, is_substitute = _selected_driver_and_truck()
@@ -320,7 +432,11 @@ def edit(id):
             phoi.cargo_description = request.form.get('cargo_description', '').strip()
             phoi.km_start = int(request.form.get('km_start', 0) or 0)
             phoi.km_end = int(request.form.get('km_end', 0) or 0)
+            if phoi.km_end and phoi.km_end < phoi.km_start:
+                raise ValueError('KM cuối không thể nhỏ hơn KM đầu.')
             phoi.calculate_km_total()
+            phoi.cargo_weight_tons = float(request.form.get('cargo_weight_tons', 0) or 0) or None
+            phoi.weigh_ticket_number = request.form.get('weigh_ticket_number', '').strip() or None
             phoi.revenue_full = float(request.form.get('revenue_full', 0) or 0)
             phoi.revenue_collected = float(request.form.get('revenue_collected', 0) or 0)
             phoi.notes = request.form.get('notes', '').strip()
@@ -329,20 +445,12 @@ def edit(id):
                 phoi.driver_wage = float(request.form.get('driver_wage', 0) or 0)
 
             _sync_return_trips(phoi)
-            PhoiExpense.query.filter_by(phoi_id=phoi.id).delete()
-            expense_categories = [
-                ('porter_fee', 'Bồi dưỡng bốc vác'),
-                ('toll_fee', 'Phí đường'),
-                ('repair', 'Sửa xe'),
-                ('other', 'Chi phí khác'),
-            ]
-            for cat_key, cat_label in expense_categories:
-                amount = float(request.form.get(f'expense_{cat_key}', 0) or 0)
-                if amount > 0:
-                    exp = PhoiExpense(phoi_id=phoi.id, category=cat_key, description=cat_label, amount=amount)
-                    db.session.add(exp)
+            _sync_standard_expenses(phoi)
+            repairs = _sync_repair_expenses(phoi)
+            _save_repair_receipts(phoi, repairs, saved_keys)
 
-            truck.current_km = max(truck.current_km, phoi.km_end)
+            if phoi.km_end:
+                truck.current_km = max(truck.current_km, phoi.km_end)
             update_truck_status(old_truck)
             update_truck_status(truck)
             db.session.commit()
@@ -351,9 +459,13 @@ def edit(id):
 
         except (ValueError, TypeError) as e:
             db.session.rollback()
+            for storage_key in saved_keys:
+                delete_attachment_file(storage_key)
             flash(f'Lỗi: {str(e)}', 'danger')
         except Exception as e:
             db.session.rollback()
+            for storage_key in saved_keys:
+                delete_attachment_file(storage_key)
             flash(f'Lỗi: {str(e)}', 'danger')
 
     return render_template(

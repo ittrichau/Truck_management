@@ -53,6 +53,9 @@
         <div class="card-body py-2">
             <div class="d-flex justify-content-between"><span>{% if phoi.return_trips.count() %}✅{% else %}❌{% endif %} Ít nhất một chuyến về</span><strong>{{ phoi.return_trips.count() }}</strong></div>
             <div class="d-flex justify-content-between"><span>{% if phoi.fuel_logs.count() %}✅{% else %}❌{% endif %} Ít nhất một lần đổ xăng</span><strong>{{ phoi.fuel_logs.count() }}</strong></div>
+            <div class="d-flex justify-content-between"><span>{% if phoi.attachment_count('km_start') %}✅{% else %}❌{% endif %} Ảnh đồng hồ KM đầu</span><strong>{{ phoi.attachment_count('km_start') }}</strong></div>
+            <div class="d-flex justify-content-between"><span>{% if phoi.attachment_count('km_end') %}✅{% else %}❌{% endif %} Ảnh đồng hồ KM cuối</span><strong>{{ phoi.attachment_count('km_end') }}</strong></div>
+            <div class="d-flex justify-content-between"><span>{% if phoi.attachment_count('weigh_ticket') %}✅{% else %}❌{% endif %} Ảnh phiếu cân</span><strong>{{ phoi.attachment_count('weigh_ticket') }}</strong></div>
         </div>
     </div>
     {% elif phoi.status == 'submitted' %}
@@ -113,6 +116,31 @@
         </div>
     </div>
 
+    <div class="card mb-3">
+        <div class="card-header">📷 Chứng từ chuyến đi</div>
+        <div class="card-body">
+            {% if phoi.cargo_weight_tons or phoi.weigh_ticket_number %}
+            <div class="mb-3 small"><strong>Khối lượng:</strong> {{ phoi.cargo_weight_tons or '--' }} tấn · <strong>Số phiếu cân:</strong> {{ phoi.weigh_ticket_number or '--' }}</div>
+            {% endif %}
+            {% if phoi.status == 'draft' and (current_user.is_manager_or_admin() or (current_user.is_driver() and phoi.driver_id == current_user.id)) %}
+            <form action="{{ url_for('phoi.upload_attachment', id=phoi.id) }}" method="POST" enctype="multipart/form-data" class="border rounded p-3 mb-3 bg-light">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-4"><label class="form-label">Loại chứng từ *</label><select name="attachment_type" class="form-select" required><option value="weigh_ticket">Phiếu cân</option><option value="km_start">Ảnh KM đầu</option><option value="km_end">Ảnh KM cuối</option><option value="other">Chứng từ khác</option></select></div>
+                    <div class="col-md-8"><label class="form-label">Chụp hoặc chọn ảnh *</label><input type="file" name="images" class="form-control" accept="image/jpeg,image/png,image/webp" capture="environment" multiple required><small class="text-muted">Tối đa 5 ảnh/lần. Ảnh được nén tự động, vẫn giữ độ rõ để đối chiếu.</small></div>
+                    <div class="col-12"><button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-camera"></i> Tải chứng từ lên</button></div>
+                </div>
+            </form>
+            {% endif %}
+            {% for attachment in phoi.attachments.all() %}
+            <div class="d-flex align-items-center justify-content-between border-bottom py-2 gap-2">
+                <a class="text-decoration-none" target="_blank" href="{{ url_for('phoi.view_attachment', id=phoi.id, attachment_id=attachment.id) }}"><i class="bi bi-image"></i> <strong>{{ attachment.type_label() }}</strong>{% if attachment.expense %}<br><small class="text-warning">Sửa xe: {{ attachment.expense.description }}</small>{% endif %}<br><small class="text-muted">{{ attachment.original_filename }} · {{ '%.1f'|format(attachment.file_size / 1024) }} KB · {{ attachment.created_at.strftime('%d/%m/%Y %H:%M') }}</small></a>
+                {% if phoi.status == 'draft' and (current_user.is_manager_or_admin() or (current_user.is_driver() and phoi.driver_id == current_user.id)) %}<form action="{{ url_for('phoi.delete_attachment', id=phoi.id, attachment_id=attachment.id) }}" method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-danger btn-sm" onclick="return confirm('Xóa ảnh này?')">Xóa</button></form>{% endif %}
+            </div>
+            {% else %}<p class="text-muted mb-0">Chưa có ảnh chứng từ nào.</p>{% endfor %}
+        </div>
+    </div>
+
     <!-- Tài chính -->
     <div class="card mb-3">
         <div class="card-header">💰 Tài chính chuyến đi</div>
@@ -125,7 +153,7 @@
                 <tr><td colspan="2"><hr class="my-1"></td></tr>
                 <tr class="text-muted"><td colspan="2"><strong>Chi phí chuyến:</strong></td></tr>
                 {% for exp in phoi.expenses.all() %}
-                <tr><td class="ps-3">{{ exp.category_label() }}</td><td class="text-end">{{ '{:,.0f}'.format(exp.amount) }} VNĐ</td></tr>
+                <tr><td class="ps-3">{{ exp.category_label() }}{% if exp.category == 'repair' %}<br><small class="text-muted">{{ exp.description }} · {% if exp.is_home_repair %}Sửa tại nhà{% else %}{{ exp.repair_location }} · {{ exp.attachments.filter_by(attachment_type='repair_receipt').count() }} hóa đơn{% endif %}</small>{% endif %}</td><td class="text-end">{{ '{:,.0f}'.format(exp.amount) }} VNĐ</td></tr>
                 {% else %}
                 <tr><td class="ps-3 text-muted">Không có chi phí</td><td></td></tr>
                 {% endfor %}

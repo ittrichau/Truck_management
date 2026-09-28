@@ -23,7 +23,7 @@ async function onCustomerChange(select) {
 <div class="mx-auto" style="max-width: 600px;">
     <h5 class="mb-3"><i class="bi bi-pencil-square"></i> Sửa Phơi {{ phoi.phoi_number }}</h5>
 
-    <form method="POST">
+    <form method="POST" id="phoi-form" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <span class="section-title"><i class="bi bi-box-seam"></i> Chọn hàng</span>
         <div class="card mb-3"><div class="card-body">
@@ -75,31 +75,16 @@ async function onCustomerChange(select) {
                 <div class="col-6"><label class="form-label">Ngày về</label><input type="date" name="return_date" class="form-control" value="{{ phoi.return_date.strftime('%Y-%m-%d') if phoi.return_date }}"></div>
             </div>
             <div class="row g-2">
-                <div class="col-6"><label class="form-label">KM đầu</label><input type="number" name="km_start" class="form-control" value="{{ phoi.km_start }}"></div>
-                <div class="col-6"><label class="form-label">KM cuối</label><input type="number" name="km_end" class="form-control" value="{{ phoi.km_end }}"></div>
+                <div class="col-6"><label class="form-label">KM đầu</label><input type="number" name="km_start" class="form-control" value="{{ phoi.km_start }}" min="0"></div>
+                <div class="col-6"><label class="form-label">KM cuối</label><input type="number" name="km_end" class="form-control" value="{{ phoi.km_end if phoi.km_end else '' }}" min="0" placeholder="Nhập khi hoàn tất"></div>
             </div>
         </div></div>
 
-        <span class="section-title"><i class="bi bi-arrow-return-left"></i> Các chuyến về</span>
-        <div class="card mb-3"><div class="card-body">
-            <p class="small text-muted">Thêm một hoặc nhiều chuyến về thuộc phơi này.</p>
-            <div id="return-trips">
-                {% for trip in phoi.return_trips.all() %}
-                <div class="return-trip border rounded p-2 mb-3 bg-light">
-                    <div class="d-flex justify-content-between align-items-center mb-2"><strong class="small"><i class="bi bi-arrow-return-left"></i> Chuyến về #{{ loop.index }}</strong><button type="button" class="btn btn-outline-danger btn-sm py-0" onclick="this.closest('.return-trip').remove(); renumberReturnTrips()">Xóa</button></div>
-                    <div class="row g-2">
-                        <div class="col-12"><input type="date" name="return_trip_date[]" class="form-control form-control-sm" value="{{ trip.return_date.strftime('%Y-%m-%d') if trip.return_date else '' }}"></div>
-                        <div class="col-6"><input type="text" name="return_trip_origin[]" class="form-control form-control-sm" required placeholder="Điểm đi" value="{{ trip.origin }}"></div><div class="col-6"><input type="text" name="return_trip_destination[]" class="form-control form-control-sm" required placeholder="Điểm đến" value="{{ trip.destination }}"></div>
-                        <div class="col-12"><input type="text" name="return_trip_cargo[]" class="form-control form-control-sm" placeholder="Hàng hóa chuyến về" value="{{ trip.cargo_description or '' }}"></div>
-                        <div class="col-6"><input type="number" name="return_trip_km_start[]" class="form-control form-control-sm" placeholder="KM đầu" value="{{ trip.km_start if trip.km_start is not none else '' }}"></div><div class="col-6"><input type="number" name="return_trip_km_end[]" class="form-control form-control-sm" placeholder="KM cuối" value="{{ trip.km_end if trip.km_end is not none else '' }}"></div>
-                        <div class="col-6"><input type="number" name="return_trip_revenue_full[]" class="form-control form-control-sm" step="1000" placeholder="Full chuyến về" value="{{ trip.revenue_full }}"></div><div class="col-6"><input type="number" name="return_trip_revenue_collected[]" class="form-control form-control-sm" step="1000" placeholder="Đã thu" value="{{ trip.revenue_collected }}"></div>
-                        <div class="col-12"><input type="text" name="return_trip_notes[]" class="form-control form-control-sm" placeholder="Ghi chú chuyến về" value="{{ trip.notes or '' }}"></div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            <button type="button" class="btn btn-outline-primary btn-sm" onclick="addReturnTrip()"><i class="bi bi-plus-lg"></i> Thêm chuyến về</button>
-        </div></div>
+        <span class="section-title"><i class="bi bi-speedometer2"></i> Thông tin phiếu cân</span>
+        <div class="card mb-3"><div class="card-body"><div class="row g-2">
+            <div class="col-6"><label class="form-label">Khối lượng (tấn)</label><input type="number" name="cargo_weight_tons" class="form-control" min="0" step="0.001" value="{{ phoi.cargo_weight_tons or '' }}"></div>
+            <div class="col-6"><label class="form-label">Số phiếu cân</label><input type="text" name="weigh_ticket_number" class="form-control" maxlength="100" value="{{ phoi.weigh_ticket_number or '' }}"></div>
+        </div><small class="text-muted d-block mt-2">Tải ảnh phiếu cân tại trang chi tiết phơi.</small></div></div>
 
         <span class="section-title"><i class="bi bi-cash-stack"></i> Doanh thu chuyến đi</span>
         <div class="card mb-3"><div class="card-body">
@@ -116,13 +101,11 @@ async function onCustomerChange(select) {
                 {% set _ = expenses.update({exp.category: exp.amount}) %}
             {% endfor %}
             <div class="row g-2 mb-2">
-                <div class="col-6"><label class="form-label">Bồi dưỡng bốc vác</label><input type="number" name="expense_porter_fee" class="form-control" value="{{ expenses.get('porter_fee', 0) }}" step="1000"></div>
-                <div class="col-6"><label class="form-label">Phí đường</label><input type="number" name="expense_toll_fee" class="form-control" value="{{ expenses.get('toll_fee', 0) }}" step="1000"></div>
+                <div class="col-6"><label class="form-label">Bồi dưỡng bốc vác</label><input type="number" name="expense_porter_fee" class="form-control" value="{{ expenses.get('porter_fee', 0) }}" min="0" step="1000"></div>
+                <div class="col-6"><label class="form-label">Phí đường</label><input type="number" name="expense_toll_fee" class="form-control" value="{{ expenses.get('toll_fee', 0) }}" min="0" step="1000"></div>
             </div>
-            <div class="row g-2">
-                <div class="col-6"><label class="form-label">Sửa xe</label><input type="number" name="expense_repair" class="form-control" value="{{ expenses.get('repair', 0) }}" step="1000"></div>
-                <div class="col-6"><label class="form-label">Chi phí khác</label><input type="number" name="expense_other" class="form-control" value="{{ expenses.get('other', 0) }}" step="1000"></div>
-            </div>
+            <div class="mb-2"><label class="form-label">Chi phí khác</label><input type="number" name="expense_other" class="form-control" value="{{ expenses.get('other', 0) }}" min="0" step="1000"></div>
+            {% include 'phoi/_repair_expenses.html' %}
         </div></div>
 
         {% if current_user.is_manager_or_admin() %}
@@ -136,6 +119,28 @@ async function onCustomerChange(select) {
             <label class="form-label">Ghi chú</label>
             <textarea name="notes" class="form-control" rows="2">{{ phoi.notes or '' }}</textarea>
         </div>
+
+        <span class="section-title"><i class="bi bi-arrow-return-left"></i> Các chuyến về</span>
+        <div class="card mb-3"><div class="card-body">
+            <p class="small text-muted">Mỗi chuyến về có thể chọn khách hàng để tự điền tuyến đường và hàng hóa, giống khi tạo phơi.</p>
+            <div id="return-trips">
+                {% for trip in phoi.return_trips.all() %}
+                <div class="return-trip border rounded p-3 mb-3 bg-light">
+                    <div class="d-flex justify-content-between align-items-center mb-2"><strong><i class="bi bi-arrow-return-left"></i> Chuyến về #{{ loop.index }}</strong><button type="button" class="btn btn-outline-danger btn-sm py-0" onclick="this.closest('.return-trip').remove(); renumberReturnTrips()">Xóa</button></div>
+                    <div class="mb-2"><label class="form-label">Khách hàng / Hàng hóa</label><select name="return_trip_customer_id[]" class="form-select form-select-sm" onchange="onReturnCustomerChange(this)"><option value="">-- Chọn khách hàng / hàng hóa --</option>{% for customer in customers %}<option value="{{ customer.id }}" {% if trip.customer_id == customer.id %}selected{% endif %}>{{ customer.name }} ({{ customer.cargo_type or '...' }})</option>{% endfor %}</select></div>
+                    <div class="row g-2">
+                        <div class="col-12"><label class="form-label">Ngày về</label><input type="date" name="return_trip_date[]" class="form-control form-control-sm" value="{{ trip.return_date.strftime('%Y-%m-%d') if trip.return_date else '' }}"></div>
+                        <div class="col-6"><label class="form-label">Điểm đi *</label><input type="text" name="return_trip_origin[]" class="form-control form-control-sm" required value="{{ trip.origin }}"></div><div class="col-6"><label class="form-label">Điểm đến *</label><input type="text" name="return_trip_destination[]" class="form-control form-control-sm" required value="{{ trip.destination }}"></div>
+                        <div class="col-12"><label class="form-label">Mô tả hàng hóa</label><input type="text" name="return_trip_cargo[]" class="form-control form-control-sm" value="{{ trip.cargo_description or '' }}"></div>
+                        <div class="col-6"><label class="form-label">KM đầu</label><input type="number" name="return_trip_km_start[]" class="form-control form-control-sm" value="{{ trip.km_start if trip.km_start is not none else '' }}"></div><div class="col-6"><label class="form-label">KM cuối</label><input type="number" name="return_trip_km_end[]" class="form-control form-control-sm" value="{{ trip.km_end if trip.km_end is not none else '' }}"></div>
+                        <div class="col-6"><label class="form-label">Full chuyến (VNĐ)</label><input type="number" name="return_trip_revenue_full[]" class="form-control form-control-sm" step="1000" value="{{ trip.revenue_full }}"></div><div class="col-6"><label class="form-label">Đã thu tạm (VNĐ)</label><input type="number" name="return_trip_revenue_collected[]" class="form-control form-control-sm" step="1000" value="{{ trip.revenue_collected }}"></div>
+                        <div class="col-12"><label class="form-label">Ghi chú</label><input type="text" name="return_trip_notes[]" class="form-control form-control-sm" value="{{ trip.notes or '' }}"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" class="btn btn-outline-primary btn-sm" onclick="addReturnTrip()"><i class="bi bi-plus-lg"></i> Thêm chuyến về</button>
+        </div></div>
 
         <div class="d-grid gap-2 mb-5">
             <button type="submit" class="btn btn-primary btn-lg" style="border-radius:12px; padding:14px;">
@@ -189,10 +194,31 @@ document.addEventListener('DOMContentLoaded', function() {
     syncAssignmentControls();
 });
 
+const customers = {{ customers | map(attribute='id') | list | tojson }}.map((id, index) => ({
+    id,
+    name: {{ customers | map(attribute='name') | list | tojson }}[index],
+    cargo: {{ customers | map(attribute='cargo_type') | list | tojson }}[index],
+    origin: {{ customers | map(attribute='default_origin') | list | tojson }}[index],
+    destination: {{ customers | map(attribute='default_destination') | list | tojson }}[index]
+}));
+
+function returnCustomerOptions() {
+    return '<option value="">-- Chọn khách hàng / hàng hóa --</option>' + customers.map(customer => `<option value="${customer.id}">${customer.name} (${customer.cargo || '...'})</option>`).join('');
+}
+
+function onReturnCustomerChange(select) {
+    const trip = select.closest('.return-trip');
+    const customer = customers.find(item => String(item.id) === select.value);
+    if (!customer) return;
+    trip.querySelector('[name="return_trip_origin[]"]').value = customer.origin || '';
+    trip.querySelector('[name="return_trip_destination[]"]').value = customer.destination || '';
+    trip.querySelector('[name="return_trip_cargo[]"]').value = customer.cargo || '';
+}
+
 function addReturnTrip() {
     const number = document.querySelectorAll('.return-trip').length + 1;
     const today = new Date().toISOString().split('T')[0];
-    document.getElementById('return-trips').insertAdjacentHTML('beforeend', `<div class="return-trip border rounded p-2 mb-3 bg-light"><div class="d-flex justify-content-between align-items-center mb-2"><strong class="small"><i class="bi bi-arrow-return-left"></i> Chuyến về #${number}</strong><button type="button" class="btn btn-outline-danger btn-sm py-0" onclick="this.closest('.return-trip').remove(); renumberReturnTrips()">Xóa</button></div><div class="row g-2"><div class="col-12"><input type="date" name="return_trip_date[]" class="form-control form-control-sm" value="${today}"></div><div class="col-6"><input type="text" name="return_trip_origin[]" class="form-control form-control-sm" required placeholder="Điểm đi"></div><div class="col-6"><input type="text" name="return_trip_destination[]" class="form-control form-control-sm" required placeholder="Điểm đến"></div><div class="col-12"><input type="text" name="return_trip_cargo[]" class="form-control form-control-sm" placeholder="Hàng hóa chuyến về"></div><div class="col-6"><input type="number" name="return_trip_km_start[]" class="form-control form-control-sm" placeholder="KM đầu"></div><div class="col-6"><input type="number" name="return_trip_km_end[]" class="form-control form-control-sm" placeholder="KM cuối"></div><div class="col-6"><input type="number" name="return_trip_revenue_full[]" class="form-control form-control-sm" step="1000" placeholder="Full chuyến về"></div><div class="col-6"><input type="number" name="return_trip_revenue_collected[]" class="form-control form-control-sm" step="1000" placeholder="Đã thu"></div><div class="col-12"><input type="text" name="return_trip_notes[]" class="form-control form-control-sm" placeholder="Ghi chú chuyến về"></div></div></div>`);
+    document.getElementById('return-trips').insertAdjacentHTML('beforeend', `<div class="return-trip border rounded p-3 mb-3 bg-light"><div class="d-flex justify-content-between align-items-center mb-2"><strong><i class="bi bi-arrow-return-left"></i> Chuyến về #${number}</strong><button type="button" class="btn btn-outline-danger btn-sm py-0" onclick="this.closest('.return-trip').remove(); renumberReturnTrips()">Xóa</button></div><div class="mb-2"><label class="form-label">Khách hàng / Hàng hóa</label><select name="return_trip_customer_id[]" class="form-select form-select-sm" onchange="onReturnCustomerChange(this)">${returnCustomerOptions()}</select></div><div class="row g-2"><div class="col-12"><label class="form-label">Ngày về</label><input type="date" name="return_trip_date[]" class="form-control form-control-sm" value="${today}"></div><div class="col-6"><label class="form-label">Điểm đi *</label><input type="text" name="return_trip_origin[]" class="form-control form-control-sm" required></div><div class="col-6"><label class="form-label">Điểm đến *</label><input type="text" name="return_trip_destination[]" class="form-control form-control-sm" required></div><div class="col-12"><label class="form-label">Mô tả hàng hóa</label><input type="text" name="return_trip_cargo[]" class="form-control form-control-sm"></div><div class="col-6"><label class="form-label">KM đầu</label><input type="number" name="return_trip_km_start[]" class="form-control form-control-sm"></div><div class="col-6"><label class="form-label">KM cuối</label><input type="number" name="return_trip_km_end[]" class="form-control form-control-sm"></div><div class="col-6"><label class="form-label">Full chuyến (VNĐ)</label><input type="number" name="return_trip_revenue_full[]" class="form-control form-control-sm" step="1000"></div><div class="col-6"><label class="form-label">Đã thu tạm (VNĐ)</label><input type="number" name="return_trip_revenue_collected[]" class="form-control form-control-sm" step="1000"></div><div class="col-12"><label class="form-label">Ghi chú</label><input type="text" name="return_trip_notes[]" class="form-control form-control-sm"></div></div></div>`);
 }
 function renumberReturnTrips() { document.querySelectorAll('.return-trip strong').forEach((item, index) => { item.innerHTML = `<i class="bi bi-arrow-return-left"></i> Chuyến về #${index + 1}`; }); }
 </script>

@@ -235,7 +235,7 @@
                 <tr><td colspan="2"><hr style="margin:4px 0;"></td></tr>
                 <tr style="font-weight:600; color:#555;"><td>Chi phí chuyến:</td><td></td></tr>
                 {% for exp in phoi.expenses.all() %}
-                <tr class="sub-row"><td>{{ exp.category_label() }}</td><td class="amount">{{ '{:,.0f}'.format(exp.amount) }} VNĐ</td></tr>
+                <tr class="sub-row"><td>{{ exp.category_label() }}{% if exp.category == 'repair' %}<br><small>{{ exp.description }} · {% if exp.is_home_repair %}Sửa tại nhà{% else %}{{ exp.repair_location }} · Có hóa đơn{% endif %}</small>{% endif %}</td><td class="amount">{{ '{:,.0f}'.format(exp.amount) }} VNĐ</td></tr>
                 {% else %}
                 <tr class="sub-row"><td style="color:#aaa;">Không có chi phí</td><td></td></tr>
                 {% endfor %}
