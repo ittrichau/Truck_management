@@ -9,6 +9,7 @@ services:
       - ./logs:/var/log/app
     environment:
       - FLASK_ENV=production
+      - FLASK_APP=run:app
       - SECRET_KEY=${SECRET_KEY:?err}
       - DATABASE_URL=${DATABASE_URL:-sqlite:///instance/truck_management.db}
       - LOG_LEVEL=${LOG_LEVEL:-WARNING}
