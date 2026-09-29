@@ -36,6 +36,59 @@
     </div>
 </div>
 
+<div class="d-flex justify-content-end mb-2">
+    <button id="phoiFilterToggle" class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#phoiFilters" aria-expanded="true" aria-controls="phoiFilters">
+        <i class="bi bi-funnel"></i> <span>Ẩn bộ lọc</span>
+    </button>
+</div>
+<div class="collapse show" id="phoiFilters">
+    <form method="GET" action="{{ url_for('phoi.index') }}" class="card card-body mb-3">
+        <div class="row g-2">
+            <div class="col-12 col-md-4">
+                <label for="q" class="form-label small mb-1">Tìm kiếm</label>
+                <input id="q" name="q" class="form-control" value="{{ search }}" placeholder="Mã phơi, tuyến, xe, tài xế">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="status" class="form-label small mb-1">Trạng thái</label>
+                <select id="status" name="status" class="form-select">
+                    <option value="">Tất cả</option>
+                    <option value="draft" {% if filter_status == 'draft' %}selected{% endif %}>Đang thực hiện</option>
+                    <option value="submitted" {% if filter_status == 'submitted' %}selected{% endif %}>Đã chốt</option>
+                    <option value="confirmed" {% if filter_status == 'confirmed' %}selected{% endif %}>Đã xác nhận</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="truck_id" class="form-label small mb-1">Số xe</label>
+                <select id="truck_id" name="truck_id" class="form-select">
+                    <option value="">Tất cả xe</option>
+                    {% for truck in trucks %}<option value="{{ truck.id }}" {% if filter_truck_id == truck.id %}selected{% endif %}>{{ truck.license_plate }}</option>{% endfor %}
+                </select>
+            </div>
+            {% if current_user.is_manager_or_admin() %}
+            <div class="col-6 col-md-2">
+                <label for="driver_id" class="form-label small mb-1">Tài xế</label>
+                <select id="driver_id" name="driver_id" class="form-select">
+                    <option value="">Tất cả tài xế</option>
+                    {% for driver in drivers %}<option value="{{ driver.id }}" {% if filter_driver_id == driver.id %}selected{% endif %}>{{ driver.full_name }}</option>{% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <div class="col-6 col-md-2">
+                <label for="start_date" class="form-label small mb-1">Từ ngày</label>
+                <input id="start_date" type="date" name="start_date" value="{{ start_date }}" class="form-control">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="end_date" class="form-label small mb-1">Đến ngày</label>
+                <input id="end_date" type="date" name="end_date" value="{{ end_date }}" class="form-control">
+            </div>
+            <div class="col-12 d-flex gap-2 justify-content-end">
+                <a href="{{ url_for('phoi.index') }}" class="btn btn-outline-secondary">Xóa lọc</a>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-funnel"></i> Lọc</button>
+            </div>
+        </div>
+    </form>
+</div>
+
 {% if phois.items %}
 <div class="row g-3">
     {% for p in phois.items %}
@@ -58,6 +111,8 @@
                     <div class="mb-2"><span class="badge bg-info text-dark"><i class="bi bi-arrow-left-right"></i> Chạy giùm</span></div>
                     {% endif %}
                     <div class="text-dark small">
+                        <div><i class="bi bi-truck"></i> <strong>Xe: {{ p.truck.license_plate }}</strong></div>
+                        <div><i class="bi bi-person"></i> {{ p.driver.full_name }}</div>
                         <div><i class="bi bi-geo-alt"></i> {{ p.origin }} → {{ p.destination }}</div>
                         <div><i class="bi bi-calendar"></i> {{ p.departure_date.strftime('%d/%m/%Y') if p.departure_date else '--' }}</div>
                         <div><i class="bi bi-arrow-return-left"></i> 1 chuyến đi + {{ p.return_trips.count() }} chuyến về</div>
@@ -86,7 +141,7 @@
         {% for page_num in phois.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
             {% if page_num %}
             <li class="page-item {% if page_num == phois.page %}active{% endif %}">
-                <a class="page-link" href="{{ url_for('phoi.index', page=page_num) }}">{{ page_num }}</a>
+                <a class="page-link" href="{{ url_for('phoi.index', page=page_num, q=search, status=filter_status, truck_id=filter_truck_id, driver_id=filter_driver_id, start_date=start_date, end_date=end_date) }}">{{ page_num }}</a>
             </li>
             {% else %}
             <li class="page-item disabled"><span class="page-link">…</span></li>
@@ -120,10 +175,26 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Huỷ</button>
                 <form method="POST" action="{{ url_for('auth.logout') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-danger"><i class="bi bi-box-arrow-right"></i> Đăng xuất</button>
                 </form>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    const phoiFilters = document.getElementById('phoiFilters');
+    const phoiFilterToggle = document.getElementById('phoiFilterToggle');
+    const phoiFilterToggleLabel = phoiFilterToggle.querySelector('span');
+
+    phoiFilters.addEventListener('show.bs.collapse', () => {
+        phoiFilterToggleLabel.textContent = 'Ẩn bộ lọc';
+        phoiFilterToggle.setAttribute('aria-expanded', 'true');
+    });
+    phoiFilters.addEventListener('hide.bs.collapse', () => {
+        phoiFilterToggleLabel.textContent = 'Hiện bộ lọc';
+        phoiFilterToggle.setAttribute('aria-expanded', 'false');
+    });
+</script>
 {% endblock %}

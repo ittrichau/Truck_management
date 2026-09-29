@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file
 from flask_login import login_required, current_user
+from sqlalchemy import or_
 from app import db
 from app.models import Phoi, PhoiAttachment, PhoiExpense, PhoiReturnTrip, FuelLog, Customer, Truck, User, generate_phoi_number
 from app.phoi_attachments import attachment_path, delete_attachment_file, save_phoi_attachment
@@ -139,15 +140,50 @@ def _sync_return_trips(phoi):
 @bp.route('/phoi')
 @login_required
 def index():
-    """Danh sách phơi – driver chỉ thấy của mình, manager/admin thấy tất cả"""
+    """Danh sách phơi – driver chỉ thấy của mình, manager/admin thấy tất cả."""
     page = request.args.get('page', 1, type=int)
+    search = request.args.get('q', '').strip()
+    filter_status = request.args.get('status', '')
+    filter_truck_id = request.args.get('truck_id', type=int)
+    filter_driver_id = request.args.get('driver_id', type=int)
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
 
-    if current_user.is_manager_or_admin():
-        query = Phoi.query.order_by(Phoi.created_at.desc())
-    else:
-        query = Phoi.query.filter_by(driver_id=current_user.id).order_by(Phoi.created_at.desc())
+    query = Phoi.query
+    if not current_user.is_manager_or_admin():
+        query = query.filter(Phoi.driver_id == current_user.id)
 
-    phois = query.paginate(page=page, per_page=20, error_out=False)
+    if search:
+        keyword = f'%{search}%'
+        query = query.outerjoin(Truck).outerjoin(User, Phoi.driver_id == User.id).filter(
+            or_(
+                Phoi.phoi_number.ilike(keyword),
+                Phoi.origin.ilike(keyword),
+                Phoi.destination.ilike(keyword),
+                Truck.license_plate.ilike(keyword),
+                User.full_name.ilike(keyword),
+            )
+        )
+    if filter_status in ('draft', 'submitted', 'confirmed'):
+        query = query.filter(Phoi.status == filter_status)
+    if filter_truck_id:
+        query = query.filter(Phoi.truck_id == filter_truck_id)
+    if current_user.is_manager_or_admin() and filter_driver_id:
+        query = query.filter(Phoi.driver_id == filter_driver_id)
+    if start_date:
+        try:
+            query = query.filter(Phoi.departure_date >= datetime.strptime(start_date, '%Y-%m-%d').date())
+        except ValueError:
+            start_date = ''
+    if end_date:
+        try:
+            query = query.filter(Phoi.departure_date <= datetime.strptime(end_date, '%Y-%m-%d').date())
+        except ValueError:
+            end_date = ''
+
+    phois = query.order_by(Phoi.created_at.desc()).paginate(page=page, per_page=20, error_out=False)
+    trucks = Truck.query.order_by(Truck.license_plate).all()
+    drivers = User.query.filter_by(role='driver').order_by(User.full_name).all() if current_user.is_manager_or_admin() else []
 
     balances = {}
     for p in phois.items:
@@ -177,7 +213,20 @@ def index():
         Truck.mark_expiry_notified(notified_truck_ids, notified_types)
         db.session.commit()
 
-    return render_template('phoi/index.html', phois=phois, balances=balances, expiry_warnings=warnings)
+    return render_template(
+        'phoi/index.html',
+        phois=phois,
+        balances=balances,
+        expiry_warnings=warnings,
+        trucks=trucks,
+        drivers=drivers,
+        search=search,
+        filter_status=filter_status,
+        filter_truck_id=filter_truck_id,
+        filter_driver_id=filter_driver_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
 
 
 @bp.route('/phoi/create', methods=['GET', 'POST'])
