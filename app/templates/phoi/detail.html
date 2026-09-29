@@ -95,7 +95,7 @@
             <div class="p-3 {% if not loop.last %}border-bottom{% endif %}">
                 <div class="d-flex justify-content-between"><strong>Chuyến về #{{ trip.trip_order }}</strong><small class="text-muted">{{ trip.return_date.strftime('%d/%m/%Y') if trip.return_date else 'Chưa có ngày' }}</small></div>
                 <div><i class="bi bi-geo-alt"></i> {{ trip.origin }} → {{ trip.destination }}</div>
-                <div class="small text-muted">Hàng: {{ trip.cargo_description or '--' }} · Full: {{ '{:,.0f}'.format(trip.revenue_full) }} VNĐ</div>
+                <div class="small text-muted">Hàng: {{ trip.cargo_description or '--' }} · Full: {{ '{:,.0f}'.format(trip.revenue_full) }} VNĐ{% if trip.payment_method == 'per_ton' %} · {{ trip.cargo_weight_tons }} tấn × {{ '{:,.0f}'.format(trip.price_per_ton or 0) }} VNĐ/tấn{% else %} · Bao chuyến{% endif %}</div>
                 {% if trip.notes %}<div class="small text-muted">Ghi chú: {{ trip.notes }}</div>{% endif %}
             </div>
             {% else %}
@@ -146,7 +146,7 @@
         <div class="card-header">💰 Tài chính chuyến đi</div>
         <div class="card-body">
             <table class="table table-sm table-borderless mb-0">
-                <tr><td>Doanh thu chuyến đi</td><td class="text-end fw-bold">{{ '{:,.0f}'.format(phoi.revenue_full) }} VNĐ</td></tr>
+                <tr><td>Doanh thu chuyến đi{% if phoi.payment_method == 'per_ton' %}<br><small class="text-muted">{{ phoi.cargo_weight_tons }} tấn × {{ '{:,.0f}'.format(phoi.price_per_ton or 0) }} VNĐ/tấn</small>{% else %}<br><small class="text-muted">Bao chuyến</small>{% endif %}</td><td class="text-end fw-bold">{{ '{:,.0f}'.format(phoi.revenue_full) }} VNĐ</td></tr>
                 <tr><td>Doanh thu các chuyến về</td><td class="text-end">{{ '{:,.0f}'.format(phoi.total_revenue_full() - phoi.revenue_full) }} VNĐ</td></tr>
                 <tr><td><strong>Tổng doanh thu phơi</strong></td><td class="text-end fw-bold">{{ '{:,.0f}'.format(phoi.total_revenue_full()) }} VNĐ</td></tr>
                 <tr><td>Tiền tài xế đã giữ</td><td class="text-end">{{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ</td></tr>

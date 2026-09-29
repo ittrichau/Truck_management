@@ -243,6 +243,8 @@ class Phoi(db.Model):
     km_total = db.Column(db.Integer, default=0)
     
     # Tiền
+    payment_method = db.Column(db.String(20), nullable=False, default='fixed', comment='fixed hoặc per_ton')
+    price_per_ton = db.Column(db.Numeric(12, 2), nullable=True, comment='Đơn giá vận chuyển mỗi tấn')
     revenue_full = db.Column(db.Numeric(12, 2), default=0, comment='Tổng doanh thu full chuyến')
     revenue_collected = db.Column(db.Numeric(12, 2), default=0, comment='Tiền mặt tài xế đã thu')
     driver_wage = db.Column(db.Numeric(12, 2), default=0, comment='Phí công tài xế (manager nhập)')
@@ -336,6 +338,9 @@ class PhoiReturnTrip(db.Model):
     origin = db.Column(db.String(200), nullable=False)
     destination = db.Column(db.String(200), nullable=False)
     cargo_description = db.Column(db.String(300))
+    cargo_weight_tons = db.Column(db.Numeric(10, 3), nullable=True, comment='Khối lượng hàng chuyến về (tấn)')
+    payment_method = db.Column(db.String(20), nullable=False, default='fixed', comment='fixed hoặc per_ton')
+    price_per_ton = db.Column(db.Numeric(12, 2), nullable=True, comment='Đơn giá vận chuyển mỗi tấn')
     km_start = db.Column(db.Integer)
     km_end = db.Column(db.Integer)
     km_total = db.Column(db.Integer, nullable=False, default=0)

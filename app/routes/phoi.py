@@ -94,6 +94,30 @@ def _selected_driver_and_truck():
     return driver, truck, False
 
 
+def _money(value):
+    """Parse a currency form field after removing visual thousand separators."""
+    try:
+        return Decimal(str(value or '0').replace(',', '').strip() or '0')
+    except (InvalidOperation, ValueError):
+        raise ValueError('Số tiền không hợp lệ.')
+
+
+def _revenue_from_form(method, fixed_revenue, weight, price_per_ton):
+    if method not in ('fixed', 'per_ton'):
+        raise ValueError('Cách tính tiền không hợp lệ.')
+    if method == 'fixed':
+        return _money(fixed_revenue), None, None
+
+    try:
+        tons = Decimal(str(weight or '').strip()) if str(weight or '').strip() else Decimal('0')
+    except InvalidOperation:
+        raise ValueError('Số tấn không hợp lệ.')
+    price = _money(price_per_ton)
+    if tons <= 0 or price <= 0:
+        raise ValueError('Khi tính theo tấn, vui lòng nhập số tấn và giá mỗi tấn lớn hơn 0.')
+    return tons * price, tons, price
+
+
 def _sync_return_trips(phoi):
     """Lưu các chuyến về; KM được ghi một lần cho toàn bộ phơi."""
     PhoiReturnTrip.query.filter_by(phoi_id=phoi.id).delete()
@@ -103,6 +127,9 @@ def _sync_return_trips(phoi):
     origins = request.form.getlist('return_trip_origin[]')
     destinations = request.form.getlist('return_trip_destination[]')
     cargoes = request.form.getlist('return_trip_cargo[]')
+    payment_methods = request.form.getlist('return_trip_payment_method[]')
+    weights = request.form.getlist('return_trip_cargo_weight_tons[]')
+    prices_per_ton = request.form.getlist('return_trip_price_per_ton[]')
     revenues = request.form.getlist('return_trip_revenue_full[]')
     collecteds = request.form.getlist('return_trip_revenue_collected[]')
     porter_fees = request.form.getlist('return_trip_porter_fee[]')
@@ -117,6 +144,13 @@ def _sync_return_trips(phoi):
             raise ValueError(f'Chuyến về #{index + 1} phải có đủ điểm đi và điểm đến.')
 
         customer_id = customer_ids[index] if index < len(customer_ids) else ''
+        payment_method = payment_methods[index] if index < len(payment_methods) else 'fixed'
+        revenue_full, cargo_weight_tons, price_per_ton = _revenue_from_form(
+            payment_method,
+            revenues[index] if index < len(revenues) else 0,
+            weights[index] if index < len(weights) else '',
+            prices_per_ton[index] if index < len(prices_per_ton) else 0,
+        )
         trip = PhoiReturnTrip(
             phoi_id=phoi.id,
             customer_id=int(customer_id) if customer_id else None,
@@ -125,9 +159,12 @@ def _sync_return_trips(phoi):
             origin=origin,
             destination=destination,
             cargo_description=cargoes[index].strip() if index < len(cargoes) else '',
-            revenue_full=float(revenues[index] or 0) if index < len(revenues) else 0,
-            revenue_collected=float(collecteds[index] or 0) if index < len(collecteds) else 0,
-            porter_fee=float(porter_fees[index] or 0) if index < len(porter_fees) else 0,
+            payment_method=payment_method,
+            cargo_weight_tons=cargo_weight_tons,
+            price_per_ton=price_per_ton,
+            revenue_full=revenue_full,
+            revenue_collected=_money(collecteds[index] if index < len(collecteds) else 0),
+            porter_fee=_money(porter_fees[index] if index < len(porter_fees) else 0),
             notes=notes[index].strip() if index < len(notes) else ''
         )
         db.session.add(trip)
@@ -272,11 +309,16 @@ def create():
             if phoi.km_end and phoi.km_end < phoi.km_start:
                 raise ValueError('KM cuối không thể nhỏ hơn KM đầu.')
             phoi.calculate_km_total()
-            phoi.cargo_weight_tons = float(request.form.get('cargo_weight_tons', 0) or 0) or None
             phoi.weigh_ticket_number = request.form.get('weigh_ticket_number', '').strip() or None
-
-            phoi.revenue_full = float(request.form.get('revenue_full', 0) or 0)
-            phoi.revenue_collected = float(request.form.get('revenue_collected', 0) or 0)
+            phoi.payment_method = request.form.get('payment_method', 'fixed')
+            phoi.revenue_full, cargo_weight_tons, phoi.price_per_ton = _revenue_from_form(
+                phoi.payment_method,
+                request.form.get('revenue_full', 0),
+                request.form.get('cargo_weight_tons', ''),
+                request.form.get('price_per_ton', 0),
+            )
+            phoi.cargo_weight_tons = cargo_weight_tons
+            phoi.revenue_collected = _money(request.form.get('revenue_collected', 0))
 
             # Phơi mới đang thực hiện; chuyến về và đổ xăng sẽ được thêm sau.
             phoi.status = 'draft'
@@ -482,10 +524,16 @@ def edit(id):
             if phoi.km_end and phoi.km_end < phoi.km_start:
                 raise ValueError('KM cuối không thể nhỏ hơn KM đầu.')
             phoi.calculate_km_total()
-            phoi.cargo_weight_tons = float(request.form.get('cargo_weight_tons', 0) or 0) or None
             phoi.weigh_ticket_number = request.form.get('weigh_ticket_number', '').strip() or None
-            phoi.revenue_full = float(request.form.get('revenue_full', 0) or 0)
-            phoi.revenue_collected = float(request.form.get('revenue_collected', 0) or 0)
+            phoi.payment_method = request.form.get('payment_method', 'fixed')
+            phoi.revenue_full, cargo_weight_tons, phoi.price_per_ton = _revenue_from_form(
+                phoi.payment_method,
+                request.form.get('revenue_full', 0),
+                request.form.get('cargo_weight_tons', ''),
+                request.form.get('price_per_ton', 0),
+            )
+            phoi.cargo_weight_tons = cargo_weight_tons
+            phoi.revenue_collected = _money(request.form.get('revenue_collected', 0))
             phoi.notes = request.form.get('notes', '').strip()
 
             if current_user.is_manager_or_admin():

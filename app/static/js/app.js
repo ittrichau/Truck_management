@@ -23,10 +23,10 @@ function formatCurrency(amount) {
 
 // Định dạng các trường tiền theo dấu phân cách hàng nghìn ngay khi nhập.
 const currencyInputNames = new Set([
-    'price_per_liter', 'revenue_full', 'revenue_collected',
+    'price_per_liter', 'revenue_full', 'revenue_collected', 'price_per_ton',
     'expense_porter_fee', 'expense_toll_fee', 'expense_other',
     'driver_wage', 'repair_amount[]', 'return_trip_revenue_full[]',
-    'return_trip_revenue_collected[]', 'return_trip_porter_fee[]'
+    'return_trip_revenue_collected[]', 'return_trip_porter_fee[]', 'return_trip_price_per_ton[]'
 ]);
 
 function isCurrencyInput(input) {
@@ -95,6 +95,39 @@ document.addEventListener('submit', function(event) {
     event.target.querySelectorAll('input').forEach(function(input) {
         if (isCurrencyInput(input)) input.value = currencyDigits(input.value);
     });
+});
+
+// Tính doanh thu theo hai cách: bao chuyến hoặc số tấn × giá mỗi tấn.
+function numericInputValue(input) {
+    return Number(String(input?.value || '').replace(/,/g, '')) || 0;
+}
+
+function syncPaymentCalculator(container) {
+    const method = container.querySelector('.payment-method');
+    if (!method) return;
+    const isPerTon = method.value === 'per_ton';
+    container.querySelectorAll('.fixed-revenue-field').forEach(field => field.classList.toggle('d-none', isPerTon));
+    container.querySelectorAll('.per-ton-field').forEach(field => field.classList.toggle('d-none', !isPerTon));
+
+    const revenue = container.querySelector('.calculated-revenue');
+    const price = container.querySelector('.price-per-ton');
+    const weight = container.querySelector('.cargo-weight') || document.querySelector('[name="cargo_weight_tons"]');
+    if (isPerTon && revenue && price && weight) {
+        const total = numericInputValue(weight) * numericInputValue(price);
+        revenue.value = total ? Math.round(total).toLocaleString('en-US') : '';
+    }
+}
+
+function syncAllPaymentCalculators() {
+    document.querySelectorAll('[data-payment-calculator]').forEach(syncPaymentCalculator);
+}
+
+document.addEventListener('DOMContentLoaded', syncAllPaymentCalculators);
+document.addEventListener('change', function(event) {
+    if (event.target.matches('.payment-method')) syncPaymentCalculator(event.target.closest('[data-payment-calculator]'));
+});
+document.addEventListener('input', function(event) {
+    if (event.target.matches('.price-per-ton, .cargo-weight, [name="cargo_weight_tons"]')) syncAllPaymentCalculators();
 });
 
 // Keyboard shortcuts
