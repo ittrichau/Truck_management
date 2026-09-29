@@ -141,6 +141,55 @@ def register_cli_commands(app):
         click.echo(f'  Trucks: {len(license_plates)}')
         click.echo(f'  Customers: {len(customers_data)}')
 
+    @app.cli.command('create-admin')
+    @click.option('--username', default='admin', show_default=True, prompt=True,
+                  help='Tên đăng nhập của tài khoản quản trị.')
+    @click.option('--full-name', prompt=True, help='Họ tên hiển thị.')
+    @click.option('--phone', default='', help='Số điện thoại (không bắt buộc).')
+    @click.password_option(confirmation_prompt=True,
+                           help='Mật khẩu mới cho tài khoản quản trị.')
+    @click.option('--update/--no-update', default=False,
+                  help='Cho phép cập nhật tài khoản nếu tên đăng nhập đã tồn tại.')
+    @with_appcontext
+    def create_admin_command(username, full_name, phone, password, update):
+        """Create a permanent administrator account without demo credentials."""
+        from app import db
+        from app.models import User
+
+        username = username.strip()
+        full_name = full_name.strip()
+        if not username or not full_name:
+            raise click.UsageError('Tên đăng nhập và họ tên không được để trống.')
+        if len(password) < 12:
+            raise click.UsageError('Mật khẩu phải có ít nhất 12 ký tự.')
+
+        user = User.query.filter_by(username=username).first()
+        if user:
+            if not update:
+                raise click.UsageError(
+                    'Tài khoản đã tồn tại. Chạy lại với --update để thay đổi mật khẩu/thông tin.'
+                )
+            user.full_name = full_name
+            user.phone = phone.strip() or None
+            user.role = 'admin'
+            user.is_active = True
+            user.set_password(password)
+            action = 'Đã cập nhật'
+        else:
+            user = User(
+                username=username,
+                full_name=full_name,
+                phone=phone.strip() or None,
+                role='admin',
+                is_active=True,
+            )
+            user.set_password(password)
+            db.session.add(user)
+            action = 'Đã tạo'
+
+        db.session.commit()
+        click.echo(f'{action} tài khoản quản trị: {user.username}')
+
     @app.cli.command('health')
     @with_appcontext
     def health_command():

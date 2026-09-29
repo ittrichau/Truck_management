@@ -1,0 +1,36 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Never run two production deployments at the same time.
+concurrency:
+  group: production-vps-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy application
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Deploy revision to VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script_stop: true
+          command_timeout: 20m
+          script: |
+            export APP_DIR=/opt/truck-management
+            export DEPLOY_BRANCH=main
+            bash /opt/truck-management/deploy/deploy-vps.sh

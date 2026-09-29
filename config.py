@@ -49,10 +49,13 @@ class ProductionConfig(Config):
     DEBUG = False
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'WARNING')
     LOG_FILE = os.environ.get('LOG_FILE', '/tmp/app.log')  # Use /tmp for writable temp logs
-    PREFERRED_URL_SCHEME = 'https'
-    SESSION_COOKIE_SECURE = True
+    PREFERRED_URL_SCHEME = os.environ.get('PREFERRED_URL_SCHEME', 'https')
+    # Keep secure cookies enabled by default. Set COOKIE_SECURE=false only for
+    # temporary IP-based HTTP access before a domain and HTTPS are configured.
+    SESSION_COOKIE_SECURE = os.environ.get('COOKIE_SECURE', 'true').lower() == 'true'
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
+    REMEMBER_COOKIE_SECURE = SESSION_COOKIE_SECURE
 
     # PostgreSQL in production (Railway provides DATABASE_URL)
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')

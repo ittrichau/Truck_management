@@ -14,5 +14,7 @@ services:
       - DATABASE_URL=${DATABASE_URL:-sqlite:///instance/truck_management.db}
       - LOG_LEVEL=${LOG_LEVEL:-WARNING}
       - LOG_FILE=${LOG_FILE:-/var/log/app/app.log}
+      - COOKIE_SECURE=${COOKIE_SECURE:-true}
+      - PREFERRED_URL_SCHEME=${PREFERRED_URL_SCHEME:-https}
       - SEED_DEFAULT_DATA=${SEED_DEFAULT_DATA:-false}
     restart: unless-stopped
