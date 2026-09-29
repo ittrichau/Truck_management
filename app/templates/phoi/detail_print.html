@@ -259,7 +259,7 @@
                 <div style="font-size:1.2rem; font-weight:bold;">{{ '{:,.0f}'.format(-bal) }} VNĐ</div>
             {% endif %}
             <div style="font-size:0.75rem; margin-top:6px; opacity:0.8;">
-                Tài xế đã ứng + Công: {{ '{:,.0f}'.format(phoi.total_expenses() + phoi.driver_wage) }} VNĐ
+                Tài xế đã ứng + Công: {{ '{:,.0f}'.format(phoi.driver_out_of_pocket_expenses() + phoi.driver_wage) }} VNĐ
                 &nbsp;|&nbsp;
                 Tài xế đã giữ: {{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ
             </div>

@@ -8,7 +8,7 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
             <label class="form-label">Giá (VNĐ/lít) *</label>
-            <input type="number" name="price_per_liter" class="form-control" required placeholder="25000" step="1">
+            <input type="text" name="price_per_liter" class="form-control currency-input" required placeholder="25,000" inputmode="numeric">
         </div>
         <div class="row g-2 mb-3">
             <div class="col-6">

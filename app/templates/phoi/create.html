@@ -129,18 +129,18 @@ function calcKm() {
                 </div>
                 <div class="row g-2 mb-2">
                     <div class="col-6">
-                        <label class="form-label">KM đầu</label>
+                        <label class="form-label">KM đầu (cả chuyến đi-về)</label>
                         <input type="number" id="km_start" class="form-control" value="{{ current_user.current_truck.current_km if current_user.current_truck else '' }}" readonly>
                         <small class="text-muted">Tự lấy theo km hiện tại của xe.</small>
                     </div>
                     <div class="col-6">
-                        <label class="form-label">KM cuối</label>
-                        <input type="number" name="km_end" id="km_end" class="form-control" placeholder="Nhập khi hoàn tất" min="0" oninput="calcKm()">
-                        <small class="text-muted">Có thể bổ sung trước khi chốt.</small>
+                        <label class="form-label">KM cuối (sau khi về)</label>
+                        <input type="number" name="km_end" id="km_end" class="form-control" placeholder="Nhập khi hoàn tất chuyến đi-về" min="0" oninput="calcKm()">
+                        <small class="text-muted">Nhập một lần sau khi hoàn tất cả chuyến đi và về.</small>
                     </div>
                 </div>
                 <div class="text-end">
-                    <small class="text-muted">Tổng KM: <strong id="km_total_display">0 km</strong></small>
+                    <small class="text-muted">Tổng KM đi-về: <strong id="km_total_display">0 km</strong></small>
                 </div>
             </div>
         </div>
@@ -170,11 +170,11 @@ function calcKm() {
                 <div class="row g-2">
                     <div class="col-6">
                         <label class="form-label">Full chuyến (VNĐ)</label>
-                        <input type="number" name="revenue_full" class="form-control" placeholder="Tổng tiền khách trả" step="1000">
+                        <input type="text" name="revenue_full" class="form-control currency-input" placeholder="Tổng tiền khách trả" inputmode="numeric">
                     </div>
                     <div class="col-6">
                         <label class="form-label">Đã thu tạm (VNĐ)</label>
-                        <input type="number" name="revenue_collected" class="form-control" placeholder="Tiền mặt đã giữ" step="1000">
+                        <input type="text" name="revenue_collected" class="form-control currency-input" placeholder="Tiền mặt đã giữ" inputmode="numeric">
                     </div>
                 </div>
             </div>
@@ -187,16 +187,18 @@ function calcKm() {
                 <div class="row g-2 mb-2">
                     <div class="col-6">
                         <label class="form-label">Bồi dưỡng bốc vác</label>
-                        <input type="number" name="expense_porter_fee" class="form-control" value="0" min="0" step="1000">
+                        <input type="text" name="expense_porter_fee" class="form-control currency-input" value="0" inputmode="numeric">
                     </div>
+                    {% if current_user.is_manager_or_admin() %}
                     <div class="col-6">
-                        <label class="form-label">Phí đường</label>
-                        <input type="number" name="expense_toll_fee" class="form-control" value="0" min="0" step="1000">
+                        <label class="form-label">Phí đường <small class="text-muted">(chủ xe quản lý)</small></label>
+                        <input type="text" name="expense_toll_fee" class="form-control currency-input" value="0" inputmode="numeric">
                     </div>
+                    {% endif %}
                 </div>
                 <div class="mb-2">
-                    <label class="form-label">Chi phí khác</label>
-                    <input type="number" name="expense_other" class="form-control" value="0" min="0" step="1000">
+                    <label class="form-label">Chi phí khác{% if current_user.is_driver() %} <small class="text-muted">(tài xế tự chi/ứng)</small>{% endif %}</label>
+                    <input type="text" name="expense_other" class="form-control currency-input" value="0" inputmode="numeric">
                 </div>
                 {% include 'phoi/_repair_expenses.html' %}
             </div>
@@ -330,10 +332,9 @@ function addReturnTrip(values = {}) {
                 <div class="col-6"><label class="form-label">Điểm đi *</label><input type="text" name="return_trip_origin[]" class="form-control form-control-sm" required value="${values.origin || ''}"></div>
                 <div class="col-6"><label class="form-label">Điểm đến *</label><input type="text" name="return_trip_destination[]" class="form-control form-control-sm" required value="${values.destination || ''}"></div>
                 <div class="col-12"><label class="form-label">Mô tả hàng hóa</label><input type="text" name="return_trip_cargo[]" class="form-control form-control-sm" value="${values.cargo || ''}"></div>
-                <div class="col-6"><label class="form-label">KM đầu</label><input type="number" name="return_trip_km_start[]" class="form-control form-control-sm" value="${values.kmStart || ''}"></div>
-                <div class="col-6"><label class="form-label">KM cuối</label><input type="number" name="return_trip_km_end[]" class="form-control form-control-sm" value="${values.kmEnd || ''}"></div>
-                <div class="col-6"><label class="form-label">Full chuyến (VNĐ)</label><input type="number" name="return_trip_revenue_full[]" class="form-control form-control-sm" step="1000" value="${values.revenueFull || ''}"></div>
-                <div class="col-6"><label class="form-label">Đã thu tạm (VNĐ)</label><input type="number" name="return_trip_revenue_collected[]" class="form-control form-control-sm" step="1000" value="${values.revenueCollected || ''}"></div>
+                <div class="col-6"><label class="form-label">Full chuyến (VNĐ)</label><input type="text" name="return_trip_revenue_full[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="${values.revenueFull || ''}"></div>
+                <div class="col-6"><label class="form-label">Đã thu tạm (VNĐ)</label><input type="text" name="return_trip_revenue_collected[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="${values.revenueCollected || ''}"></div>
+                <div class="col-12"><label class="form-label">Tiền bốc vác (VNĐ)</label><input type="text" name="return_trip_porter_fee[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="${values.porterFee || '0'}"></div>
                 <div class="col-12"><label class="form-label">Ghi chú</label><input type="text" name="return_trip_notes[]" class="form-control form-control-sm" value="${values.notes || ''}"></div>
             </div>
         </div>`;

@@ -52,10 +52,10 @@
         <div class="card-header bg-primary text-white">✅ Điều kiện để chốt phơi</div>
         <div class="card-body py-2">
             <div class="d-flex justify-content-between"><span>{% if phoi.return_trips.count() %}✅{% else %}❌{% endif %} Ít nhất một chuyến về</span><strong>{{ phoi.return_trips.count() }}</strong></div>
-            <div class="d-flex justify-content-between"><span>{% if phoi.fuel_logs.count() %}✅{% else %}❌{% endif %} Ít nhất một lần đổ xăng</span><strong>{{ phoi.fuel_logs.count() }}</strong></div>
+            <div class="d-flex justify-content-between"><span>{% if phoi.fuel_logs %}✅{% else %}❌{% endif %} Ít nhất một lần đổ xăng</span><strong>{{ phoi.fuel_logs|length }}</strong></div>
             <div class="d-flex justify-content-between"><span>{% if phoi.attachment_count('km_start') %}✅{% else %}❌{% endif %} Ảnh đồng hồ KM đầu</span><strong>{{ phoi.attachment_count('km_start') }}</strong></div>
             <div class="d-flex justify-content-between"><span>{% if phoi.attachment_count('km_end') %}✅{% else %}❌{% endif %} Ảnh đồng hồ KM cuối</span><strong>{{ phoi.attachment_count('km_end') }}</strong></div>
-            <div class="d-flex justify-content-between"><span>{% if phoi.attachment_count('weigh_ticket') %}✅{% else %}❌{% endif %} Ảnh phiếu cân</span><strong>{{ phoi.attachment_count('weigh_ticket') }}</strong></div>
+            <div class="d-flex justify-content-between text-muted"><span>Ảnh phiếu cân (nếu có)</span><strong>{{ phoi.attachment_count('weigh_ticket') }}</strong></div>
         </div>
     </div>
     {% elif phoi.status == 'submitted' %}
@@ -80,9 +80,9 @@
             </div>
             <hr>
             <div class="row g-2">
-                <div class="col-4"><small class="text-muted">KM đầu</small><br><strong>{{ phoi.km_start }}</strong></div>
-                <div class="col-4"><small class="text-muted">KM cuối</small><br><strong>{{ phoi.km_end }}</strong></div>
-                <div class="col-4"><small class="text-muted">Tổng KM</small><br><strong class="text-primary">{{ phoi.km_total }}</strong></div>
+                <div class="col-4"><small class="text-muted">KM đầu (cả chuyến)</small><br><strong>{{ phoi.km_start }}</strong></div>
+                <div class="col-4"><small class="text-muted">KM cuối (sau khi về)</small><br><strong>{{ phoi.km_end }}</strong></div>
+                <div class="col-4"><small class="text-muted">Tổng KM đi-về</small><br><strong class="text-primary">{{ phoi.km_total }}</strong></div>
             </div>
         </div>
     </div>
@@ -95,7 +95,7 @@
             <div class="p-3 {% if not loop.last %}border-bottom{% endif %}">
                 <div class="d-flex justify-content-between"><strong>Chuyến về #{{ trip.trip_order }}</strong><small class="text-muted">{{ trip.return_date.strftime('%d/%m/%Y') if trip.return_date else 'Chưa có ngày' }}</small></div>
                 <div><i class="bi bi-geo-alt"></i> {{ trip.origin }} → {{ trip.destination }}</div>
-                <div class="small text-muted">Hàng: {{ trip.cargo_description or '--' }} · {{ trip.km_total }} km · Full: {{ '{:,.0f}'.format(trip.revenue_full) }} VNĐ</div>
+                <div class="small text-muted">Hàng: {{ trip.cargo_description or '--' }} · Full: {{ '{:,.0f}'.format(trip.revenue_full) }} VNĐ</div>
                 {% if trip.notes %}<div class="small text-muted">Ghi chú: {{ trip.notes }}</div>{% endif %}
             </div>
             {% else %}
@@ -105,9 +105,9 @@
     </div>
 
     <div class="card mb-3">
-        <div class="card-header">⛽ Lần đổ xăng đã gắn ({{ phoi.fuel_logs.count() }})</div>
+        <div class="card-header">⛽ Lần đổ xăng đã gắn ({{ phoi.fuel_logs|length }})</div>
         <div class="card-body p-0">
-            {% for fuel in phoi.fuel_logs.all() %}
+            {% for fuel in phoi.fuel_logs %}
             <div class="p-3 {% if not loop.last %}border-bottom{% endif %}">
                 <div class="d-flex justify-content-between"><strong>{{ fuel.refuel_date.strftime('%d/%m/%Y') }}</strong><strong>{{ '{:,.0f}'.format(fuel.total_cost) }} VNĐ</strong></div>
                 <div class="small text-muted">{{ fuel.liters }} lít · {{ '{:,.0f}'.format(fuel.price_per_liter) }} VNĐ/lít · {{ fuel.truck.license_plate }}</div>
@@ -170,7 +170,7 @@
             <div class="row g-2 text-center">
                 <div class="col-6">
                     <small class="text-muted">Tài xế đã ứng + Công</small><br>
-                    <span class="fs-5 fw-bold">{{ '{:,.0f}'.format(phoi.total_expenses() + phoi.driver_wage) }} VNĐ</span>
+                    <span class="fs-5 fw-bold">{{ '{:,.0f}'.format(phoi.driver_out_of_pocket_expenses() + phoi.driver_wage) }} VNĐ</span>
                 </div>
                 <div class="col-6">
                     <small class="text-muted">Tài xế đã giữ</small><br>

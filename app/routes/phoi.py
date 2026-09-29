@@ -18,14 +18,14 @@ def can_manage_phoi(user, phoi):
 def submission_error(phoi):
     if phoi.return_trips.count() == 0:
         return 'Phơi chưa có chuyến về. Vui lòng thêm ít nhất một chuyến về trước khi chốt.'
-    if phoi.fuel_logs.count() == 0:
+    # FuelLog.phois creates this backref as a regular list, not a query.
+    if not phoi.fuel_logs:
         return 'Phơi chưa được gắn lần đổ xăng nào. Vui lòng ghi nhận đổ xăng trước khi chốt.'
     if not phoi.km_start or not phoi.km_end or phoi.km_end < phoi.km_start:
         return 'Vui lòng nhập KM đầu và KM cuối hợp lệ trước khi chốt phơi.'
     required_attachments = {
         'km_start': 'ảnh đồng hồ KM đầu',
         'km_end': 'ảnh đồng hồ KM cuối',
-        'weigh_ticket': 'ít nhất một ảnh phiếu cân',
     }
     for attachment_type, label in required_attachments.items():
         if phoi.attachment_count(attachment_type) == 0:
@@ -95,7 +95,7 @@ def _selected_driver_and_truck():
 
 
 def _sync_return_trips(phoi):
-    """Lưu các chuyến về từ biểu mẫu; một phơi có thể có nhiều chuyến về."""
+    """Lưu các chuyến về; KM được ghi một lần cho toàn bộ phơi."""
     PhoiReturnTrip.query.filter_by(phoi_id=phoi.id).delete()
 
     dates = request.form.getlist('return_trip_date[]')
@@ -103,10 +103,9 @@ def _sync_return_trips(phoi):
     origins = request.form.getlist('return_trip_origin[]')
     destinations = request.form.getlist('return_trip_destination[]')
     cargoes = request.form.getlist('return_trip_cargo[]')
-    km_starts = request.form.getlist('return_trip_km_start[]')
-    km_ends = request.form.getlist('return_trip_km_end[]')
     revenues = request.form.getlist('return_trip_revenue_full[]')
     collecteds = request.form.getlist('return_trip_revenue_collected[]')
+    porter_fees = request.form.getlist('return_trip_porter_fee[]')
     notes = request.form.getlist('return_trip_notes[]')
 
     for index, origin in enumerate(origins):
@@ -126,13 +125,11 @@ def _sync_return_trips(phoi):
             origin=origin,
             destination=destination,
             cargo_description=cargoes[index].strip() if index < len(cargoes) else '',
-            km_start=int(km_starts[index] or 0) if index < len(km_starts) else 0,
-            km_end=int(km_ends[index] or 0) if index < len(km_ends) else 0,
             revenue_full=float(revenues[index] or 0) if index < len(revenues) else 0,
             revenue_collected=float(collecteds[index] or 0) if index < len(collecteds) else 0,
+            porter_fee=float(porter_fees[index] or 0) if index < len(porter_fees) else 0,
             notes=notes[index].strip() if index < len(notes) else ''
         )
-        trip.calculate_km_total()
         db.session.add(trip)
 
 

@@ -286,12 +286,18 @@ class Phoi(db.Model):
         return self.km_total
     
     def total_expenses(self):
-        """Tổng chi phí của toàn bộ phơi (bốc vác, phí đường, sửa xe...)."""
-        return sum(exp.amount for exp in self.expenses.all())
+        """Tổng chi phí chủ xe của toàn bộ phơi, bao gồm phí đường và bốc vác chuyến về."""
+        return sum(exp.amount for exp in self.expenses.all()) + sum(
+            trip.porter_fee for trip in self.return_trips.all()
+        )
+
+    def driver_out_of_pocket_expenses(self):
+        """Chỉ các khoản tài xế tự chi/ứng, được ghi nhận tại mục Chi phí khác."""
+        return sum(exp.amount for exp in self.expenses.filter_by(category='other').all())
 
     def total_km_all_trips(self):
-        """Tổng kilomet của chuyến đi và tất cả chuyến về."""
-        return self.km_total + sum(trip.km_total for trip in self.return_trips.all())
+        """Tổng KM của cả chuyến đi-về, đo bằng một lần ghi đồng hồ."""
+        return self.km_total
 
     def total_revenue_full(self):
         """Tổng doanh thu của chuyến đi và tất cả chuyến về."""
@@ -306,8 +312,9 @@ class Phoi(db.Model):
         Tính balance toàn phơi:
         - Dương: Chủ xe phải trả thêm cho tài xế
         - Âm: Tài xế phải nộp lại cho chủ xe
+        - Phí đường do chủ xe thanh toán trực tiếp nên không tính là tiền tài xế đã ứng.
         """
-        owner_owes = self.total_expenses() + self.driver_wage
+        owner_owes = self.driver_out_of_pocket_expenses() + self.driver_wage
         driver_owes = self.total_revenue_collected()
         return owner_owes - driver_owes
     
@@ -334,6 +341,7 @@ class PhoiReturnTrip(db.Model):
     km_total = db.Column(db.Integer, nullable=False, default=0)
     revenue_full = db.Column(db.Numeric(12, 2), nullable=False, default=0)
     revenue_collected = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    porter_fee = db.Column(db.Numeric(12, 2), nullable=False, default=0)
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 

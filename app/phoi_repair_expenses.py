@@ -10,7 +10,15 @@ from app.phoi_attachments import save_phoi_attachment
 
 
 def _sync_standard_expenses(phoi):
-    for category, label in [('porter_fee', 'Bồi dưỡng bốc vác'), ('toll_fee', 'Phí đường'), ('other', 'Chi phí khác')]:
+    standard_expenses = [
+        ('porter_fee', 'Bồi dưỡng bốc vác'),
+        ('other', 'Chi phí khác'),
+    ]
+    # Phí đường được trừ trực tiếp từ tài khoản chủ xe, chỉ quản lý/admin được nhập.
+    if current_user.is_manager_or_admin():
+        standard_expenses.insert(1, ('toll_fee', 'Phí đường'))
+
+    for category, label in standard_expenses:
         try:
             amount = Decimal((request.form.get(f'expense_{category}', '0') or '0').strip())
         except (InvalidOperation, AttributeError):

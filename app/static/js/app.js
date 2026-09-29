@@ -14,12 +14,88 @@ document.addEventListener('htmx:load', function() {
 
 // Format currency on display
 function formatCurrency(amount) {
-    return new Intl.NumberFormat('vi-VN', { 
-        style: 'currency', 
+    return new Intl.NumberFormat('vi-VN', {
+        style: 'currency',
         currency: 'VND',
-        maximumFractionDigits: 0 
+        maximumFractionDigits: 0
     }).format(amount);
 }
+
+// Định dạng các trường tiền theo dấu phân cách hàng nghìn ngay khi nhập.
+const currencyInputNames = new Set([
+    'price_per_liter', 'revenue_full', 'revenue_collected',
+    'expense_porter_fee', 'expense_toll_fee', 'expense_other',
+    'driver_wage', 'repair_amount[]', 'return_trip_revenue_full[]',
+    'return_trip_revenue_collected[]', 'return_trip_porter_fee[]'
+]);
+
+function isCurrencyInput(input) {
+    return input instanceof HTMLInputElement && currencyInputNames.has(input.name);
+}
+
+function currencyDigits(value) {
+    return String(value || '').replace(/\D/g, '');
+}
+
+function formatCurrencyInput(input) {
+    const digits = currencyDigits(input.value);
+    input.value = digits ? Number(digits).toLocaleString('en-US') : '';
+}
+
+function prepareCurrencyInput(input) {
+    if (!isCurrencyInput(input)) return;
+    input.type = 'text';
+    input.inputMode = 'numeric';
+    input.autocomplete = 'off';
+    formatCurrencyInput(input);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('input').forEach(prepareCurrencyInput);
+});
+
+document.addEventListener('input', function(event) {
+    const input = event.target;
+    if (!isCurrencyInput(input)) return;
+
+    const cursorFromEnd = input.value.length - input.selectionStart;
+    formatCurrencyInput(input);
+    const cursor = Math.max(0, input.value.length - cursorFromEnd);
+    input.setSelectionRange(cursor, cursor);
+});
+
+// Các ô được thêm động (chuyến về, hạng mục sửa xe) cũng tự chuyển thành ô tiền.
+document.addEventListener('focusin', function(event) {
+    prepareCurrencyInput(event.target);
+});
+
+// Tương thích với biểu mẫu chuyến về được tạo bởi các phiên bản giao diện trước.
+// Nếu thiếu tiền bốc vác, bổ sung trường này ngay sau khi thẻ chuyến về xuất hiện.
+const returnTripObserver = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+        mutation.addedNodes.forEach(function(node) {
+            if (!(node instanceof HTMLElement)) return;
+            const trip = node.matches('.return-trip') ? node : node.querySelector('.return-trip');
+            if (!trip || trip.querySelector('[name="return_trip_porter_fee[]"]')) return;
+
+            const notes = trip.querySelector('[name="return_trip_notes[]"]');
+            if (!notes) return;
+            const field = document.createElement('div');
+            field.className = 'col-12';
+            field.innerHTML = '<label class="form-label">Tiền bốc vác (VNĐ)</label><input type="text" name="return_trip_porter_fee[]" class="form-control form-control-sm currency-input" value="0" inputmode="numeric">';
+            notes.closest('.col-12').before(field);
+            prepareCurrencyInput(field.querySelector('input'));
+        });
+    });
+});
+returnTripObserver.observe(document.body, { childList: true, subtree: true });
+
+// Giá trị gửi về máy chủ phải là số thuần, không có dấu phẩy.
+document.addEventListener('submit', function(event) {
+    event.target.querySelectorAll('input').forEach(function(input) {
+        if (isCurrencyInput(input)) input.value = currencyDigits(input.value);
+    });
+});
 
 // Keyboard shortcuts
 window.addEventListener('keydown', function(e) {
