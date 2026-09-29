@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
-# Create non-root user
-RUN groupadd -r app && useradd -r -g app -d /app -s /bin/false app
+# Create non-root user with a stable UID/GID for host bind-mount permissions.
+RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --home-dir /app --shell /usr/sbin/nologin app
 
 WORKDIR /app
 

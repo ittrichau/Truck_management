@@ -19,8 +19,12 @@ fi
 echo "Running database migrations..."
 flask db upgrade
 
-echo "Seeding default data (if empty)..."
-flask seed-data
+if [ "${SEED_DEFAULT_DATA:-false}" = "true" ]; then
+    echo "Seeding default data (if empty)..."
+    flask seed-data
+else
+    echo "Skipping default-data seed (set SEED_DEFAULT_DATA=true to enable it)."
+fi
 
 echo "Starting application..."
 exec gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 2 --timeout 120 --access-logfile - --error-logfile - "run:app"

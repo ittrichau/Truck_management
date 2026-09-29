@@ -1,10 +1,8 @@
-version: "3.8"
-
 services:
   web:
     build: .
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
     volumes:
       - ./data:/app/data
       - ./instance:/app/instance
@@ -13,4 +11,7 @@ services:
       - FLASK_ENV=production
       - SECRET_KEY=${SECRET_KEY:?err}
       - DATABASE_URL=${DATABASE_URL:-sqlite:///instance/truck_management.db}
+      - LOG_LEVEL=${LOG_LEVEL:-WARNING}
+      - LOG_FILE=${LOG_FILE:-/var/log/app/app.log}
+      - SEED_DEFAULT_DATA=${SEED_DEFAULT_DATA:-false}
     restart: unless-stopped
