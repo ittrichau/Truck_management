@@ -65,7 +65,7 @@ def create():
             # Tự động lấy giá xăng từ bảng FuelPrice
             fuel_price = _get_active_price_or_none(refuel_date)
             if fuel_price:
-                price = fuel_price.price_per_liter
+                price = float(fuel_price.price_per_liter)
             else:
                 price = float(request.form.get('price_per_liter', 0))
                 if price <= 0:

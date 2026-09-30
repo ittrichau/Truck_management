@@ -1,6 +1,46 @@
 // HTMX configuration
 htmx.config.globalViewTransitions = true;
 
+function initializeDatePicker(input) {
+    if (!window.flatpickr || input._flatpickr) return;
+
+    const isDateTime = input.type === 'datetime-local';
+    input.lang = 'en-GB';
+    window.flatpickr(input, {
+        altInput: true,
+        altInputClass: `${input.className} date-display-input`,
+        altFormat: isDateTime ? 'd/m/Y H:i' : 'd/m/Y',
+        dateFormat: isDateTime ? 'Y-m-d\\TH:i' : 'Y-m-d',
+        enableTime: isDateTime,
+        time_24hr: true,
+        locale: window.flatpickr.l10ns.vn || 'default',
+        disableMobile: true,
+        allowInput: true
+    });
+}
+
+function initializeDatePickers(root) {
+    const selector = 'input[type="date"], input[type="datetime-local"]';
+    if (root instanceof HTMLInputElement && root.matches(selector)) {
+        initializeDatePicker(root);
+    }
+    if (root.querySelectorAll) {
+        root.querySelectorAll(selector).forEach(initializeDatePicker);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const datePickerObserver = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            mutation.addedNodes.forEach(function(node) {
+                if (node instanceof HTMLElement) initializeDatePickers(node);
+            });
+        });
+    });
+    datePickerObserver.observe(document.body, { childList: true, subtree: true });
+    setTimeout(() => initializeDatePickers(document), 0);
+});
+
 // Auto-dismiss alerts after 4 seconds
 document.addEventListener('htmx:load', function() {
     const alerts = document.querySelectorAll('.alert:not(.alert-permanent)');
