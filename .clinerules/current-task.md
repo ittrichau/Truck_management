@@ -229,3 +229,27 @@
 - Do-not-repeat notes:
   - Keep the role guard on every new phơi revenue/profit display, including printable layouts.
   - Do not change `Phoi.balance()` or `Phoi.owner_profit()` when adjusting role-based financial visibility.
+
+## 2026-10-01 - Prevent ambiguous Alembic migration deploys
+
+- Status: done
+- Goal: Restore one unambiguous Alembic migration head and prevent a multiple-head migration graph from reaching the VPS deployment job.
+- Files changed:
+  - `migrations/versions/d4e5f6a7b8c9_merge_manager_revenue_head.py` — empty merge revision joining the payment/fuel and manager-revenue heads without DDL or data changes.
+  - `.github/workflows/deploy.yml` — adds a required pre-deploy job that fails unless `flask --app run:app db heads` reports exactly one head.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: Pushes to `main` now verify Alembic topology in GitHub Actions before the production SSH deployment. The container retains `flask db upgrade`; it now has a single, deterministic target revision. The merge migration modifies migration history only and does not alter application tables or rows.
+- Key decisions:
+  - Do not use `flask db upgrade heads`: it hides an invalid branching history instead of enforcing a linear deploy target.
+  - Make `deploy` depend on `verify-migrations`, so a topology failure prevents the VPS deploy step from starting.
+  - Keep the CI test independent of production credentials and databases; it inspects only the revision files.
+- Validation:
+  - Ran `flask --app run:app db heads` with the configured virtual environment and asserted exactly one head.
+  - Confirmed the workflow contains the required head-count failure guard and `deploy` dependency.
+  - Editor diagnostics report no errors in the workflow or merge migration. No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - A developer must resolve migrations to a single head (usually with an explicit empty merge migration) before merging to `main`; the CI gate correctly blocks otherwise.
+  - The merge revision must be committed and deployed with all referenced ancestor migration files.
+- Do-not-repeat notes:
+  - Never delete, rewrite, or manually stamp already-deployed migration revisions to resolve a branch; add a merge revision instead.
+  - Retain the pre-deploy single-head gate when modifying deployment workflows.
