@@ -37,11 +37,11 @@
 </div>
 
 <div class="d-flex justify-content-end mb-2">
-    <button id="phoiFilterToggle" class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#phoiFilters" aria-expanded="true" aria-controls="phoiFilters">
-        <i class="bi bi-funnel"></i> <span>Ẩn bộ lọc</span>
+    <button id="phoiFilterToggle" class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#phoiFilters" aria-expanded="false" aria-controls="phoiFilters">
+        <i class="bi bi-funnel"></i> <span>Hiện bộ lọc</span>
     </button>
 </div>
-<div class="collapse show" id="phoiFilters">
+<div class="collapse" id="phoiFilters">
     <form method="GET" action="{{ url_for('phoi.index') }}" class="card card-body mb-3">
         <div class="row g-2">
             <div class="col-12 col-md-4">
@@ -51,6 +51,7 @@
             <div class="col-6 col-md-2">
                 <label for="status" class="form-label small mb-1">Trạng thái</label>
                 <select id="status" name="status" class="form-select">
+                    <option value="active" {% if filter_status == 'active' %}selected{% endif %}>Đang hoạt động</option>
                     <option value="">Tất cả</option>
                     <option value="draft" {% if filter_status == 'draft' %}selected{% endif %}>Đang thực hiện</option>
                     <option value="submitted" {% if filter_status == 'submitted' %}selected{% endif %}>Đã chốt</option>

@@ -38,6 +38,7 @@
                 <th>Số lít</th>
                 <th>Đơn giá</th>
                 <th>Tổng tiền</th>
+                <th>Thanh toán</th>
                 <th>KM lúc đổ</th>
                 <th>Phơi</th>
                 <th></th>
@@ -51,6 +52,20 @@
                 <td>{{ log.liters }}</td>
                 <td>{{ '{:,.0f}'.format(log.price_per_liter) }}</td>
                 <td><strong>{{ '{:,.0f}'.format(log.total_cost) }} VNĐ</strong></td>
+                <td>
+                    {% if log.paid_by == 'driver' %}
+                    <span class="badge bg-warning text-dark">Tài xế trả</span>
+                    {% if log.receipts.count() %}
+                    <small class="d-block text-muted">
+                        {% for receipt in log.receipts.all() %}
+                        <a href="{{ url_for('fuel.view_receipt', id=log.id, receipt_id=receipt.id) }}" target="_blank">Hóa đơn {{ loop.index }}</a>{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                    </small>
+                    {% endif %}
+                    {% else %}
+                    <span class="badge bg-secondary">Chủ xe trả</span>
+                    {% endif %}
+                </td>
                 <td>{{ log.km_at_refuel or '-' }}</td>
                 <td>
                     {% set phoi_list = log.phois.all() %}
@@ -75,7 +90,7 @@
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="8" class="text-center text-muted py-4">Chưa có bản ghi đổ xăng nào.</td></tr>
+            <tr><td colspan="9" class="text-center text-muted py-4">Chưa có bản ghi đổ xăng nào.</td></tr>
             {% endfor %}
         </tbody>
     </table>

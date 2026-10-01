@@ -1,7 +1,8 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, send_file
 from flask_login import login_required, current_user
 from app import db
-from app.models import FuelLog, FuelPrice, Truck, Phoi
+from app.models import FuelLog, FuelPrice, FuelReceipt, Truck, Phoi
+from app.phoi_attachments import save_phoi_attachment, delete_attachment_file, attachment_path
 from datetime import datetime, date
 
 bp = Blueprint('fuel', __name__)
@@ -59,6 +60,16 @@ def create():
     if request.method == 'POST':
         try:
             liters = float(request.form.get('liters', 0))
+            if liters <= 0:
+                raise ValueError('Số lít phải lớn hơn 0.')
+            paid_by = request.form.get('paid_by', 'owner')
+            if paid_by not in ('owner', 'driver'):
+                raise ValueError('Hình thức thanh toán không hợp lệ.')
+            receipt_files = [file for file in request.files.getlist('receipts') if file and file.filename]
+            if paid_by == 'driver' and not receipt_files:
+                raise ValueError('Tài xế tự trả tiền phải tải lên ít nhất một ảnh hóa đơn.')
+            if len(receipt_files) > 5:
+                raise ValueError('Chỉ được tải tối đa 5 ảnh hóa đơn mỗi lần đổ xăng.')
             refuel_date_str = request.form.get('refuel_date', '')
             refuel_date = datetime.strptime(refuel_date_str, '%Y-%m-%d').date() if refuel_date_str else date.today()
 
@@ -84,6 +95,7 @@ def create():
                 liters=liters,
                 price_per_liter=price,
                 total_cost=liters * price,
+                paid_by=paid_by,
                 km_at_refuel=int(request.form.get('km_at_refuel', 0) or 0),
                 refuel_date=refuel_date,
                 is_substitute=is_substitute,
@@ -123,7 +135,18 @@ def create():
                 truck.current_km = log.km_at_refuel
 
             db.session.add(log)
-            db.session.commit()
+            db.session.flush()
+            saved_keys = []
+            try:
+                for file in receipt_files:
+                    metadata = save_phoi_attachment(file, log.id)
+                    saved_keys.append(metadata['storage_key'])
+                    db.session.add(FuelReceipt(fuel_log_id=log.id, uploaded_by_id=current_user.id, **metadata))
+                db.session.commit()
+            except Exception:
+                for storage_key in saved_keys:
+                    delete_attachment_file(storage_key)
+                raise
             flash(f'Đã ghi nhận đổ {liters} lít xăng (giá {price:,.0f}đ/lít).', 'success')
             return_to_phoi_id = request.form.get('return_to_phoi_id', type=int)
             if return_to_phoi_id:
@@ -139,6 +162,23 @@ def create():
                            selected_phoi_id=selected_phoi_id,
                            selected_truck_id=selected_truck_id)
 
+
+@bp.route('/fuel/<int:id>/receipts/<int:receipt_id>')
+@login_required
+def view_receipt(id, receipt_id):
+    log = FuelLog.query.get_or_404(id)
+    if current_user.is_driver() and log.created_by_id != current_user.id:
+        flash('Bạn không có quyền xem hóa đơn này.', 'danger')
+        return redirect(url_for('fuel.index'))
+    receipt = FuelReceipt.query.filter_by(id=receipt_id, fuel_log_id=log.id).first_or_404()
+    try:
+        path = attachment_path(receipt.storage_key)
+        if not path.is_file():
+            raise FileNotFoundError
+        return send_file(path, mimetype=receipt.mime_type, conditional=True)
+    except (FileNotFoundError, ValueError):
+        flash('Không tìm thấy ảnh hóa đơn.', 'warning')
+        return redirect(url_for('fuel.index'))
 
 @bp.route('/fuel/<int:id>/delete', methods=['POST'])
 @login_required

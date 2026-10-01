@@ -482,6 +482,7 @@ class FuelLog(db.Model):
     liters = db.Column(db.Numeric(12, 2), nullable=False)
     price_per_liter = db.Column(db.Numeric(12, 2), nullable=False)
     total_cost = db.Column(db.Numeric(12, 2), nullable=False)
+    paid_by = db.Column(db.String(20), nullable=False, default='owner', comment='owner hoặc driver')
     km_at_refuel = db.Column(db.Integer)
     refuel_date = db.Column(db.Date, nullable=False)
     is_substitute = db.Column(db.Boolean, default=False, comment='Tài xế đổ xăng cho xe không phải xe mặc định của mình (chạy giùm)')
@@ -492,6 +493,7 @@ class FuelLog(db.Model):
     # Relations
     created_by = db.relationship('User', backref='fuel_logs')
     phois = db.relationship('Phoi', secondary=fuel_log_phois, backref='fuel_logs', lazy='dynamic')
+    receipts = db.relationship('FuelReceipt', backref='fuel_log', lazy='dynamic', cascade='all, delete-orphan')
     
     def attached_phoi_count(self):
         """Số phơi được gắn vào lần đổ xăng này"""
@@ -499,6 +501,22 @@ class FuelLog(db.Model):
     
     def __repr__(self):
         return f'<FuelLog {self.liters}L on {self.refuel_date}>'
+
+class FuelReceipt(db.Model):
+    """Hóa đơn cho lần đổ xăng do tài xế tự thanh toán."""
+    __tablename__ = 'fuel_receipts'
+    id = db.Column(db.Integer, primary_key=True)
+    fuel_log_id = db.Column(db.Integer, db.ForeignKey('fuel_logs.id', ondelete='CASCADE'), nullable=False, index=True)
+    original_filename = db.Column(db.String(255), nullable=False)
+    storage_key = db.Column(db.String(500), nullable=False, unique=True)
+    mime_type = db.Column(db.String(100), nullable=False, default='image/jpeg')
+    file_size = db.Column(db.Integer, nullable=False)
+    width = db.Column(db.Integer, nullable=False)
+    height = db.Column(db.Integer, nullable=False)
+    uploaded_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    uploaded_by = db.relationship('User', backref='fuel_receipts')
 
 class ActivityLog(db.Model):
     """Ghi log mọi hành động thay đổi dữ liệu trên hệ thống."""

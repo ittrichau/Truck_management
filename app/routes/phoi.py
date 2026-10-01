@@ -177,7 +177,7 @@ def index():
     """Danh sách phơi – driver chỉ thấy của mình, manager/admin thấy tất cả."""
     page = request.args.get('page', 1, type=int)
     search = request.args.get('q', '').strip()
-    filter_status = request.args.get('status', '')
+    filter_status = request.args.get('status', 'active')
     filter_truck_id = request.args.get('truck_id', type=int)
     filter_driver_id = request.args.get('driver_id', type=int)
     start_date = request.args.get('start_date', '')
@@ -198,7 +198,9 @@ def index():
                 User.full_name.ilike(keyword),
             )
         )
-    if filter_status in ('draft', 'submitted', 'confirmed'):
+    if filter_status == 'active':
+        query = query.filter(Phoi.status.in_(['draft', 'submitted']))
+    elif filter_status in ('draft', 'submitted', 'confirmed'):
         query = query.filter(Phoi.status == filter_status)
     if filter_truck_id:
         query = query.filter(Phoi.truck_id == filter_truck_id)

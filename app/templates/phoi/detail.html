@@ -127,7 +127,7 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="row g-2 align-items-end">
                     <div class="col-md-4"><label class="form-label">Loại chứng từ *</label><select name="attachment_type" class="form-select" required><option value="weigh_ticket">Phiếu cân</option><option value="km_start">Ảnh KM đầu</option><option value="km_end">Ảnh KM cuối</option><option value="other">Chứng từ khác</option></select></div>
-                    <div class="col-md-8"><label class="form-label">Chụp hoặc chọn ảnh *</label><input type="file" name="images" class="form-control" accept="image/jpeg,image/png,image/webp" capture="environment" multiple required><small class="text-muted">Tối đa 5 ảnh/lần. Ảnh được nén tự động, vẫn giữ độ rõ để đối chiếu.</small></div>
+                    <div class="col-md-8"><label class="form-label">Chụp hoặc chọn ảnh *</label><input type="file" name="images" class="form-control" accept="image/jpeg,image/png,image/webp" multiple required><small class="text-muted">Có thể chọn ảnh có sẵn từ thư viện hoặc chụp ảnh mới. Tối đa 5 ảnh/lần; ảnh được nén tự động.</small></div>
                     <div class="col-12"><button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-camera"></i> Tải chứng từ lên</button></div>
                 </div>
             </form>
