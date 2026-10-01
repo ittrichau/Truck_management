@@ -30,7 +30,7 @@ def create_app(config_name=None):
     app.config['ENV'] = config_name
 
     # --------------------------------------------------------------
-    # Trust reverse‑proxy headers (Railway, Heroku, Render, etc.)
+    # Trust reverse-proxy headers (for example, Nginx on the VPS).
     # This makes request.is_secure True when the request arrives
     # via HTTPS behind the proxy, allowing Secure cookies to be sent.
     # --------------------------------------------------------------
@@ -67,6 +67,7 @@ def create_app(config_name=None):
     from app.routes.phoi import bp as phoi_bp
     from app.routes.fuel import bp as fuel_bp
     from app.routes.drivers import bp as drivers_bp
+    from app.routes.debts import bp as debts_bp
     from app.routes.activity_logs import bp as activity_logs_bp
 
     app.register_blueprint(auth_bp)
@@ -75,6 +76,7 @@ def create_app(config_name=None):
     app.register_blueprint(phoi_bp)
     app.register_blueprint(fuel_bp)
     app.register_blueprint(drivers_bp)
+    app.register_blueprint(debts_bp)
     app.register_blueprint(activity_logs_bp)
 
     # Register CLI commands

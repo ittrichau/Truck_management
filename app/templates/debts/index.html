@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Báo cáo công nợ{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0"><i class="bi bi-cash-stack"></i> Báo cáo công nợ</h5>
+</div>
+
+<div class="alert alert-info small" role="alert">
+    <i class="bi bi-info-circle"></i>
+    Chỉ tổng hợp chuyến đi và chuyến về thuộc các phơi đã xác nhận.
+    Công nợ = tiền phải thu − tiền đã thu.
+</div>
+
+<div class="row g-2 mb-3">
+    <div class="col-12 col-md-4">
+        <div class="card p-3">
+            <small class="text-muted">Tổng phải thu</small>
+            <strong class="fs-5">{{ "{:,.0f}".format(totals.revenue_full) }} đ</strong>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="card p-3">
+            <small class="text-muted">Tổng đã thu</small>
+            <strong class="fs-5 amount-positive">{{ "{:,.0f}".format(totals.revenue_collected) }} đ</strong>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="card p-3">
+            <small class="text-muted">Tổng công nợ</small>
+            <strong class="fs-5 {% if totals.outstanding > 0 %}amount-negative{% else %}amount-positive{% endif %}">{{ "{:,.0f}".format(totals.outstanding) }} đ</strong>
+        </div>
+    </div>
+</div>
+
+{% if debts %}
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Chủ hàng</th>
+                    <th class="text-end">Phải thu</th>
+                    <th class="text-end">Đã thu</th>
+                    <th class="text-end">Công nợ</th>
+                    <th class="text-center">Số chuyến</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for debt in debts %}
+                <tr>
+                    <td>
+                        <strong>{{ debt.customer.name }}</strong>
+                        {% if debt.customer.contact_phone %}
+                        <small class="d-block text-muted">{{ debt.customer.contact_phone }}</small>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">{{ "{:,.0f}".format(debt.revenue_full) }} đ</td>
+                    <td class="text-end amount-positive">{{ "{:,.0f}".format(debt.revenue_collected) }} đ</td>
+                    <td class="text-end {% if debt.outstanding > 0 %}amount-negative{% else %}amount-positive{% endif %}">
+                        {{ "{:,.0f}".format(debt.outstanding) }} đ
+                    </td>
+                    <td class="text-center">{{ debt.trip_count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+    <i class="bi bi-cash-stack display-4"></i>
+    <p class="mt-2 mb-0">Chưa có dữ liệu công nợ từ phơi đã xác nhận.</p>
+</div>
+{% endif %}
+{% endblock %}

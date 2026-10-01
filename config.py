@@ -57,10 +57,10 @@ class ProductionConfig(Config):
     SESSION_COOKIE_SAMESITE = 'Lax'
     REMEMBER_COOKIE_SECURE = SESSION_COOKIE_SECURE
 
-    # PostgreSQL in production (Railway provides DATABASE_URL)
+    # Production database URL is supplied by the server environment.
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
 
-    # PostgreSQL connection pooling
+    # Database connection pooling
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_size': int(os.environ.get('DB_POOL_SIZE', '5')),
         'max_overflow': int(os.environ.get('DB_POOL_OVERFLOW', '10')),

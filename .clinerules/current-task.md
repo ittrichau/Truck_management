@@ -68,3 +68,55 @@
   - Update this record after every completed task, including validation and risk details.
   - Do not assume a written rule creates automatic task updates; a hook/integration is required for true automation.
   - Keep rule path references aligned with `.clinerules/rules/`.
+
+## 2026-10-01 - Remove obsolete Railway deployment configuration
+
+- Status: done
+- Goal: Remove Railway-specific deployment configuration now that production runs only on the VPS.
+- Files changed:
+  - `railway.json` — deleted; it was only a Railway build/deploy manifest.
+  - `config.py` — replaced the Railway-specific database comment with a server-environment description.
+  - `docker-entrypoint.sh` — replaced Railway environment-variable guidance with generic server-environment guidance.
+  - `app/__init__.py` — documented reverse-proxy handling for VPS Nginx instead of former platform examples.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: Deployment configuration and operator messages only. The Docker entrypoint, `DATABASE_URL`/`SECRET_KEY` requirements, migrations, Gunicorn startup, health check, Nginx reverse proxy, and Docker Compose VPS deployment behavior are unchanged. No persisted data, schema, financial logic, roles, URLs, or application templates changed.
+- Key decisions:
+  - User approved removal after the impact assessment.
+  - Retained generic production environment checks because they are required by the existing VPS deployment flow.
+  - Preserved `ProxyFix`, which is needed for HTTPS and secure cookies behind VPS Nginx.
+- Validation:
+  - Confirmed `railway.json` was removed.
+  - Reviewed `Dockerfile`, `docker-compose.yml`, `deploy/GITHUB_ACTIONS_DEPLOY.md`, and `deploy/VPS_UBUNTU.md`; they use the VPS Docker/Nginx deployment flow and do not depend on Railway.
+  - No development server was launched.
+- Risks/constraints:
+  - Railway deployment is no longer configured from this repository; restoring it would require recreating a provider manifest and platform configuration.
+- Do-not-repeat notes:
+  - Before removing provider configuration, search both repository references and deployment documentation, then retain only platform-neutral runtime safeguards.
+
+## 2026-10-01 - Add confirmed-trip customer debt report and role-aware navigation
+
+- Status: done
+- Goal: Add a manager/admin-only customer debt report based solely on existing confirmed phơi and return-trip revenue data; prevent mobile navigation from overflowing and keep drivers from seeing pages they cannot access.
+- Files changed:
+  - `app/routes/debts.py` — added protected `/debts` report route that aggregates outbound and return trips by their own customer.
+  - `app/templates/debts/index.html` — added debt totals and per-customer report table.
+  - `app/__init__.py` — registered the debt-report blueprint.
+  - `app/templates/base.html` — added desktop debt navigation; mobile uses a manager-only “Thêm” bottom-sheet for Công nợ, Người dùng, and admin Nhật ký; Fuel stays visible to drivers because they are authorized to create fuel logs.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: Read-only financial reporting. Only `Phoi.status == 'confirmed'` records contribute. Each outbound trip uses `Phoi.customer_id`; each return trip uses its own `PhoiReturnTrip.customer_id`, preventing revenue from different customers on one phơi from being mixed. No data, schema, payment workflow, existing financial calculation method, confirmation rule, or fuel association changed.
+- Key decisions:
+  - Per-customer outstanding amount is calculated as `revenue_full - revenue_collected` from existing fields only.
+  - Customerless trips are excluded because they cannot be assigned to a customer debt balance.
+  - Server-side authorization redirects drivers from `/debts`; menu visibility is only a usability layer.
+  - Drivers see Phơi and Xăng only; manager/admin-only pages are hidden. The existing Fuel route explicitly supports drivers, so it must remain visible.
+- Validation:
+  - Reviewed models, phơi/fuel routes, navigation template, and authorization patterns before editing.
+  - Ran `git diff --check` successfully.
+  - Ran syntax compilation for `app/routes/debts.py` successfully.
+  - Editor diagnostics found no template errors. Python import diagnostics could not resolve Flask dependencies because the configured `.venv` executable is absent from this workspace; no development server was launched.
+- Risks/constraints:
+  - The report represents only amounts recorded as expected/collected on confirmed trips; it does not support separate owner payment transactions or customerless trips.
+  - A separate customer-payment ledger would require a schema/workflow change and explicit approval before implementation.
+- Do-not-repeat notes:
+  - Do not use `Phoi.total_revenue_full()` or `total_revenue_collected()` for customer debt because they combine the outbound customer and every return-trip customer.
+  - Preserve both route-level authorization and role-based navigation visibility.

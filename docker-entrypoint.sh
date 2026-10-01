@@ -6,13 +6,13 @@ echo "Database URL: ${DATABASE_URL:0:20}..." # Show only first 20 chars for secu
 
 # Check if DATABASE_URL is set
 if [ -z "$DATABASE_URL" ]; then
-    echo "ERROR: DATABASE_URL not set. Railway should provide this automatically."
+    echo "ERROR: DATABASE_URL not set. Configure it in the server environment."
     exit 1
 fi
 
 # Check if SECRET_KEY is set in production
 if [ "$FLASK_ENV" = "production" ] && [ -z "$SECRET_KEY" ]; then
-    echo "ERROR: SECRET_KEY not set. Set it in Railway environment variables."
+    echo "ERROR: SECRET_KEY not set. Configure it in the server environment."
     exit 1
 fi
 

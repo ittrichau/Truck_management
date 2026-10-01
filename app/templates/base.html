@@ -192,6 +192,11 @@
                 ><i class="bi bi-journal-text"></i> Phơi</a
               >
             </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('fuel.index') }}"
+                ><i class="bi bi-fuel-pump"></i> Xăng</a
+              >
+            </li>
             {% if current_user.is_manager_or_admin() %}
             <li class="nav-item">
               <a class="nav-link" href="{{ url_for('trucks.index') }}"
@@ -204,8 +209,8 @@
               >
             </li>
             <li class="nav-item">
-              <a class="nav-link" href="{{ url_for('fuel.index') }}"
-                ><i class="bi bi-fuel-pump"></i> Xăng</a
+              <a class="nav-link" href="{{ url_for('debts.index') }}"
+                ><i class="bi bi-cash-stack"></i> Công nợ</a
               >
             </li>
             <li class="nav-item">
@@ -283,6 +288,12 @@
       >
         <i class="bi bi-journal-text"></i> Phơi
       </a>
+      <a
+        href="{{ url_for('fuel.index') }}"
+        class="{% if request.endpoint and 'fuel' in request.endpoint %}active{% endif %}"
+      >
+        <i class="bi bi-fuel-pump"></i> Xăng
+      </a>
       {% if current_user.is_manager_or_admin() %}
       <a
         href="{{ url_for('trucks.index') }}"
@@ -297,27 +308,38 @@
         <i class="bi bi-people"></i> Hàng
       </a>
       <a
-        href="{{ url_for('fuel.index') }}"
-        class="{% if request.endpoint and 'fuel' in request.endpoint %}active{% endif %}"
+        href="#moreMenu"
+        data-bs-toggle="offcanvas"
+        class="{% if request.endpoint and ('debts' in request.endpoint or 'drivers' in request.endpoint or 'activity_logs' in request.endpoint) %}active{% endif %}"
       >
-        <i class="bi bi-fuel-pump"></i> Xăng
-      </a>
-      <a
-        href="{{ url_for('drivers.index') }}"
-        class="{% if request.endpoint and 'drivers' in request.endpoint %}active{% endif %}"
-      >
-        <i class="bi bi-person-badge"></i> Người dùng
-      </a>
-      {% endif %}
-      {% if current_user.is_admin() %}
-      <a
-        href="{{ url_for('activity_logs.index') }}"
-        class="{% if request.endpoint and 'activity_logs' in request.endpoint %}active{% endif %}"
-      >
-        <i class="bi bi-journal-code"></i> Nhật ký
+        <i class="bi bi-grid"></i> Thêm
       </a>
       {% endif %}
     </nav>
+
+    {% if current_user.is_manager_or_admin() %}
+    <div class="offcanvas offcanvas-bottom rounded-top-4 d-md-none" tabindex="-1" id="moreMenu" aria-labelledby="moreMenuLabel" style="height: auto;">
+      <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="moreMenuLabel">Chức năng quản lý</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Đóng"></button>
+      </div>
+      <div class="offcanvas-body pt-0">
+        <div class="list-group list-group-flush">
+          <a href="{{ url_for('debts.index') }}" class="list-group-item list-group-item-action py-3">
+            <i class="bi bi-cash-stack me-2 text-primary"></i> Công nợ
+          </a>
+          <a href="{{ url_for('drivers.index') }}" class="list-group-item list-group-item-action py-3">
+            <i class="bi bi-person-badge me-2 text-primary"></i> Người dùng
+          </a>
+          {% if current_user.is_admin() %}
+          <a href="{{ url_for('activity_logs.index') }}" class="list-group-item list-group-item-action py-3">
+            <i class="bi bi-journal-code me-2 text-primary"></i> Nhật ký
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
     {% endif %}
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
