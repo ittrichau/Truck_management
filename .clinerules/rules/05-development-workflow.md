@@ -3,14 +3,15 @@
 ## Standard Flow
 
 1. Understand: goal + affected files + constraints.
-2. Analyze: read existing code and find matching patterns.
-3. Plan: write short, concrete steps.
-4. Implement: minimal change, consistent with patterns.
-5. Validate: confirm related logic still works.
-6. Test: run key and edge scenarios.
-7. Summarize: list changed files and verification result.
-8. Update Current Task Record: write the final task state to avoid repeating work.
-9. Skip Server Launch: after task completion, do NOT start the development server. Confirm task is done via code review and verification checks only.
+2. Analyze: read existing code, call sites, and matching patterns; map the affected flow and compatibility impact.
+3. Risk gate: before implementation, ask for approval when the change meets `04-ai-behavior-rules.md` high-risk criteria.
+4. Plan: write short, concrete steps and relevant regression/rollback checks.
+5. Implement: minimal change, consistent with patterns.
+6. Validate: confirm related logic still works.
+7. Test: run key and edge scenarios.
+8. Summarize: list changed files, impact, risks, and verification result.
+9. Update Current Task Record: write the final task state to avoid repeating work.
+10. Skip Server Launch: after task completion, do NOT start the development server. Confirm task is done via code review and verification checks only.
 
 ## Required Output Format
 
@@ -47,8 +48,8 @@ For technical tasks, use a compact format:
 ## Current Task Record (Required)
 
 - Record file: `.clinerules/current-task.md`.
-- Always update this file after finishing a task.
-- Include: task title, status (`done`), files changed, key decisions, constraints handled, and "do-not-repeat" notes.
+- Always update this file after finishing a task; this is a required manual workflow step, not an automated Git hook.
+- Include: date, task title, status (`done`), files changed, affected flow/impact, key decisions, constraints/risks handled, validation, and "do-not-repeat" notes.
 - If the file does not exist, create it.
 - If task scope changes mid-way, update this record immediately.
 

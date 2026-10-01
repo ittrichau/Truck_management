@@ -52,7 +52,7 @@
                 <label for="status" class="form-label small mb-1">Trạng thái</label>
                 <select id="status" name="status" class="form-select">
                     <option value="active" {% if filter_status == 'active' %}selected{% endif %}>Đang hoạt động</option>
-                    <option value="">Tất cả</option>
+                    <option value="" {% if filter_status == '' %}selected{% endif %}>Tất cả</option>
                     <option value="draft" {% if filter_status == 'draft' %}selected{% endif %}>Đang thực hiện</option>
                     <option value="submitted" {% if filter_status == 'submitted' %}selected{% endif %}>Đã chốt</option>
                     <option value="confirmed" {% if filter_status == 'confirmed' %}selected{% endif %}>Đã xác nhận</option>

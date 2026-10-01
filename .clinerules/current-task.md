@@ -44,3 +44,27 @@
   - Khi thêm role select vào form, luôn kèm JS toggle truck section
   - Check role validation cả route lẫn template
   - is_admin phải được truyền vào context của template
+
+## 2026-10-01 - Review and strengthen project change-control rules
+
+- Status: done
+- Goal: Verify whether rule files and task records are current; ensure every future change assesses impact on stable flows and asks for approval before material risk.
+- Files changed:
+  - `.github/copilot-instructions.md` — workspace-wide Copilot instructions for stability-first workflow and approval gate
+  - `.clinerules/rules/04-ai-behavior-rules.md` — impact analysis and explicit high-risk approval criteria
+  - `.clinerules/rules/05-development-workflow.md` — risk gate, regression/rollback planning, and complete task-record fields
+  - `.continue/prompts/truck_rules.md` — corrected obsolete `project-ai/rules` paths to `.clinerules/rules`
+  - `.clinerules/current-task.md` — this record
+- Affected flow/impact: No application behavior changed. Future work must protect auth/roles, driver-truck assignment, phoi lifecycle, fuel associations, financial calculations, migrations, and deployment.
+- Key decisions:
+  - `current-task.md` is version-controlled but had not been updated for commits after 2026-06-26; it is not automatically updated by the existing rules.
+  - Copilot now receives workspace-wide instructions through `.github/copilot-instructions.md`; Continue references the actual rule location.
+  - High-risk changes require an impact report and explicit user approval before editing.
+- Validation:
+  - Confirmed all `.clinerules` and `.continue` rule/task files are tracked by Git.
+  - Confirmed the financial formulas in `app/models.py` use the current return-trip-aware implementations.
+  - Confirmed no runtime application files were modified in this task.
+- Do-not-repeat notes:
+  - Update this record after every completed task, including validation and risk details.
+  - Do not assume a written rule creates automatic task updates; a hook/integration is required for true automation.
+  - Keep rule path references aligned with `.clinerules/rules/`.

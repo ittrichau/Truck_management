@@ -21,6 +21,10 @@ instance/
 # Docker
 data/
 
+# Runtime logs
+logs/*.log
+logs.*.log
+
 # OS
 .DS_Store
 Thumbs.db

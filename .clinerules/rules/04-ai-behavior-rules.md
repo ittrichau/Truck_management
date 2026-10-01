@@ -5,6 +5,7 @@
 - Read relevant files before editing; never assume.
 - Follow existing patterns (route/model/template/error handling).
 - Create a short plan before multi-file changes.
+- Before editing, identify the affected user flow, compatibility impact, regression risk, and validation scenarios.
 - Prefer the smallest possible change.
 - Keep current architecture: business logic in models, thin routes, Vietnamese UI.
 - If schema changes are required: create migration.
@@ -42,3 +43,8 @@
 - `app/routes/phoi.py`: create -> submit -> confirm -> print flow.
 - `app/routes/fuel.py`: fuel-phoi constraints.
 - `app/routes/auth.py`: login security.
+- `migrations/versions/`, `config.py`, Docker/deployment files: persisted data and production behavior.
+
+## Approval Gate For High-Risk Changes
+
+Before editing, stop and ask for approval if a change may alter database/schema or existing data, financial results, authentication/roles, confirmation eligibility, fuel-log associations, existing routes/forms/template context, migrations, or deployment behavior. Report the affected flow, risk level, plausible regression, safer alternatives, and validation/rollback plan. Do not treat a requested code change as approval to accept an unmentioned breaking impact.
