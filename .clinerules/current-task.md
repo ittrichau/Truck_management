@@ -204,3 +204,28 @@
 - Do-not-repeat notes:
   - Keep the default quick-confirmation option as unpaid; do not silently assume direct customer payment.
   - Do not move the confirmation financial validation into JavaScript alone.
+
+## 2026-10-01 - Separate driver settlement from trip revenue display
+
+- Status: done
+- Goal: Prevent drivers from seeing trip revenue and owner profit in phơi views, while retaining a clear settlement amount showing whether the owner must pay the driver or the driver must remit to the owner.
+- Files changed:
+  - `app/templates/phoi/index.html` — hides each phơi's total revenue from drivers; manager/admin retain it.
+  - `app/templates/phoi/detail.html` — hides return-trip revenue detail, the revenue/expense table, and owner profit from drivers; retains the settlement card with the driver advance/wage and driver-collected amounts.
+  - `app/templates/phoi/detail_print.html` — applies the same role-aware visibility to the printable phơi.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: Presentation-only role separation across the phơi list, detail, and print views. Drivers still see their own phơi and the existing `Phoi.balance()` outcome. Manager/admin continue to see full revenue, collections, expenses, and owner profit. No persisted data, schema, URLs, forms, confirmation rules, fuel associations, or financial source-of-truth formulas changed.
+- Key decisions:
+  - The driver settlement card continues to show only the two reconciliation inputs: `Tài xế đã ứng + Công` and `Tài xế đã thu`, plus the resulting amount to receive or remit.
+  - Revenue disclosure is protected in templates with `current_user.is_manager_or_admin()` in all three viewing surfaces, including print.
+  - Return-trip operational details remain available to drivers, but the Full amount and per-ton pricing are hidden.
+- Validation:
+  - Reviewed the role checks, phơi routes, financial methods, and all three affected templates before editing.
+  - Editor diagnostics report no errors in `app/templates/phoi/index.html`, `app/templates/phoi/detail.html`, or `app/templates/phoi/detail_print.html`.
+  - Loaded all three templates through the configured Flask/Jinja environment and ran `git diff --check`; no failure was reported. No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - This is display-level access control within already authorized phơi pages; it does not introduce a new data API or alter model-level financial permissions.
+  - Drivers can still infer limited amounts from their own settlement inputs by design, but cannot view the trip's full revenue, direct owner collections, or owner profit.
+- Do-not-repeat notes:
+  - Keep the role guard on every new phơi revenue/profit display, including printable layouts.
+  - Do not change `Phoi.balance()` or `Phoi.owner_profit()` when adjusting role-based financial visibility.

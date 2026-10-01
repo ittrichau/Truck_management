@@ -224,7 +224,8 @@
             </table>
         </div>
 
-        <!-- Block 2: Tài chính -->
+        <!-- Block 2: Tài chính (chỉ quản lý/chủ xe) -->
+        {% if current_user.is_manager_or_admin() %}
         <div class="phoi-block">
             <h5>💰 Tài chính</h5>
             <table class="phoi-financial-table">
@@ -244,6 +245,7 @@
                 <tr class="total-row"><td><strong>Phí công tài xế</strong></td><td class="amount" style="color:#0d6efd;">{{ '{:,.0f}'.format(phoi.driver_wage) }} VNĐ</td></tr>
             </table>
         </div>
+        {% endif %}
     </div>
 
     <!-- GRID: Kết quả đối chiếu + Kết luận -->
@@ -261,17 +263,19 @@
             <div style="font-size:0.75rem; margin-top:6px; opacity:0.8;">
                 Tài xế đã ứng + Công: {{ '{:,.0f}'.format(phoi.driver_out_of_pocket_expenses() + phoi.driver_wage) }} VNĐ
                 &nbsp;|&nbsp;
-                Tài xế đã giữ: {{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ
+                Tài xế đã thu: {{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ
             </div>
         </div>
 
         <!-- Block 4: Lợi nhuận chủ xe -->
+        {% if current_user.is_manager_or_admin() %}
         <div class="phoi-block" style="text-align:center; background:#f8f9fa;">
             <div style="font-size:0.8rem; color:#6c757d; margin-bottom:4px;">Lợi nhuận chủ xe (Full - Chi - Công)</div>
             <div style="font-size:1.2rem; font-weight:bold; {% if phoi.owner_profit() >= 0 %}color:#198754{% else %}color:#dc3545{% endif %};">
                 {{ '{:,.0f}'.format(phoi.owner_profit()) }} VNĐ
             </div>
         </div>
+        {% endif %}
     </div>
 
     {% if phoi.notes %}
