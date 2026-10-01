@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Xác nhận {{ phoi.phoi_number }}{% endblock %}
+{% block content %}
+<div class="mx-auto" style="max-width: 650px;">
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <a href="{{ url_for('phoi.detail', id=phoi.id) }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Quay lại</a>
+        <h5 class="mb-0"><i class="bi bi-check-circle"></i> Xác nhận {{ phoi.phoi_number }}</h5>
+    </div>
+
+    <div class="alert alert-info small">
+        <i class="bi bi-info-circle"></i> Chọn <strong>Chưa thu</strong> nếu số còn lại sẽ vào công nợ. Chọn <strong>Đã thu đủ</strong> nếu quản lý/chủ xe đã nhận phần còn lại. Chỉ nhập số tiền khi thu một phần.
+    </div>
+
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="d-flex justify-content-end mb-2">
+            <button type="button" class="btn btn-outline-success btn-sm" onclick="markAllPaidInFull()"><i class="bi bi-check2-all"></i> Đã thu đủ tất cả</button>
+        </div>
+
+        {% for trip in trips %}
+        {% set remaining = trip.revenue_full - trip.revenue_collected %}
+        {% set manager_received = trip.manager_revenue_collected or 0 %}
+        {% set status_name = 'outbound_collection_status' if trip.kind == 'outbound' else 'return_collection_status_' ~ trip.id %}
+        {% set amount_name = 'outbound_manager_revenue_collected' if trip.kind == 'outbound' else 'return_manager_revenue_collected_' ~ trip.id %}
+        <div class="card mb-3 collection-card" data-status-name="{{ status_name }}" data-amount-name="{{ amount_name }}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between gap-2 mb-2">
+                    <strong>{{ trip.label }}</strong>
+                    <span class="text-end">{{ '{:,.0f}'.format(trip.revenue_full) }} đ</span>
+                </div>
+                <div class="small text-muted mb-3">
+                    {{ trip.customer.name if trip.customer else 'Chưa gán chủ hàng' }} · Tài xế đã thu: {{ '{:,.0f}'.format(trip.revenue_collected) }} đ · Còn lại: <strong>{{ '{:,.0f}'.format(remaining) }} đ</strong>
+                </div>
+                <div class="btn-group w-100" role="group">
+                    <input type="radio" class="btn-check collection-status" name="{{ status_name }}" id="{{ status_name }}-unpaid" value="unpaid" {% if manager_received == 0 %}checked{% endif %}>
+                    <label class="btn btn-outline-danger" for="{{ status_name }}-unpaid">Chưa thu</label>
+                    <input type="radio" class="btn-check collection-status" name="{{ status_name }}" id="{{ status_name }}-full" value="full" {% if remaining > 0 and manager_received == remaining %}checked{% endif %}>
+                    <label class="btn btn-outline-success" for="{{ status_name }}-full">Đã thu đủ</label>
+                    <input type="radio" class="btn-check collection-status" name="{{ status_name }}" id="{{ status_name }}-partial" value="partial" {% if manager_received > 0 and manager_received != remaining %}checked{% endif %}>
+                    <label class="btn btn-outline-primary" for="{{ status_name }}-partial">Thu một phần</label>
+                </div>
+                <div class="partial-amount mt-3 {% if not (manager_received > 0 and manager_received != remaining) %}d-none{% endif %}">
+                    <label class="form-label small mb-1">Quản lý/chủ xe đã nhận (VNĐ)</label>
+                    <input type="text" class="form-control currency-input" name="{{ amount_name }}" value="{{ '{:,.0f}'.format(manager_received) if manager_received > 0 else '' }}" inputmode="numeric" placeholder="Nhập số tiền thực nhận">
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <div class="d-grid gap-2 mb-5">
+            <button type="submit" class="btn btn-success btn-lg"><i class="bi bi-check-circle"></i> XÁC NHẬN PHƠI</button>
+            <a href="{{ url_for('phoi.detail', id=phoi.id) }}" class="btn btn-outline-secondary">Hủy</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+function updatePartialField(card) {
+    const status = card.querySelector('.collection-status:checked').value;
+    card.querySelector('.partial-amount').classList.toggle('d-none', status !== 'partial');
+}
+
+document.querySelectorAll('.collection-status').forEach(input => {
+    input.addEventListener('change', () => updatePartialField(input.closest('.collection-card')));
+});
+
+function markAllPaidInFull() {
+    document.querySelectorAll('.collection-card').forEach(card => {
+        const fullOption = card.querySelector('.collection-status[value="full"]');
+        fullOption.checked = true;
+        updatePartialField(card);
+    });
+}
+</script>
+{% endblock %}

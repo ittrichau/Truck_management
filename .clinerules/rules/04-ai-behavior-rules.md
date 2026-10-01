@@ -9,7 +9,7 @@
 - Prefer the smallest possible change.
 - Keep current architecture: business logic in models, thin routes, Vietnamese UI.
 - If schema changes are required: create migration.
-- After task completion, update the current task record to capture what was done and prevent repeating the same work later.
+- After a completed task that changes application source code, update the current task record to capture what was done and prevent repeating the same work later.
 
 ## Must Not
 

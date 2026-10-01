@@ -34,22 +34,30 @@ def index():
         }
     )
 
-    def add_debt(customer, revenue_full, revenue_collected):
+    def add_debt(customer, revenue_full, driver_collected, manager_collected):
         if not customer:
             return
         debt = customer_debts[customer.id]
         debt['customer'] = customer
         debt['revenue_full'] += revenue_full or Decimal('0')
-        debt['revenue_collected'] += revenue_collected or Decimal('0')
+        debt['revenue_collected'] += (
+            (driver_collected or Decimal('0')) + (manager_collected or Decimal('0'))
+        )
         debt['trip_count'] += 1
 
     for phoi in phois:
-        add_debt(phoi.customer, phoi.revenue_full, phoi.revenue_collected)
+        add_debt(
+            phoi.customer,
+            phoi.revenue_full,
+            phoi.revenue_collected,
+            phoi.manager_revenue_collected,
+        )
         for return_trip in phoi.return_trips:
             add_debt(
                 return_trip.customer,
                 return_trip.revenue_full,
                 return_trip.revenue_collected,
+                return_trip.manager_revenue_collected,
             )
 
     debts = []

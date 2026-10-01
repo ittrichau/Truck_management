@@ -247,6 +247,7 @@ class Phoi(db.Model):
     price_per_ton = db.Column(db.Numeric(12, 2), nullable=True, comment='Đơn giá vận chuyển mỗi tấn')
     revenue_full = db.Column(db.Numeric(12, 2), default=0, comment='Tổng doanh thu full chuyến')
     revenue_collected = db.Column(db.Numeric(12, 2), default=0, comment='Tiền mặt tài xế đã thu')
+    manager_revenue_collected = db.Column(db.Numeric(12, 2), default=0, nullable=False, comment='Tiền quản lý/chủ xe đã nhận trực tiếp')
     driver_wage = db.Column(db.Numeric(12, 2), default=0, comment='Phí công tài xế (manager nhập)')
     
     # Trạng thái
@@ -346,6 +347,7 @@ class PhoiReturnTrip(db.Model):
     km_total = db.Column(db.Integer, nullable=False, default=0)
     revenue_full = db.Column(db.Numeric(12, 2), nullable=False, default=0)
     revenue_collected = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    manager_revenue_collected = db.Column(db.Numeric(12, 2), nullable=False, default=0, comment='Tiền quản lý/chủ xe đã nhận trực tiếp')
     porter_fee = db.Column(db.Numeric(12, 2), nullable=False, default=0)
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

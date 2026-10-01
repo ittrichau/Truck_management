@@ -63,7 +63,7 @@
                 </thead>
                 <tbody>
                     {% for log in logs %}
-                    <tr>
+                    <tr class="{% if log.action == 'ALERT' %}table-danger{% endif %}">
                         <td class="text-nowrap small">{{ log.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
                         <td>{{ log.username or 'N/A' }}</td>
                         <td>
@@ -77,6 +77,8 @@
                             <span class="badge bg-info text-dark">Đăng nhập</span>
                             {% elif log.action == 'LOGOUT' %}
                             <span class="badge bg-secondary">Đăng xuất</span>
+                            {% elif log.action == 'ALERT' %}
+                            <span class="badge bg-danger"><i class="bi bi-exclamation-triangle-fill"></i> Cảnh báo KM</span>
                             {% else %}
                             <span class="badge bg-light text-dark">{{ log.action }}</span>
                             {% endif %}
@@ -87,7 +89,7 @@
                             <br><code class="small">{{ log.resource_id }}</code>
                             {% endif %}
                         </td>
-                        <td class="small" style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        <td class="small {% if log.action == 'ALERT' %}fw-semibold text-danger{% endif %}" style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                             {% if log.details %}
                             {{ log.details|truncate(120) }}
                             {% endif %}

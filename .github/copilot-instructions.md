@@ -20,4 +20,4 @@ Do **not** edit until the user approves when a proposed change can alter persist
 
 ## Completion requirements
 
-Validate the changed flow and relevant edge cases without launching the development server unless requested. Report files changed and checks performed. Update `.clinerules/current-task.md` for every completed task with date, scope, files, decisions, validation, risks/constraints, and do-not-repeat notes. This is a required project record but is not technically auto-generated; keep it current manually as part of each task.
+Validate the changed flow and relevant edge cases without launching the development server unless requested. Report files changed and checks performed. Update `.clinerules/current-task.md` only after a completed task changes application source code. Do not create a record for review-only work or documentation, rule, configuration, or task-record-only changes. For qualifying code changes, include date, scope, code files changed, decisions, validation, risks/constraints, and do-not-repeat notes.

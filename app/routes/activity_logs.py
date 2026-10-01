@@ -10,8 +10,8 @@ bp = Blueprint('activity_logs', __name__)
 @bp.route('/activity-logs')
 @login_required
 def index():
-    """Admin-only page to view all activity logs."""
-    if not current_user.is_admin():
+    """Manager/admin page to view operational activity logs and KM alerts."""
+    if not current_user.is_manager_or_admin():
         flash('Bạn không có quyền truy cập.', 'danger')
         return redirect(url_for('phoi.index'))
 
@@ -56,7 +56,7 @@ def index():
     users = User.query.order_by(User.full_name).all()
 
     # Available actions for filter dropdown
-    actions = ['CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT']
+    actions = ['CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT', 'ALERT']
 
     return render_template(
         'activity_logs/index.html',

@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 from app import db
-from app.models import Phoi, PhoiAttachment, PhoiExpense, PhoiReturnTrip, FuelLog, Customer, Truck, User, generate_phoi_number
+from app.models import ActivityLog, Phoi, PhoiAttachment, PhoiExpense, PhoiReturnTrip, FuelLog, Customer, Truck, User, generate_phoi_number
 from app.phoi_attachments import attachment_path, delete_attachment_file, save_phoi_attachment
 from app.phoi_repair_expenses import _sync_standard_expenses, _sync_repair_expenses, _save_repair_receipts
 from datetime import datetime, date
@@ -33,6 +33,29 @@ def submission_error(phoi):
     return None
 
 
+def financial_confirmation_error(phoi):
+    """Return the first missing or inconsistent financial datum needed to finalize a phơi."""
+    trips = [phoi, *phoi.return_trips.all()]
+    for index, trip in enumerate(trips):
+        trip_label = 'chuyến đi' if index == 0 else f'chuyến về #{trip.trip_order}'
+        if trip.payment_method == 'fixed':
+            if trip.revenue_full is None or trip.revenue_full <= 0:
+                return f'Vui lòng nhập doanh thu bao chuyến lớn hơn 0 cho {trip_label} trước khi xác nhận.'
+        elif trip.payment_method == 'per_ton':
+            if trip.cargo_weight_tons is None or trip.cargo_weight_tons <= 0:
+                return f'Vui lòng nhập số tấn lớn hơn 0 cho {trip_label} trước khi xác nhận.'
+            if trip.price_per_ton is None or trip.price_per_ton <= 0:
+                return f'Vui lòng nhập đơn giá mỗi tấn lớn hơn 0 cho {trip_label} trước khi xác nhận.'
+        else:
+            return f'Cách tính tiền của {trip_label} không hợp lệ.'
+        driver_collected = trip.revenue_collected or Decimal('0')
+        manager_collected = trip.manager_revenue_collected or Decimal('0')
+        if driver_collected < 0 or manager_collected < 0:
+            return f'Tiền đã thu của {trip_label} không thể âm.'
+        if driver_collected + manager_collected > trip.revenue_full:
+            return f'Tổng tiền tài xế và quản lý đã thu của {trip_label} không thể lớn hơn doanh thu full.'
+    return None
+
 def update_truck_status(truck):
     if not truck:
         return
@@ -43,6 +66,44 @@ def update_truck_status(truck):
     truck.status = 'in_trip' if has_active_phoi else 'available'
 
 
+
+def _ensure_truck_has_no_other_active_phoi(truck_id, excluded_phoi_id=None):
+    """A truck may have only one in-progress draft phơi at a time."""
+    query = Phoi.query.filter(
+        Phoi.truck_id == truck_id,
+        Phoi.status == 'draft'
+    )
+    if excluded_phoi_id:
+        query = query.filter(Phoi.id != excluded_phoi_id)
+    active_phoi = query.order_by(Phoi.created_at.desc()).first()
+    if active_phoi:
+        raise ValueError(
+            f'Xe đang có phơi {active_phoi.phoi_number} ở trạng thái '
+            'đang thực hiện. Hãy chốt phơi này trước khi tạo phơi mới.'
+        )
+
+def _record_km_start_warning(phoi, baseline_km, entered_km):
+    """Record an admin-visible alert for a large driver odometer correction."""
+    difference = abs(entered_km - baseline_km)
+    if not current_user.is_driver() or difference <= 50:
+        return
+    db.session.add(ActivityLog(
+        user_id=current_user.id,
+        username=current_user.username,
+        action='ALERT',
+        resource_type='phoi_km_warning',
+        resource_id=str(phoi.id),
+        details=(
+            f'CẢNH BÁO KM: Tài xế sửa KM đầu phơi {phoi.phoi_number} '
+            f'của xe {phoi.truck.license_plate} từ {baseline_km:,} thành '
+            f'{entered_km:,} km (chênh {difference:,} km).'
+        ),
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent', '')[:200],
+        method=request.method,
+        endpoint=request.endpoint,
+        status_code=200,
+    ))
 
 def _active_phoi_options():
     """Return active trucks, drivers, and each truck's default driver."""
@@ -103,23 +164,31 @@ def _money(value):
 
 
 def _revenue_from_form(method, fixed_revenue, weight, price_per_ton):
+    """Parse revenue while allowing an owner to finalize a per-ton price later."""
     if method not in ('fixed', 'per_ton'):
         raise ValueError('Cách tính tiền không hợp lệ.')
     if method == 'fixed':
         return _money(fixed_revenue), None, None
 
     try:
-        tons = Decimal(str(weight or '').strip()) if str(weight or '').strip() else Decimal('0')
+        tons = Decimal(str(weight).strip()) if str(weight or '').strip() else None
     except InvalidOperation:
         raise ValueError('Số tấn không hợp lệ.')
-    price = _money(price_per_ton)
-    if tons <= 0 or price <= 0:
-        raise ValueError('Khi tính theo tấn, vui lòng nhập số tấn và giá mỗi tấn lớn hơn 0.')
-    return tons * price, tons, price
+    price = _money(price_per_ton) if str(price_per_ton or '').strip() else None
+    if tons is not None and tons < 0:
+        raise ValueError('Số tấn không thể âm.')
+    if price is not None and price < 0:
+        raise ValueError('Đơn giá mỗi tấn không thể âm.')
+    revenue = tons * price if tons is not None and price is not None else Decimal('0')
+    return revenue, tons, price
 
 
 def _sync_return_trips(phoi):
     """Lưu các chuyến về; KM được ghi một lần cho toàn bộ phơi."""
+    existing_manager_collections = {
+        trip.trip_order: trip.manager_revenue_collected
+        for trip in phoi.return_trips.all()
+    }
     PhoiReturnTrip.query.filter_by(phoi_id=phoi.id).delete()
 
     dates = request.form.getlist('return_trip_date[]')
@@ -132,6 +201,7 @@ def _sync_return_trips(phoi):
     prices_per_ton = request.form.getlist('return_trip_price_per_ton[]')
     revenues = request.form.getlist('return_trip_revenue_full[]')
     collecteds = request.form.getlist('return_trip_revenue_collected[]')
+    manager_collecteds = request.form.getlist('return_trip_manager_revenue_collected[]')
     porter_fees = request.form.getlist('return_trip_porter_fee[]')
     notes = request.form.getlist('return_trip_notes[]')
 
@@ -164,6 +234,11 @@ def _sync_return_trips(phoi):
             price_per_ton=price_per_ton,
             revenue_full=revenue_full,
             revenue_collected=_money(collecteds[index] if index < len(collecteds) else 0),
+            manager_revenue_collected=(
+                _money(manager_collecteds[index])
+                if index < len(manager_collecteds)
+                else existing_manager_collections.get(index + 1, Decimal('0'))
+            ),
             porter_fee=_money(porter_fees[index] if index < len(porter_fees) else 0),
             notes=notes[index].strip() if index < len(notes) else ''
         )
@@ -286,6 +361,8 @@ def create():
         saved_keys = []
         try:
             driver, truck, is_substitute = _selected_driver_and_truck()
+            _ensure_truck_has_no_other_active_phoi(truck.id)
+            baseline_km = truck.current_km or 0
             phoi = Phoi()
             phoi.phoi_number = generate_phoi_number()
             phoi.driver_id = driver.id
@@ -305,8 +382,8 @@ def create():
             phoi.destination = request.form.get('destination', '').strip()
             phoi.cargo_description = request.form.get('cargo_description', '').strip()
 
-            # Dữ liệu xe cũ có thể chưa có current_km; xem là 0 để vẫn tạo được phơi.
-            phoi.km_start = truck.current_km or 0
+            # Mặc định lấy KM hiện tại của xe; tài xế được phép điều chỉnh khi cần.
+            phoi.km_start = int(request.form.get('km_start', baseline_km) or 0)
             phoi.km_end = int(request.form.get('km_end', 0) or 0)
             if phoi.km_end and phoi.km_end < phoi.km_start:
                 raise ValueError('KM cuối không thể nhỏ hơn KM đầu.')
@@ -328,6 +405,7 @@ def create():
 
             db.session.add(phoi)
             db.session.flush()
+            _record_km_start_warning(phoi, baseline_km, phoi.km_start)
             _sync_return_trips(phoi)
 
             for attachment_type, field_name, maximum_files in (
@@ -399,8 +477,12 @@ def detail(id):
 @login_required
 def upload_attachment(id):
     phoi = Phoi.query.get_or_404(id)
-    if phoi.status != 'draft' or not can_manage_phoi(current_user, phoi):
-        flash('Chỉ có thể tải chứng từ cho phơi đang thực hiện của bạn.', 'danger')
+    can_update_attachments = (
+        (phoi.status == 'draft' and can_manage_phoi(current_user, phoi))
+        or (phoi.status == 'submitted' and current_user.is_manager_or_admin())
+    )
+    if not can_update_attachments:
+        flash('Chỉ chủ xe mới có thể bổ sung chứng từ sau khi phơi đã chốt.', 'danger')
         return redirect(url_for('phoi.detail', id=id))
 
     attachment_type = request.form.get('attachment_type', '')
@@ -457,8 +539,12 @@ def view_attachment(id, attachment_id):
 @login_required
 def delete_attachment(id, attachment_id):
     phoi = Phoi.query.get_or_404(id)
-    if phoi.status != 'draft' or not can_manage_phoi(current_user, phoi):
-        flash('Chỉ có thể xóa chứng từ của phơi đang thực hiện.', 'danger')
+    can_delete_attachment = (
+        (phoi.status == 'draft' and can_manage_phoi(current_user, phoi))
+        or (phoi.status == 'submitted' and current_user.is_manager_or_admin())
+    )
+    if not can_delete_attachment:
+        flash('Chỉ chủ xe mới có thể xóa chứng từ sau khi phơi đã chốt.', 'danger')
         return redirect(url_for('phoi.detail', id=id))
     attachment = PhoiAttachment.query.filter_by(id=attachment_id, phoi_id=phoi.id).first_or_404()
     if attachment.attachment_type == 'repair_receipt' and attachment.expense and not attachment.expense.is_home_repair:
@@ -488,12 +574,12 @@ def print_view(id):
 @login_required
 def edit(id):
     phoi = Phoi.query.get_or_404(id)
-
-    if phoi.status != 'draft':
-        flash('Chỉ có thể sửa phơi đang thực hiện. Phơi đã chốt hoặc xác nhận không thể chỉnh sửa.', 'warning')
-        return redirect(url_for('phoi.detail', id=id))
-    if not can_manage_phoi(current_user, phoi):
-        flash('Bạn không có quyền sửa phơi này.', 'danger')
+    can_edit = (
+        (phoi.status == 'draft' and can_manage_phoi(current_user, phoi))
+        or (phoi.status == 'submitted' and current_user.is_manager_or_admin())
+    )
+    if not can_edit:
+        flash('Tài xế chỉ có thể sửa phơi đang thực hiện; phơi đã xác nhận không thể chỉnh sửa.', 'warning')
         return redirect(url_for('phoi.detail', id=id))
 
     trucks, drivers, driver_by_truck_id = _active_phoi_options()
@@ -503,7 +589,9 @@ def edit(id):
         saved_keys = []
         try:
             old_truck = phoi.truck
+            previous_km_start = phoi.km_start or 0
             driver, truck, is_substitute = _selected_driver_and_truck()
+            _ensure_truck_has_no_other_active_phoi(truck.id, excluded_phoi_id=phoi.id)
             phoi.driver_id = driver.id
             phoi.truck_id = truck.id
             phoi.is_substitute = is_substitute
@@ -526,6 +614,7 @@ def edit(id):
             if phoi.km_end and phoi.km_end < phoi.km_start:
                 raise ValueError('KM cuối không thể nhỏ hơn KM đầu.')
             phoi.calculate_km_total()
+            _record_km_start_warning(phoi, previous_km_start, phoi.km_start)
             phoi.weigh_ticket_number = request.form.get('weigh_ticket_number', '').strip() or None
             phoi.payment_method = request.form.get('payment_method', 'fixed')
             phoi.revenue_full, cargo_weight_tons, phoi.price_per_ton = _revenue_from_form(
@@ -539,12 +628,34 @@ def edit(id):
             phoi.notes = request.form.get('notes', '').strip()
 
             if current_user.is_manager_or_admin():
-                phoi.driver_wage = float(request.form.get('driver_wage', 0) or 0)
+                if 'manager_revenue_collected' in request.form:
+                    phoi.manager_revenue_collected = _money(
+                        request.form.get('manager_revenue_collected', 0)
+                    )
+                phoi.driver_wage = _money(request.form.get('driver_wage', 0))
 
             _sync_return_trips(phoi)
             _sync_standard_expenses(phoi)
             repairs = _sync_repair_expenses(phoi)
             _save_repair_receipts(phoi, repairs, saved_keys)
+
+            if phoi.status == 'submitted' and current_user.is_manager_or_admin():
+                db.session.add(ActivityLog(
+                    user_id=current_user.id,
+                    username=current_user.username,
+                    action='UPDATE',
+                    resource_type='phoi_reconciliation',
+                    resource_id=str(phoi.id),
+                    details=(
+                        f'Đã đối soát và cập nhật phơi {phoi.phoi_number} đã chốt, gồm thông tin '
+                        'chuyến đi, chứng từ, doanh thu, chi phí hoặc phí công tài xế.'
+                    ),
+                    ip_address=request.remote_addr,
+                    user_agent=request.headers.get('User-Agent', '')[:200],
+                    method=request.method,
+                    endpoint=request.endpoint,
+                    status_code=200,
+                ))
 
             if phoi.km_end:
                 truck.current_km = max(truck.current_km, phoi.km_end)
@@ -598,7 +709,7 @@ def submit(id):
     return redirect(url_for('phoi.detail', id=id))
 
 
-@bp.route('/phoi/<int:id>/confirm', methods=['POST'])
+@bp.route('/phoi/<int:id>/confirm', methods=['GET', 'POST'])
 @login_required
 def confirm(id):
     if not current_user.is_manager_or_admin():
@@ -610,16 +721,55 @@ def confirm(id):
         flash('Chỉ có thể xác nhận phơi đã chốt.', 'warning')
         return redirect(url_for('phoi.detail', id=id))
 
-    error = submission_error(phoi)
-    if error:
-        flash(error, 'danger')
-        return redirect(url_for('phoi.detail', id=id))
+    trips = [
+        {'kind': 'outbound', 'label': 'Chuyến đi', 'customer': phoi.customer,
+         'revenue_full': phoi.revenue_full, 'revenue_collected': phoi.revenue_collected,
+         'manager_revenue_collected': phoi.manager_revenue_collected},
+        *[
+            {'kind': 'return', 'id': trip.id, 'label': f'Chuyến về #{trip.trip_order}',
+             'customer': trip.customer, 'revenue_full': trip.revenue_full,
+             'revenue_collected': trip.revenue_collected,
+             'manager_revenue_collected': trip.manager_revenue_collected}
+            for trip in phoi.return_trips.all()
+        ],
+    ]
+    if request.method == 'GET':
+        return render_template('phoi/confirm.html', phoi=phoi, trips=trips)
 
-    phoi.status = 'confirmed'
-    phoi.confirmed_by_id = current_user.id
-    phoi.confirmed_at = datetime.utcnow()
-    update_truck_status(phoi.truck)
-    db.session.commit()
+    try:
+        for trip in trips:
+            if trip['kind'] == 'outbound':
+                status_name = 'outbound_collection_status'
+                amount_name = 'outbound_manager_revenue_collected'
+                target = phoi
+            else:
+                status_name = f"return_collection_status_{trip['id']}"
+                amount_name = f"return_manager_revenue_collected_{trip['id']}"
+                target = PhoiReturnTrip.query.get_or_404(trip['id'])
+            status = request.form.get(status_name, 'unpaid')
+            remaining = (target.revenue_full or Decimal('0')) - (target.revenue_collected or Decimal('0'))
+            if status == 'unpaid':
+                target.manager_revenue_collected = Decimal('0')
+            elif status == 'full':
+                target.manager_revenue_collected = remaining
+            elif status == 'partial':
+                target.manager_revenue_collected = _money(request.form.get(amount_name, 0))
+            else:
+                raise ValueError('Trạng thái thu tiền không hợp lệ.')
+
+        error = submission_error(phoi) or financial_confirmation_error(phoi)
+        if error:
+            raise ValueError(error)
+
+        phoi.status = 'confirmed'
+        phoi.confirmed_by_id = current_user.id
+        phoi.confirmed_at = datetime.utcnow()
+        update_truck_status(phoi.truck)
+        db.session.commit()
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), 'danger')
+        return redirect(url_for('phoi.confirm', id=id))
 
     flash(f'Đã xác nhận phơi {phoi.phoi_number}. Balance: {phoi.balance():,.0f} VNĐ', 'success')
     return redirect(url_for('phoi.detail', id=id))

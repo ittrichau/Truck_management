@@ -219,7 +219,7 @@
               >
             </li>
             {% endif %}
-            {% if current_user.is_admin() %}
+            {% if current_user.is_manager_or_admin() %}
             <li class="nav-item">
               <a class="nav-link" href="{{ url_for('activity_logs.index') }}"
                 ><i class="bi bi-journal-code"></i> Nhật ký</a
@@ -331,11 +331,9 @@
           <a href="{{ url_for('drivers.index') }}" class="list-group-item list-group-item-action py-3">
             <i class="bi bi-person-badge me-2 text-primary"></i> Người dùng
           </a>
-          {% if current_user.is_admin() %}
           <a href="{{ url_for('activity_logs.index') }}" class="list-group-item list-group-item-action py-3">
             <i class="bi bi-journal-code me-2 text-primary"></i> Nhật ký
           </a>
-          {% endif %}
         </div>
       </div>
     </div>

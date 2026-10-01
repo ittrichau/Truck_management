@@ -45,54 +45,6 @@
   - Check role validation cả route lẫn template
   - is_admin phải được truyền vào context của template
 
-## 2026-10-01 - Review and strengthen project change-control rules
-
-- Status: done
-- Goal: Verify whether rule files and task records are current; ensure every future change assesses impact on stable flows and asks for approval before material risk.
-- Files changed:
-  - `.github/copilot-instructions.md` — workspace-wide Copilot instructions for stability-first workflow and approval gate
-  - `.clinerules/rules/04-ai-behavior-rules.md` — impact analysis and explicit high-risk approval criteria
-  - `.clinerules/rules/05-development-workflow.md` — risk gate, regression/rollback planning, and complete task-record fields
-  - `.continue/prompts/truck_rules.md` — corrected obsolete `project-ai/rules` paths to `.clinerules/rules`
-  - `.clinerules/current-task.md` — this record
-- Affected flow/impact: No application behavior changed. Future work must protect auth/roles, driver-truck assignment, phoi lifecycle, fuel associations, financial calculations, migrations, and deployment.
-- Key decisions:
-  - `current-task.md` is version-controlled but had not been updated for commits after 2026-06-26; it is not automatically updated by the existing rules.
-  - Copilot now receives workspace-wide instructions through `.github/copilot-instructions.md`; Continue references the actual rule location.
-  - High-risk changes require an impact report and explicit user approval before editing.
-- Validation:
-  - Confirmed all `.clinerules` and `.continue` rule/task files are tracked by Git.
-  - Confirmed the financial formulas in `app/models.py` use the current return-trip-aware implementations.
-  - Confirmed no runtime application files were modified in this task.
-- Do-not-repeat notes:
-  - Update this record after every completed task, including validation and risk details.
-  - Do not assume a written rule creates automatic task updates; a hook/integration is required for true automation.
-  - Keep rule path references aligned with `.clinerules/rules/`.
-
-## 2026-10-01 - Remove obsolete Railway deployment configuration
-
-- Status: done
-- Goal: Remove Railway-specific deployment configuration now that production runs only on the VPS.
-- Files changed:
-  - `railway.json` — deleted; it was only a Railway build/deploy manifest.
-  - `config.py` — replaced the Railway-specific database comment with a server-environment description.
-  - `docker-entrypoint.sh` — replaced Railway environment-variable guidance with generic server-environment guidance.
-  - `app/__init__.py` — documented reverse-proxy handling for VPS Nginx instead of former platform examples.
-  - `.clinerules/current-task.md` — this record.
-- Affected flow/impact: Deployment configuration and operator messages only. The Docker entrypoint, `DATABASE_URL`/`SECRET_KEY` requirements, migrations, Gunicorn startup, health check, Nginx reverse proxy, and Docker Compose VPS deployment behavior are unchanged. No persisted data, schema, financial logic, roles, URLs, or application templates changed.
-- Key decisions:
-  - User approved removal after the impact assessment.
-  - Retained generic production environment checks because they are required by the existing VPS deployment flow.
-  - Preserved `ProxyFix`, which is needed for HTTPS and secure cookies behind VPS Nginx.
-- Validation:
-  - Confirmed `railway.json` was removed.
-  - Reviewed `Dockerfile`, `docker-compose.yml`, `deploy/GITHUB_ACTIONS_DEPLOY.md`, and `deploy/VPS_UBUNTU.md`; they use the VPS Docker/Nginx deployment flow and do not depend on Railway.
-  - No development server was launched.
-- Risks/constraints:
-  - Railway deployment is no longer configured from this repository; restoring it would require recreating a provider manifest and platform configuration.
-- Do-not-repeat notes:
-  - Before removing provider configuration, search both repository references and deployment documentation, then retain only platform-neutral runtime safeguards.
-
 ## 2026-10-01 - Add confirmed-trip customer debt report and role-aware navigation
 
 - Status: done
@@ -120,3 +72,135 @@
 - Do-not-repeat notes:
   - Do not use `Phoi.total_revenue_full()` or `total_revenue_collected()` for customer debt because they combine the outbound customer and every return-trip customer.
   - Preserve both route-level authorization and role-based navigation visibility.
+
+## 2026-10-01 - Enforce one active phơi per truck and KM correction alerts
+
+- Status: done
+- Goal: Let drivers adjust an auto-filled KM đầu, create a prominent activity-log warning for a driver correction greater than 50 km, and prevent a truck from having more than one active phơi.
+- Files changed:
+  - `app/routes/phoi.py` — server-side active-phơi validation and KM-difference alert creation on create/edit.
+  - `app/templates/phoi/create.html` — KM đầu remains auto-filled but is editable and explains the alert threshold.
+  - `app/routes/activity_logs.py` — permits managers and admins to view logs and exposes the `ALERT` filter.
+  - `app/templates/activity_logs/index.html` — highlights KM alerts in red with a warning badge.
+  - `app/templates/base.html` — exposes Nhật ký to managers on desktop and mobile navigation.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: `Truck.current_km` is the create-time KM baseline. A truck is blocked from creating another phơi while one is `draft` or `submitted`; it becomes available only once the existing phơi is confirmed. The existing rule that KM cuối advances `Truck.current_km` on save is retained.
+- Key decisions:
+  - Only driver-initiated KM đầu changes create a warning; manager/admin corrections do not.
+  - A correction with an absolute difference strictly greater than 50 km creates an `ActivityLog` entry with action `ALERT`, phơi number, truck plate, old/new KM, and difference.
+  - Existing `ActivityLog` storage is reused; no schema migration is required.
+- Validation:
+  - Ran `python -m compileall -q app` successfully using the configured virtual environment.
+  - Ran `git diff --check` successfully.
+  - Editor diagnostics report no errors in `app/routes/phoi.py` or `app/routes/activity_logs.py`.
+  - No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - The one-active-phơi constraint is enforced in application code rather than a database partial unique constraint, so simultaneous requests can theoretically race; normal UI use is protected.
+  - The alert is visible in Nhật ký to manager/admin users; it is not a push or email notification.
+- Do-not-repeat notes:
+  - Keep the one-active-phơi check in both create and edit, excluding the edited phơi itself.
+  - Keep the >50 km comparison server-side and store alert details before the phơi transaction commits.
+
+## 2026-10-01 - Allow next phơi after driver submission
+
+- Status: done
+- Goal: Permit a driver to begin the next trip for a truck once the prior phơi is chốt (`submitted`), while still preventing two concurrently in-progress phơi.
+- Files changed:
+  - `app/routes/phoi.py` — changed the server-side per-truck blocker to consider only `draft` phơi and updated its Vietnamese validation message.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: A `draft` phơi continues to block another phơi for the same truck. Submitting it changes its status to `submitted`, which releases creation of the next phơi while the prior record remains available for manager/admin final confirmation. Multiple `submitted` phơi for one truck are now permitted, as explicitly approved. `Truck.current_km`, fuel-log attachment eligibility, confirmation requirements, and financial calculations are unchanged.
+- Key decisions:
+  - The create and edit routes retain the same shared validation helper, so the rule is applied consistently.
+  - Truck display status remains `in_trip` while a draft or submitted phơi exists; this is display/status behavior only and does not block the approved next-phơi creation flow.
+- Validation:
+  - Reviewed the create/edit call sites, submit/confirm lifecycle, truck status updates, and fuel-log selection behavior.
+  - Ran `python -m compileall -q app` successfully using the configured virtual environment.
+  - Ran `git diff --check` successfully; editor diagnostics report no errors in `app/routes/phoi.py`.
+  - No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - Multiple submitted phơi require manager/admin confirmation to be selected and completed deliberately; no automatic confirmation ordering was added.
+  - The application-level draft check retains its existing theoretical concurrent-request race condition.
+- Do-not-repeat notes:
+  - Keep the per-truck blocker scoped to `draft`; do not re-add `submitted` without revisiting the approved sequential-trip workflow.
+
+## 2026-10-01 - Owner reconciliation for submitted phơi
+
+- Status: done
+- Goal: Treat driver input as operational data collection while allowing manager/admin (owner) to correct every phơi detail and finalize unknown per-ton prices before final confirmation.
+- Files changed:
+  - `app/routes/phoi.py` — permits manager/admin edits and attachment changes for `submitted` phơi; keeps drivers limited to their own `draft` phơi; supports incomplete per-ton pricing during data entry; requires complete positive revenue or tonnage/price data only at confirmation; records manager reconciliation updates in `ActivityLog`.
+  - `app/templates/phoi/detail.html` — exposes the owner reconciliation action and evidence controls for submitted phơi, and explains the review stage.
+  - `app/templates/phoi/edit.html` — identifies submitted edits as the final owner reconciliation step.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: `draft → submitted → confirmed` is retained without a schema migration. A driver can submit evidence even when an agreed per-ton price is unavailable. Manager/admin may revise trip, driver/truck, operational, financial, and evidence details while submitted. `confirmed` records remain locked. Existing `Phoi.balance()` and `Phoi.owner_profit()` formulas are unchanged.
+- Key decisions:
+  - Confirmation blocks a fixed-price trip with revenue ≤ 0 and a per-ton trip without positive tonnage and price; this applies to outbound and every return trip.
+  - A submitted phơi update creates an `UPDATE` activity-log item; no new log table or migration is needed.
+  - Managers may delete as well as upload evidence during reconciliation so they can fully correct the record before locking it.
+- Validation:
+  - Reviewed phơi create/edit/submit/confirm routes, attachment permissions, financial model formulas, and detail/edit templates before changing behavior.
+  - Ran `python -m compileall -q app` successfully using the configured virtual environment.
+  - Ran `git diff --check` successfully; Git reported only existing line-ending conversion warnings.
+  - Editor diagnostics report no errors in the changed route and templates. No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - Fixed-price revenue may still be entered as zero until final confirmation, intentionally allowing drivers to submit a record when the price is unknown.
+  - The current form permits a manager to edit all submitted fields in one save; the activity log records the reconciliation event but not a field-by-field audit diff.
+- Do-not-repeat notes:
+  - Keep financial completeness enforcement in the confirmation route, not only JavaScript or the submitted form.
+  - Do not alter the established balance and owner-profit formulas while changing reconciliation permissions.
+
+## 2026-10-01 - Track manager direct collections in customer debt
+
+- Status: done
+- Goal: Let manager/admin distinguish customer money received directly by management from money held by the driver, then calculate confirmed-trip customer debt from both receipt sources.
+- Files changed:
+  - `app/models.py` — added `manager_revenue_collected` to outbound `Phoi` and each `PhoiReturnTrip`.
+  - `migrations/versions/c6d7e8f9a0b1_add_manager_collections_to_trip_revenue.py` — adds the non-null numeric columns with a zero default; downgrade removes them.
+  - `app/routes/phoi.py` — saves direct-management collections during manager reconciliation and blocks confirmation when a trip's driver plus manager collections are negative or exceed its full revenue.
+  - `app/templates/phoi/edit.html` — exposes manager collection fields and a convenience checkbox that fills the remaining amount after driver-collected cash; includes dynamically added return trips.
+  - `app/routes/debts.py` and `app/templates/debts/index.html` — count both driver and manager collections as customer payments, while retaining per-customer outbound/return-trip aggregation.
+  - `app/templates/phoi/detail.html` — shows the direct-management receipt total separately from driver-held cash.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: During submitted-phơi owner reconciliation, driver-collected cash remains the sole input to `Phoi.balance()`. Direct manager/customer payments reduce the relevant customer's confirmed debt but do not change driver settlement or owner-profit. Existing rows begin with a direct-management receipt of zero, preserving their previous debt result.
+- Key decisions:
+  - The checkbox means management received the remaining revenue after money already collected by the driver; partial direct payments remain available through the amount field.
+  - The server, rather than only JavaScript, rejects a negative receipt or combined driver and manager receipts above full revenue for each outbound or return trip.
+  - Debt calculation remains per trip/customer; never combine mixed-customer phơi totals.
+- Validation:
+  - Ran `python -m compileall -q app migrations` successfully using the configured virtual environment.
+  - Ran `git diff --check` successfully; output only reports existing LF-to-CRLF conversion warnings.
+  - Ran an in-memory validation check: collection $20 + $80 against revenue $100 passes; $20 + $81 is rejected with the expected Vietnamese message.
+  - Editor diagnostics report no errors in changed models, routes, templates, or migration. No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - The fields represent accumulated receipt totals entered at reconciliation, not a dated payment ledger; later payment events still require a separate ledger/workflow.
+  - Deployments must run the new Alembic migration before using owner-receipt fields.
+- Do-not-repeat notes:
+  - Do not include manager direct receipts in `total_revenue_collected()` or `balance()`; that method is strictly for money the driver holds.
+  - Keep the confirmation upper-bound check for every return trip as well as the outbound trip.
+
+## 2026-10-01 - Streamline manager collection confirmation
+
+- Status: done
+- Goal: Reduce manager reconciliation work by moving direct-customer-collection choices out of the long phơi edit form into a short final confirmation screen.
+- Files changed:
+  - `app/routes/phoi.py` — `confirm` now renders a GET confirmation page and, on POST, applies each outbound/return-trip collection choice before running existing financial validation. Normal edit saves preserve existing direct-manager receipt totals.
+  - `app/templates/phoi/confirm.html` — added the quick confirmation screen with default “Chưa thu”, per-trip “Đã thu đủ”, optional partial amount, and “Đã thu đủ tất cả”.
+  - `app/templates/phoi/detail.html` — replaces direct POST confirmation with the quick-confirmation action and explains the streamlined flow.
+  - `app/templates/phoi/edit.html` — removes manager receipt controls from the long reconciliation form; it now directs managers to confirmation for that decision.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: Manager/admin first corrects only operational/financial source data if needed, then opens `Xác nhận nhanh`. Unpaid is the default and creates debt; full collection automatically records only the amount remaining after driver cash; partial collection exposes a single amount input. Driver balance, owner profit, customer debt aggregation, schema, and migration remain unchanged.
+- Key decisions:
+  - All confirmation receipt choices are applied server-side; the existing per-trip no-negative/no-over-collection validation remains authoritative.
+  - A normal submitted-phơi edit does not erase direct-manager collections already selected in an earlier confirmation attempt.
+  - The route accepts GET only for manager/admin on a submitted phơi and POST performs the final state transition.
+- Validation:
+  - Ran `python -m compileall -q app migrations` successfully using the configured virtual environment.
+  - Ran `git diff --check` successfully; only existing LF-to-CRLF conversion warnings were reported.
+  - Verified in memory: a $100$ trip with driver receipt $20$ passes for manager receipt $0$ (unpaid) and $80$ (paid in full), and rejects $81$ as over-collection.
+  - Editor diagnostics report no errors in the modified route or templates. No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - “Đã thu đủ tất cả” is intentionally explicit; it should only be used after management has verified each customer payment.
+  - Historical confirmed phơi remain immutable and are not changed by this UI simplification.
+- Do-not-repeat notes:
+  - Keep the default quick-confirmation option as unpaid; do not silently assume direct customer payment.
+  - Do not move the confirmation financial validation into JavaScript alone.

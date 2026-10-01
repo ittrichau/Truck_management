@@ -130,8 +130,8 @@ function calcKm() {
                 <div class="row g-2 mb-2">
                     <div class="col-6">
                         <label class="form-label">KM đầu (cả chuyến đi-về)</label>
-                        <input type="number" id="km_start" class="form-control" value="{{ current_user.current_truck.current_km if current_user.current_truck else '' }}" readonly>
-                        <small class="text-muted">Tự lấy theo km hiện tại của xe.</small>
+                        <input type="number" name="km_start" id="km_start" class="form-control" value="{{ current_user.current_truck.current_km if current_user.current_truck else '' }}" min="0" oninput="calcKm()">
+                        <small class="text-muted">Tự lấy theo KM hiện tại của xe. Nếu tài xế sửa lệch quá 50 km, quản lý sẽ được cảnh báo trong nhật ký hoạt động.</small>
                     </div>
                     <div class="col-6">
                         <label class="form-label">KM cuối (sau khi về)</label>
