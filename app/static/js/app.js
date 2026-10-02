@@ -226,9 +226,11 @@ document.addEventListener('click', function(e) {
     // - Link có data-no-loading
     if (link.target === '_blank' ||
         link.hasAttribute('download') ||
-        link.getAttribute('href') === '#' ||
+        (link.getAttribute('href') || '').startsWith('#') ||
         link.getAttribute('href') === '' ||
-        link.dataset.noLoading !== undefined) {
+        link.dataset.noLoading !== undefined ||
+        link.hasAttribute('data-bs-toggle') ||
+        link.hasAttribute('data-bs-dismiss')) {
         return;
     }
     
