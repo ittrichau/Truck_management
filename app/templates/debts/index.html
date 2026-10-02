@@ -44,13 +44,16 @@
                     <th class="text-end">Đã thu</th>
                     <th class="text-end">Công nợ</th>
                     <th class="text-center">Số chuyến</th>
+                    <th class="text-center"></th>
                 </tr>
             </thead>
             <tbody>
                 {% for debt in debts %}
                 <tr>
                     <td>
-                        <strong>{{ debt.customer.name }}</strong>
+                        <a href="{{ url_for('debts.customer_detail', customer_id=debt.customer.id) }}" class="text-decoration-none">
+                            <strong>{{ debt.customer.name }}</strong>
+                        </a>
                         {% if debt.customer.contact_phone %}
                         <small class="d-block text-muted">{{ debt.customer.contact_phone }}</small>
                         {% endif %}
@@ -61,6 +64,11 @@
                         {{ "{:,.0f}".format(debt.outstanding) }} đ
                     </td>
                     <td class="text-center">{{ debt.trip_count }}</td>
+                    <td class="text-center">
+                        <a href="{{ url_for('debts.customer_detail', customer_id=debt.customer.id) }}" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

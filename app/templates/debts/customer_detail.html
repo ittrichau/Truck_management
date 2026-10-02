@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Công nợ – {{ customer.name }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <a href="{{ url_for('debts.index') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Quay lại
+    </a>
+    <h5 class="mb-0"><i class="bi bi-person-lines-fill"></i> {{ customer.name }}</h5>
+    <div></div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+  <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+{% endwith %}
+
+{# ── Tổng nợ nổi bật ── #}
+<div class="card mb-3 border-0" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
+    <div class="card-body text-white text-center py-4">
+        <div class="mb-1" style="font-size: 0.9rem; opacity: 0.85;">Tổng công nợ hiện tại</div>
+        <div style="font-size: 2.2rem; font-weight: 700; letter-spacing: -1px;">
+            {{ "{:,.0f}".format(total_outstanding) }} đ
+        </div>
+        {% if customer.contact_phone %}
+        <div class="mt-1" style="opacity: 0.8; font-size: 0.85rem;">
+            <i class="bi bi-telephone"></i> {{ customer.contact_phone }}
+        </div>
+        {% endif %}
+        <div class="row g-2 mt-2">
+            <div class="col-6">
+                <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 8px;">
+                    <div style="font-size: 0.75rem; opacity: 0.8;">Phải thu</div>
+                    <div style="font-weight: 600;">{{ "{:,.0f}".format(total_revenue_full) }} đ</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 8px;">
+                    <div style="font-size: 0.75rem; opacity: 0.8;">Đã thu</div>
+                    <div style="font-weight: 600;">{{ "{:,.0f}".format(total_revenue_collected) }} đ</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── Form thu tiền nhanh ── #}
+{% if total_outstanding > 0 %}
+<div class="card mb-3">
+    <div class="card-header">
+        <i class="bi bi-cash-coin"></i> Thu tiền từ {{ customer.name }}
+    </div>
+    <div class="card-body">
+        <form action="{{ url_for('debts.collect_payment', customer_id=customer.id) }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-5">
+                    <label class="form-label">Số tiền thu <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                        <input type="text" name="amount" class="form-control"
+                               placeholder="Ví dụ: 10000000"
+                               inputmode="numeric"
+                               required>
+                        <span class="input-group-text">đ</span>
+                    </div>
+                </div>
+                <div class="col-12 col-md-5">
+                    <label class="form-label">Ghi chú (tuỳ chọn)</label>
+                    <input type="text" name="notes" class="form-control"
+                           placeholder="Ví dụ: Trả đợt 1">
+                </div>
+                <div class="col-12 col-md-2">
+                    <button type="submit" class="btn btn-success w-100"
+                            onclick="return confirm('Xác nhận thu tiền từ {{ customer.name }}?')">
+                        <i class="bi bi-check-lg"></i> Thu tiền
+                    </button>
+                </div>
+            </div>
+            <div class="mt-2">
+                <small class="text-muted">
+                    <i class="bi bi-info-circle"></i>
+                    Tiền sẽ được phân bổ tự động vào các phơi cũ nhất còn nợ trước.
+                </small>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{# ── Danh sách phơi còn nợ ── #}
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h6 class="mb-0">
+        <i class="bi bi-list-ul"></i>
+        Phơi còn nợ
+        <span class="badge bg-danger ms-1">{{ total_count }}</span>
+    </h6>
+    {% if not show_all %}
+    <small class="text-muted">Hiển thị {{ rows|length }} / {{ total_count }}</small>
+    {% endif %}
+</div>
+
+{% if rows %}
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Số xe</th>
+                    <th>Ngày</th>
+                    <th class="text-end">Phải thu</th>
+                    <th class="text-end">Đã thu</th>
+                    <th class="text-end amount-negative">Còn nợ</th>
+                    <th class="text-center d-none d-md-table-cell"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td>
+                        <strong>{{ row.truck_number }}</strong>
+                        {% if row.return_trip %}
+                        <span class="badge bg-secondary ms-1" style="font-size: 0.65rem;">Về</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-nowrap">
+                        {% if row.date %}
+                            {{ row.date.strftime('%d/%m/%Y') }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td class="text-end">{{ "{:,.0f}".format(row.revenue_full) }} đ</td>
+                    <td class="text-end amount-positive">{{ "{:,.0f}".format(row.revenue_collected) }} đ</td>
+                    <td class="text-end amount-negative">{{ "{:,.0f}".format(row.outstanding) }} đ</td>
+                    <td class="text-center d-none d-md-table-cell">
+                        <a href="{{ url_for('phoi.detail', id=row.phoi.id) }}"
+                           class="btn btn-outline-secondary btn-sm"
+                           title="Xem phơi {{ row.phoi.phoi_number }}">
+                            <i class="bi bi-box-arrow-up-right"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if has_more %}
+<div class="text-center mt-3">
+    <a href="{{ url_for('debts.customer_detail', customer_id=customer.id, all=1) }}"
+       class="btn btn-outline-primary">
+        <i class="bi bi-chevron-down"></i> Hiển thị tất cả {{ total_count }} phơi còn nợ
+    </a>
+</div>
+{% endif %}
+
+{% else %}
+<div class="text-center py-5 text-muted">
+    <i class="bi bi-check-circle display-4 text-success"></i>
+    <p class="mt-2 mb-0">{{ customer.name }} không còn công nợ.</p>
+</div>
+{% endif %}
+
+{% endblock %}
