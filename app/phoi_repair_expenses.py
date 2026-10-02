@@ -47,6 +47,7 @@ def _sync_repair_expenses(phoi):
     amounts = request.form.getlist('repair_amount[]')
     home_indices = set(request.form.getlist('repair_home_index[]'))
     locations = request.form.getlist('repair_location[]')
+    driver_paid_indices = set(request.form.getlist('repair_driver_paid_index[]'))
     repairs, kept_ids = [], set()
 
     for index in range(max(len(ids), len(descriptions), len(amounts), len(locations))):
@@ -55,6 +56,7 @@ def _sync_repair_expenses(phoi):
         raw_amount = amounts[index].strip() if index < len(amounts) else ''
         is_home = str(index) in home_indices
         location = locations[index].strip() if index < len(locations) else ''
+        driver_paid = (not is_home) and (str(index) in driver_paid_indices)
         if not any([expense_id, description, raw_amount, is_home, location]):
             continue
         if not description or not raw_amount:
@@ -76,11 +78,13 @@ def _sync_repair_expenses(phoi):
             kept_ids.add(expense.id)
             expense.description, expense.amount = description, amount
             expense.is_home_repair, expense.repair_location = is_home, None if is_home else location
+            expense.driver_paid = driver_paid
         else:
             expense = PhoiExpense(
                 phoi_id=phoi.id, category='repair', description=description,
                 amount=amount, is_home_repair=is_home,
                 repair_location=None if is_home else location,
+                driver_paid=driver_paid,
             )
             db.session.add(expense)
         repairs.append((index, expense))

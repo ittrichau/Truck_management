@@ -295,8 +295,12 @@ class Phoi(db.Model):
         )
 
     def driver_out_of_pocket_expenses(self):
-        """Chỉ các khoản tài xế tự chi/ứng, được ghi nhận tại mục Chi phí khác."""
-        return sum(exp.amount for exp in self.expenses.filter_by(category='other').all())
+        """Các khoản tài xế tự chi/ứng: Chi phí khác + sửa xe bên ngoài do tài xế tự trả."""
+        other = sum(exp.amount for exp in self.expenses.filter_by(category='other').all())
+        repair_paid = sum(
+            exp.amount for exp in self.expenses.filter_by(category='repair', driver_paid=True).all()
+        )
+        return other + repair_paid
 
     def total_km_all_trips(self):
         """Tổng KM của cả chuyến đi-về, đo bằng một lần ghi đồng hồ."""
@@ -404,6 +408,7 @@ class PhoiExpense(db.Model):
     amount = db.Column(db.Numeric(12, 2), nullable=False, default=0)
     is_home_repair = db.Column(db.Boolean, nullable=False, default=False)
     repair_location = db.Column(db.String(200))
+    driver_paid = db.Column(db.Boolean, nullable=False, default=False, comment='Tài xế tự ứng tiền sửa xe bên ngoài')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     attachments = db.relationship(

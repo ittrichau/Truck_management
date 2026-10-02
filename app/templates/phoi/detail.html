@@ -153,7 +153,7 @@
                 <tr><td colspan="2"><hr class="my-1"></td></tr>
                 <tr class="text-muted"><td colspan="2"><strong>Chi phí chuyến:</strong></td></tr>
                 {% for exp in phoi.expenses.all() %}
-                <tr><td class="ps-3">{{ exp.category_label() }}{% if exp.category == 'repair' %}<br><small class="text-muted">{{ exp.description }} · {% if exp.is_home_repair %}Sửa tại nhà{% else %}{{ exp.repair_location }} · {{ exp.attachments.filter_by(attachment_type='repair_receipt').count() }} hóa đơn{% endif %}</small>{% endif %}</td><td class="text-end">{{ '{:,.0f}'.format(exp.amount) }} VNĐ</td></tr>
+                <tr><td class="ps-3">{{ exp.category_label() }}{% if exp.category == 'repair' %}<br><small class="text-muted">{{ exp.description }} · {% if exp.is_home_repair %}Sửa tại nhà{% else %}{{ exp.repair_location }} · {{ exp.attachments.filter_by(attachment_type='repair_receipt').count() }} hóa đơn{% if exp.driver_paid %} · <span class="badge bg-warning text-dark">Tài xế tự trả</span>{% endif %}{% endif %}</small>{% endif %}</td><td class="text-end">{{ '{:,.0f}'.format(exp.amount) }} VNĐ</td></tr>
                 {% else %}
                 <tr><td class="ps-3 text-muted">Không có chi phí</td><td></td></tr>
                 {% endfor %}
@@ -172,6 +172,9 @@
                 <div class="col-6">
                     <small class="text-muted">Tài xế đã ứng + Công</small><br>
                     <span class="fs-5 fw-bold">{{ '{:,.0f}'.format(phoi.driver_out_of_pocket_expenses() + phoi.driver_wage) }} VNĐ</span>
+                    {% if phoi.expenses.filter_by(category='repair', driver_paid=True).count() %}
+                    <br><small class="text-warning">Gồm {{ '{:,.0f}'.format(phoi.expenses.filter_by(category='repair', driver_paid=True).all()|sum(attribute='amount')) }} VNĐ sửa xe tài xế tự trả</small>
+                    {% endif %}
                 </div>
                 <div class="col-6">
                     <small class="text-muted">Tài xế đã thu</small><br>

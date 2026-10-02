@@ -10,7 +10,7 @@
         <div class="d-flex justify-content-between mb-2"><strong>Hạng mục sửa xe</strong><button type="button" class="btn btn-outline-danger btn-sm py-0 remove-repair">Xóa</button></div>
         <div class="mb-2"><label class="form-label">Nội dung sửa *</label><input type="text" name="repair_description[]" class="form-control repair-description" maxlength="200"></div>
         <div class="row g-2"><div class="col-6"><label class="form-label">Số tiền (VNĐ) *</label><input type="text" name="repair_amount[]" class="form-control repair-amount currency-input" required inputmode="numeric"></div><div class="col-6 d-flex align-items-end"><div class="form-check mb-2"><input class="form-check-input repair-home" type="checkbox" name="repair_home_index[]" value="__INDEX__"><label class="form-check-label">Sửa tại nhà</label></div></div></div>
-        <div class="repair-external mt-2"><label class="form-label">Nơi sửa / Garage *</label><input type="text" name="repair_location[]" class="form-control repair-location" maxlength="200"><label class="form-label mt-2">Ảnh hóa đơn *</label><input type="file" class="form-control repair-receipts" accept="image/jpeg,image/png,image/webp" name="repair_receipts___INDEX__" multiple><small class="text-muted">Có thể chọn ảnh có sẵn từ thư viện hoặc chụp ảnh mới. Tối đa 5 ảnh.</small></div>
+        <div class="repair-external mt-2"><label class="form-label">Nơi sửa / Garage *</label><input type="text" name="repair_location[]" class="form-control repair-location" maxlength="200"><div class="form-check mt-2"><input class="form-check-input repair-driver-paid" type="checkbox" name="repair_driver_paid_index[]" value="__INDEX__"><label class="form-check-label">Tài xế tự trả (hoàn lại cho tài xế)</label></div><label class="form-label mt-2">Ảnh hóa đơn *</label><input type="file" class="form-control repair-receipts" accept="image/jpeg,image/png,image/webp" name="repair_receipts___INDEX__" multiple><small class="text-muted">Có thể chọn ảnh có sẵn từ thư viện hoặc chụp ảnh mới. Tối đa 5 ảnh.</small></div>
     </div>
 </template>
 <script>
@@ -44,6 +44,8 @@
         card.querySelector('.repair-home').checked = !!values.isHome;
         card.querySelector('.repair-home').value = index;
         card.querySelector('.repair-location').value = values.location || '';
+        card.querySelector('.repair-driver-paid').checked = !!values.driverPaid;
+        card.querySelector('.repair-driver-paid').value = index;
         card.querySelector('.repair-receipts').name = `repair_receipts_${index}`;
         card.dataset.hasReceipt = values.hasReceipt ? '1' : '';
         if (values.hasReceipt) card.querySelector('.repair-external').insertAdjacentHTML('beforeend', '<div class="small text-success mt-1">Đã có hóa đơn đính kèm.</div>');
@@ -55,6 +57,7 @@
     function reindex() {
         items.querySelectorAll('.repair-item').forEach((card, index) => {
             card.querySelector('.repair-home').value = index;
+            card.querySelector('.repair-driver-paid').value = index;
             card.querySelector('.repair-receipts').name = `repair_receipts_${index}`;
         });
     }
@@ -62,7 +65,7 @@
     addButton.addEventListener('click', () => addRepair());
     document.getElementById('phoi-form').addEventListener('submit', reindex);
     window.addRepair = addRepair;
-    {% if phoi is defined %}{% for expense in phoi.expenses.filter_by(category='repair').all() %}addRepair({id: '{{ expense.id }}', description: {{ expense.description|tojson }}, amount: '{{ expense.amount }}', isHome: {{ expense.is_home_repair|tojson }}, location: {{ expense.repair_location|default('', true)|tojson }}, hasReceipt: {{ (expense.attachments.filter_by(attachment_type='repair_receipt').count() > 0)|tojson }}});{% endfor %}{% endif %}
+    {% if phoi is defined %}{% for expense in phoi.expenses.filter_by(category='repair').all() %}addRepair({id: '{{ expense.id }}', description: {{ expense.description|tojson }}, amount: '{{ expense.amount }}', isHome: {{ expense.is_home_repair|tojson }}, location: {{ expense.repair_location|default('', true)|tojson }}, driverPaid: {{ expense.driver_paid|tojson }}, hasReceipt: {{ (expense.attachments.filter_by(attachment_type='repair_receipt').count() > 0)|tojson }}});{% endfor %}{% endif %}
     refresh();
 })();
 </script>
