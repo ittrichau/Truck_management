@@ -3,7 +3,6 @@ from decimal import Decimal
 
 from flask import Blueprint, flash, redirect, render_template, url_for
 from flask_login import current_user, login_required
-from sqlalchemy.orm import selectinload
 
 from app.models import Phoi
 
@@ -20,7 +19,6 @@ def index():
 
     phois = (
         Phoi.query.filter_by(status='confirmed')
-        .options(selectinload(Phoi.return_trips))
         .order_by(Phoi.departure_date.desc(), Phoi.id.desc())
         .all()
     )
