@@ -105,7 +105,7 @@ def customer_detail(customer_id):
             'revenue_collected': rc,
             'outstanding': outstanding,
             'date': phoi.departure_date,
-            'truck_number': phoi.truck.truck_number if phoi.truck else '',
+            'truck_number': phoi.truck.license_plate if phoi.truck else '',
         })
 
     # Chuyến về mà khách là chủ hàng (khác với phơi chính)
@@ -129,7 +129,7 @@ def customer_detail(customer_id):
             'revenue_collected': rc,
             'outstanding': outstanding,
             'date': rt.return_date or rt.phoi.departure_date,
-            'truck_number': rt.phoi.truck.truck_number if rt.phoi.truck else '',
+            'truck_number': rt.phoi.truck.license_plate if rt.phoi.truck else '',
         })
 
     # Sắp xếp: mới nhất trước
