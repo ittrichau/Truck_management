@@ -39,7 +39,6 @@
                 <th>Đơn giá</th>
                 <th>Tổng tiền</th>
                 <th>Thanh toán</th>
-                <th>KM lúc đổ</th>
                 <th>Phơi</th>
                 <th></th>
             </tr>
@@ -66,7 +65,6 @@
                     <span class="badge bg-secondary">Chủ xe trả</span>
                     {% endif %}
                 </td>
-                <td>{{ log.km_at_refuel or '-' }}</td>
                 <td>
                     {% set phoi_list = log.phois.all() %}
                     {% if phoi_list %}
@@ -81,16 +79,19 @@
                     {% endif %}
                 </td>
                 <td>
+                    {% if current_user.is_manager_or_admin() or (current_user.is_driver() and log.created_by_id == current_user.id) %}
+                    <a href="{{ url_for('fuel.edit', id=log.id) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i></a>
                     {% if current_user.is_manager_or_admin() %}
-                    <form action="{{ url_for('fuel.delete', id=log.id) }}" method="POST">
+                    <form action="{{ url_for('fuel.delete', id=log.id) }}" method="POST" class="d-inline">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Xóa bản ghi này?')"><i class="bi bi-trash"></i></button>
                     </form>
                     {% endif %}
+                    {% endif %}
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="9" class="text-center text-muted py-4">Chưa có bản ghi đổ xăng nào.</td></tr>
+            <tr><td colspan="8" class="text-center text-muted py-4">Chưa có bản ghi đổ xăng nào.</td></tr>
             {% endfor %}
         </tbody>
     </table>

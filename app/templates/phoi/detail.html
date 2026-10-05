@@ -107,6 +107,9 @@
             <div class="p-3 {% if not loop.last %}border-bottom{% endif %}">
                 <div class="d-flex justify-content-between"><strong>{{ fuel.refuel_date.strftime('%d/%m/%Y') }}</strong><strong>{{ '{:,.0f}'.format(fuel.total_cost) }} VNĐ</strong></div>
                 <div class="small text-muted">{{ fuel.liters }} lít · {{ '{:,.0f}'.format(fuel.price_per_liter) }} VNĐ/lít · {{ fuel.truck.license_plate }}</div>
+                {% if phoi.status != 'confirmed' and (current_user.is_manager_or_admin() or (current_user.is_driver() and fuel.created_by_id == current_user.id)) %}
+                <a href="{{ url_for('fuel.edit', id=fuel.id) }}" class="btn btn-outline-primary btn-sm mt-2"><i class="bi bi-pencil"></i> Sửa số lít / ngày đổ</a>
+                {% endif %}
             </div>
             {% else %}<div class="p-3 text-muted">Chưa có lần đổ xăng nào được gắn.</div>{% endfor %}
         </div>
@@ -153,8 +156,9 @@
                 {% for exp in phoi.expenses.all() %}
                 <tr><td class="ps-3">{{ exp.category_label() }}{% if exp.category == 'repair' %}<br><small class="text-muted">{{ exp.description }} · {% if exp.is_home_repair %}Sửa tại nhà{% else %}{{ exp.repair_location }} · {{ exp.attachments.filter_by(attachment_type='repair_receipt').count() }} hóa đơn{% if exp.driver_paid %} · <span class="badge bg-warning text-dark">Tài xế tự trả</span>{% endif %}{% endif %}</small>{% endif %}</td><td class="text-end">{{ '{:,.0f}'.format(exp.amount) }} VNĐ</td></tr>
                 {% else %}
-                <tr><td class="ps-3 text-muted">Không có chi phí</td><td></td></tr>
+                <tr><td class="ps-3 text-muted">Không có chi phí khác</td><td></td></tr>
                 {% endfor %}
+                <tr><td class="ps-3">Tiền xăng ({{ phoi.fuel_logs|length }} lần)</td><td class="text-end">{{ '{:,.0f}'.format(phoi.fuel_expenses()) }} VNĐ</td></tr>
                 <tr><td><strong>Tổng chi</strong></td><td class="text-end fw-bold">{{ '{:,.0f}'.format(phoi.total_expenses()) }} VNĐ</td></tr>
                 <tr><td colspan="2"><hr class="my-1"></td></tr>
                 <tr><td><strong>Phí công tài xế</strong></td><td class="text-end fw-bold text-primary">{{ '{:,.0f}'.format(phoi.driver_wage) }} VNĐ</td></tr>

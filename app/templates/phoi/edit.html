@@ -28,6 +28,20 @@ async function onCustomerChange(select) {
 
     <form method="POST" id="phoi-form" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <span class="section-title"><i class="bi bi-fuel-pump"></i> Đổ xăng đã gắn ({{ phoi.fuel_logs|length }} lần)</span>
+        <div class="card mb-3"><div class="card-body py-2">
+            {% for fuel in phoi.fuel_logs %}
+            <div class="d-flex justify-content-between align-items-center {% if not loop.last %}border-bottom pb-2 mb-2{% endif %}">
+                <small>{{ fuel.refuel_date.strftime('%d/%m/%Y') }} · {{ fuel.liters }} lít · {{ '{:,.0f}'.format(fuel.total_cost) }} VNĐ</small>
+                {% if phoi.status != 'confirmed' and (current_user.is_manager_or_admin() or (current_user.is_driver() and fuel.created_by_id == current_user.id)) %}
+                <a href="{{ url_for('fuel.edit', id=fuel.id) }}" class="btn btn-outline-primary btn-sm">Sửa</a>
+                {% endif %}
+            </div>
+            {% else %}
+            <small class="text-muted">Chưa có lần đổ xăng nào. Hãy lưu phơi rồi ghi nhận đổ xăng.</small>
+            {% endfor %}
+        </div></div>
+
         <span class="section-title"><i class="bi bi-box-seam"></i> Chọn hàng</span>
         <div class="card mb-3"><div class="card-body">
             <select class="form-select" name="customer_id" onchange="onCustomerChange(this)">

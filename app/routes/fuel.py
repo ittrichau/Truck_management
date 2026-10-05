@@ -96,43 +96,28 @@ def create():
                 price_per_liter=price,
                 total_cost=liters * price,
                 paid_by=paid_by,
-                km_at_refuel=int(request.form.get('km_at_refuel', 0) or 0),
                 refuel_date=refuel_date,
                 is_substitute=is_substitute,
                 notes=request.form.get('notes', '').strip(),
                 created_by_id=current_user.id
             )
 
-            # Gắn nhiều phơi — bắt buộc ít nhất 1 phơi, phải cùng xe
-            selected_phoi_ids = set(request.form.getlist('phoi_ids'))
-            attached_count = 0
-            for pid in selected_phoi_ids:
-                if not pid:
-                    continue
-                selected_phoi_record = Phoi.query.get(int(pid))
-                if not selected_phoi_record or selected_phoi_record.status not in ['draft', 'submitted']:
-                    flash('Chỉ được gắn lần đổ xăng vào phơi đang thực hiện hoặc đã chốt.', 'danger')
-                    return render_template('fuel/create.html', trucks=trucks, phois=phois,
-                                           current_price=_get_active_price_or_none())
-                if current_user.is_driver() and selected_phoi_record.driver_id != current_user.id:
-                    flash('Tài xế chỉ được gắn đổ xăng vào phơi của mình.', 'danger')
-                    return render_template('fuel/create.html', trucks=trucks, phois=phois,
-                                           current_price=_get_active_price_or_none())
-                if selected_phoi_record.truck_id != truck_id:
-                    flash(f'Phơi {selected_phoi_record.phoi_number} không thuộc xe đã chọn. Vui lòng chọn phơi của cùng xe.', 'danger')
-                    return render_template('fuel/create.html', trucks=trucks, phois=phois,
-                                           current_price=_get_active_price_or_none())
-                log.phois.append(selected_phoi_record)
-                attached_count += 1
-
-            if attached_count == 0:
-                flash('Phải gắn ít nhất một phơi đang tiến hành cho lần đổ xăng này.', 'danger')
+            # Mỗi lần đổ xăng chỉ được tính cho một phơi đang thực hiện cùng xe.
+            selected_phoi_id = request.form.get('phoi_id', type=int)
+            selected_phoi_record = Phoi.query.get(selected_phoi_id) if selected_phoi_id else None
+            if not selected_phoi_record or selected_phoi_record.status not in ['draft', 'submitted']:
+                flash('Phải chọn đúng một phơi đang thực hiện để ghi nhận lần đổ xăng.', 'danger')
                 return render_template('fuel/create.html', trucks=trucks, phois=phois,
                                        current_price=_get_active_price_or_none())
-
-            truck = Truck.query.get(log.truck_id)
-            if truck and log.km_at_refuel > truck.current_km:
-                truck.current_km = log.km_at_refuel
+            if current_user.is_driver() and selected_phoi_record.driver_id != current_user.id:
+                flash('Tài xế chỉ được gắn đổ xăng vào phơi của mình.', 'danger')
+                return render_template('fuel/create.html', trucks=trucks, phois=phois,
+                                       current_price=_get_active_price_or_none())
+            if selected_phoi_record.truck_id != truck_id:
+                flash(f'Phơi {selected_phoi_record.phoi_number} không thuộc xe đã chọn. Vui lòng chọn phơi của cùng xe.', 'danger')
+                return render_template('fuel/create.html', trucks=trucks, phois=phois,
+                                       current_price=_get_active_price_or_none())
+            log.phois.append(selected_phoi_record)
 
             db.session.add(log)
             db.session.flush()
@@ -162,6 +147,43 @@ def create():
                            selected_phoi_id=selected_phoi_id,
                            selected_truck_id=selected_truck_id)
 
+
+@bp.route('/fuel/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit(id):
+    log = FuelLog.query.get_or_404(id)
+    linked_phois = log.phois.all()
+    if current_user.is_driver() and (
+        log.created_by_id != current_user.id
+        or any(phoi.driver_id != current_user.id for phoi in linked_phois)
+    ):
+        flash('Bạn không có quyền sửa lần đổ xăng này.', 'danger')
+        return redirect(url_for('fuel.index'))
+    if any(phoi.status == 'confirmed' for phoi in linked_phois):
+        flash('Không thể sửa lần đổ xăng đã gắn với phơi được xác nhận.', 'warning')
+        return redirect(url_for('fuel.index'))
+
+    if request.method == 'POST':
+        try:
+            liters = float(request.form.get('liters', 0))
+            if liters <= 0:
+                raise ValueError('Số lít phải lớn hơn 0.')
+            refuel_date_str = request.form.get('refuel_date', '')
+            if not refuel_date_str:
+                raise ValueError('Vui lòng chọn ngày đổ xăng.')
+            log.liters = liters
+            log.refuel_date = datetime.strptime(refuel_date_str, '%Y-%m-%d').date()
+            log.total_cost = liters * log.price_per_liter
+            db.session.commit()
+            flash('Đã cập nhật số lít và ngày đổ xăng.', 'success')
+            if len(linked_phois) == 1:
+                return redirect(url_for('phoi.detail', id=linked_phois[0].id))
+            return redirect(url_for('fuel.index'))
+        except (TypeError, ValueError) as exc:
+            db.session.rollback()
+            flash(f'Lỗi: {str(exc)}', 'danger')
+
+    return render_template('fuel/edit.html', log=log, linked_phois=linked_phois)
 
 @bp.route('/fuel/<int:id>/receipts/<int:receipt_id>')
 @login_required

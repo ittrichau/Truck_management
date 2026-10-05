@@ -288,10 +288,21 @@ class Phoi(db.Model):
             self.km_total = self.km_end - self.km_start
         return self.km_total
     
+    def fuel_expenses(self):
+        """Chi phí xăng của phơi; dữ liệu cũ gắn nhiều phơi được chia đều để không trừ lặp."""
+        total = 0
+        for fuel_log in self.fuel_logs:
+            attached_count = fuel_log.attached_phoi_count()
+            if attached_count:
+                total += fuel_log.total_cost / attached_count
+        return total
+
     def total_expenses(self):
-        """Tổng chi phí chủ xe của toàn bộ phơi, bao gồm phí đường và bốc vác chuyến về."""
-        return sum(exp.amount for exp in self.expenses.all()) + sum(
-            trip.porter_fee for trip in self.return_trips.all()
+        """Tổng chi phí chủ xe của toàn bộ phơi, gồm cả xăng đã gắn vào phơi."""
+        return (
+            sum(exp.amount for exp in self.expenses.all())
+            + sum(trip.porter_fee for trip in self.return_trips.all())
+            + self.fuel_expenses()
         )
 
     def driver_out_of_pocket_expenses(self):

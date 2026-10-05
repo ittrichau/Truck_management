@@ -237,8 +237,9 @@
                 {% for exp in phoi.expenses.all() %}
                 <tr class="sub-row"><td>{{ exp.category_label() }}{% if exp.category == 'repair' %}<br><small>{{ exp.description }} · {% if exp.is_home_repair %}Sửa tại nhà{% else %}{{ exp.repair_location }} · Có hóa đơn{% endif %}</small>{% endif %}</td><td class="amount">{{ '{:,.0f}'.format(exp.amount) }} VNĐ</td></tr>
                 {% else %}
-                <tr class="sub-row"><td style="color:#aaa;">Không có chi phí</td><td></td></tr>
+                <tr class="sub-row"><td style="color:#aaa;">Không có chi phí khác</td><td></td></tr>
                 {% endfor %}
+                <tr class="sub-row"><td>Tiền xăng ({{ phoi.fuel_logs|length }} lần)</td><td class="amount">{{ '{:,.0f}'.format(phoi.fuel_expenses()) }} VNĐ</td></tr>
                 <tr class="total-row"><td><strong>Tổng chi</strong></td><td class="amount">{{ '{:,.0f}'.format(phoi.total_expenses()) }} VNĐ</td></tr>
                 <tr><td colspan="2"><hr style="margin:4px 0;"></td></tr>
                 <tr class="total-row"><td><strong>Phí công tài xế</strong></td><td class="amount" style="color:#0d6efd;">{{ '{:,.0f}'.format(phoi.driver_wage) }} VNĐ</td></tr>

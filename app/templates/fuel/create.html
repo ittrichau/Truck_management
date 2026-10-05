@@ -37,22 +37,16 @@
             <small id="phoi-count-hint" class="text-muted" style="display:none;"></small>
         </div>
         <div class="mb-3">
-            <label class="form-label">Gắn với Phơi * <small class="text-danger">(bắt buộc chọn ít nhất 1)</small></label>
-            <div id="phoi-list" class="border rounded p-2" style="max-height: 180px; overflow-y: auto;">
-                <p id="phoi-select-truck-hint" class="text-muted small mb-0">Vui lòng chọn xe trước</p>
+            <label class="form-label" for="phoi_id">Gắn với Phơi *</label>
+            <select name="phoi_id" id="phoi_id" class="form-select" required disabled>
+                <option value="">-- Chọn xe trước --</option>
                 {% for p in phois %}
-                <div class="form-check phoi-checkbox" data-truck-id="{{ p.truck_id }}" style="display:none;">
-                    <input class="form-check-input" type="checkbox" name="phoi_ids" value="{{ p.id }}" id="phoi_{{ p.id }}"
-                           data-truck-id="{{ p.truck_id }}" {% if selected_phoi_id == p.id %}checked{% endif %}>
-                    <label class="form-check-label small" for="phoi_{{ p.id }}"
-                           data-truck-id="{{ p.truck_id }}">
-                        {{ p.phoi_number }} — {{ p.origin }}→{{ p.destination }} ({{ p.truck.license_plate }})
-                    </label>
-                </div>
+                <option value="{{ p.id }}" data-truck-id="{{ p.truck_id }}" {% if selected_phoi_id == p.id %}selected{% endif %}>
+                    {{ p.phoi_number }} — {{ p.origin }}→{{ p.destination }}
+                </option>
                 {% endfor %}
-                <p id="no-phoi-message" class="text-muted small mb-0" style="display:none;">Không có phơi đang tiến hành cho xe này</p>
-            </div>
-            <small class="text-warning">⚠️ Mỗi lần đổ xăng bắt buộc phải gắn vào ít nhất 1 phơi đang tiến hành của cùng xe.</small>
+            </select>
+            <small class="text-warning">⚠️ Mỗi lần đổ xăng chỉ được gắn với đúng một phơi đang thực hiện của cùng xe.</small>
         </div>
         <fieldset class="mb-3">
             <legend class="form-label mb-2">Ai trả tiền xăng? *</legend>
@@ -92,15 +86,9 @@
                 <small class="text-muted">Chọn ảnh có sẵn từ thư viện hoặc chụp ảnh mới. Tối đa 5 ảnh.</small>
             </div>
         </div>
-        <div class="row g-2 mb-3">
-            <div class="col-6">
-                <label class="form-label">Ngày đổ *</label>
-                <input type="date" name="refuel_date" class="form-control" required>
-            </div>
-            <div class="col-6">
-                <label class="form-label">KM lúc đổ</label>
-                <input type="number" name="km_at_refuel" class="form-control" placeholder="0">
-            </div>
+        <div class="mb-3">
+            <label class="form-label">Ngày đổ *</label>
+            <input type="date" name="refuel_date" class="form-control" required>
         </div>
         <div class="mb-3">
             <label class="form-label">Ghi chú</label>
@@ -158,20 +146,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function filterPhoiByTruck() {
     const truckId = document.getElementById('truck_select').value;
-    const checkboxes = document.querySelectorAll('.phoi-checkbox');
+    const phoiSelect = document.getElementById('phoi_id');
     const hint = document.getElementById('phoi-count-hint');
-    const selectHint = document.getElementById('phoi-select-truck-hint');
-    const noPhoiMsg = document.getElementById('no-phoi-message');
     let count = 0;
-    checkboxes.forEach(cb => {
-        const show = Boolean(truckId) && cb.dataset.truckId === truckId;
-        cb.style.display = show ? '' : 'none';
+    Array.from(phoiSelect.options).forEach(option => {
+        if (!option.value) return;
+        const show = Boolean(truckId) && option.dataset.truckId === truckId;
+        option.hidden = !show;
+        option.disabled = !show;
         if (show) count++;
     });
+    phoiSelect.disabled = !truckId || count === 0;
+    if (phoiSelect.selectedOptions[0] && phoiSelect.selectedOptions[0].disabled) {
+        phoiSelect.value = '';
+    }
     hint.style.display = truckId ? '' : 'none';
-    hint.textContent = `Có ${count} phơi đang tiến hành cho xe này`;
-    selectHint.style.display = truckId ? 'none' : '';
-    noPhoiMsg.style.display = (truckId && count === 0) ? '' : 'none';
+    hint.textContent = count ? `Có ${count} phơi đang tiến hành cho xe này` : 'Không có phơi đang tiến hành cho xe này';
 }
 
 // Hiển thị ghi chú khi chọn xe khác xe mặc định (chạy giùm)

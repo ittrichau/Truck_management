@@ -306,3 +306,54 @@
 - Do-not-repeat notes:
   - Keep every new porter-fee input included in both `total_expenses()` and `driver_out_of_pocket_expenses()` while the policy remains that the driver always advances it.
   - Do not add porter fees to `total_revenue_collected()`; that field is solely cash held from customers by the driver.
+
+## 2026-10-05 - Clarify phơi status filter labels
+
+- Status: done
+- Goal: Make the phơi list's status filter explicitly distinguish a driver-submitted phơi from a manager-confirmed phơi.
+- Files changed:
+  - `app/templates/phoi/index.html` — renamed the `submitted` option to “Tài xế đã chốt” and the `confirmed` option to “Quản lý đã chốt”.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: Presentation-only change to the phơi list filter. The existing query values (`submitted` and `confirmed`), route filtering, permissions, confirmation eligibility, data, schema, and financial calculations are unchanged.
+- Key decisions:
+  - Retained the existing status values to preserve saved URLs and pagination links.
+  - Kept “Đang hoạt động” and “Đang thực hiện” unchanged.
+- Validation:
+  - Reviewed `Phoi.status` values and the index route's accepted filters.
+  - Editor diagnostics found no errors in `app/templates/phoi/index.html`.
+  - Ran `git diff --check` successfully; Git reported only the repository's LF-to-CRLF conversion warning.
+  - No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - This explains the existing workflow in the filter only; status badges elsewhere intentionally retain their current wording.
+- Do-not-repeat notes:
+  - Preserve the underlying filter values when changing user-facing status wording so existing filter URLs remain compatible.
+
+## 2026-10-05 - One-phơi fuel logs and fuel-cost profit accounting
+
+- Status: done
+- Goal: Require each newly recorded fuel fill to link to exactly one active phơi, remove the refuel-KM input, let authorized users correct fuel quantity and refuel date before confirmation, and deduct fuel from phơi profit.
+- Files changed:
+  - `app/models.py` — adds `fuel_expenses()` and includes it in `total_expenses()`; legacy multi-phơi fuel records are split evenly to avoid duplicate deductions.
+  - `app/routes/fuel.py` — validates exactly one active same-truck phơi on fuel creation; removes refuel-KM processing; adds protected quantity/date editing that is blocked once any linked phơi is confirmed.
+  - `app/templates/fuel/create.html` — replaces multiple phơi checkboxes with one required phơi selector and removes the KM-at-refuel field.
+  - `app/templates/fuel/edit.html` — new focused form for changing only liters and refuel date.
+  - `app/templates/fuel/index.html` — removes historical KM display and provides an edit action to authorized users.
+  - `app/templates/phoi/edit.html` and `app/templates/phoi/detail.html` — display the number/list of linked fuel fills and an authorized edit action.
+  - `app/templates/phoi/detail.html` and `app/templates/phoi/detail_print.html` — itemize fuel as a trip expense before the total cost and owner profit.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: New fuel logs link to one `draft` or `submitted` phơi of the selected truck. Liter changes recalculate the stored total using the original per-liter price; changing fuel logs tied to confirmed phơi remains blocked. Owner profit now correctly uses total expenses including fuel. No schema migration or persisted-data rewrite is required.
+- Key decisions:
+  - Existing historical rows that already link one fill to several phơi remain readable; `fuel_expenses()` divides their cost by the number of linked phơi to preserve one total deduction across those phơi.
+  - The existing `km_at_refuel` column remains for compatibility, but no new UI or route logic writes or displays it.
+  - Drivers may edit only fuel logs they created and only where every linked phơi belongs to them; manager/admin may edit any eligible log.
+- Validation:
+  - Ran `python -m compileall -q app` successfully with the configured virtual environment.
+  - Loaded the changed fuel/phơi Jinja templates through the Flask environment successfully.
+  - Editor diagnostics found no errors in all changed application files.
+  - Ran `git diff --check` successfully. No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - A database-level unique constraint was not added because historical `fuel_log_phois` data may contain multiple links; application validation enforces the new policy without a data migration.
+  - The quantity/date correction intentionally does not alter price, payer, receipts, truck, or phơi association; those changes need separate approval because they affect accounting/audit semantics.
+- Do-not-repeat notes:
+  - Keep historical multi-link allocation in `fuel_expenses()` until those rows are explicitly migrated or reconciled.
+  - Keep fuel inside `total_expenses()` so `owner_profit()` deducts it via the established formula; do not add fuel to driver settlement unless the payment policy is changed explicitly.
