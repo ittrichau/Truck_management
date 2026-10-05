@@ -284,7 +284,7 @@ class Phoi(db.Model):
         return self.attachments.filter_by(attachment_type=attachment_type).count()
 
     def calculate_km_total(self):
-        if self.km_end and self.km_start:
+        if self.km_start is not None and self.km_end is not None and self.km_end >= self.km_start:
             self.km_total = self.km_end - self.km_start
         return self.km_total
     
@@ -295,12 +295,14 @@ class Phoi(db.Model):
         )
 
     def driver_out_of_pocket_expenses(self):
-        """Các khoản tài xế tự chi/ứng: Chi phí khác + sửa xe bên ngoài do tài xế tự trả."""
+        """Các khoản tài xế tự chi/ứng, gồm toàn bộ tiền bốc vác của phơi."""
         other = sum(exp.amount for exp in self.expenses.filter_by(category='other').all())
         repair_paid = sum(
             exp.amount for exp in self.expenses.filter_by(category='repair', driver_paid=True).all()
         )
-        return other + repair_paid
+        porter_fee = sum(exp.amount for exp in self.expenses.filter_by(category='porter_fee').all())
+        return_trip_porter_fee = sum(trip.porter_fee for trip in self.return_trips.all())
+        return other + repair_paid + porter_fee + return_trip_porter_fee
 
     def total_km_all_trips(self):
         """Tổng KM của cả chuyến đi-về, đo bằng một lần ghi đồng hồ."""
@@ -319,7 +321,7 @@ class Phoi(db.Model):
         Tính balance toàn phơi:
         - Dương: Chủ xe phải trả thêm cho tài xế
         - Âm: Tài xế phải nộp lại cho chủ xe
-        - Phí đường do chủ xe thanh toán trực tiếp nên không tính là tiền tài xế đã ứng.
+        - Tiền bốc vác luôn do tài xế ứng trước; phí đường do chủ xe thanh toán trực tiếp.
         """
         owner_owes = self.driver_out_of_pocket_expenses() + self.driver_wage
         driver_owes = self.total_revenue_collected()

@@ -21,15 +21,8 @@ def submission_error(phoi):
     # FuelLog.phois creates this backref as a regular list, not a query.
     if not phoi.fuel_logs:
         return 'Phơi chưa được gắn lần đổ xăng nào. Vui lòng ghi nhận đổ xăng trước khi chốt.'
-    if not phoi.km_start or not phoi.km_end or phoi.km_end < phoi.km_start:
-        return 'Vui lòng nhập KM đầu và KM cuối hợp lệ trước khi chốt phơi.'
-    required_attachments = {
-        'km_start': 'ảnh đồng hồ KM đầu',
-        'km_end': 'ảnh đồng hồ KM cuối',
-    }
-    for attachment_type, label in required_attachments.items():
-        if phoi.attachment_count(attachment_type) == 0:
-            return f'Phơi chưa có {label}. Vui lòng tải ảnh lên trước khi chốt.'
+    if not phoi.km_end or phoi.km_end <= 0:
+        return 'Vui l\u00f2ng nh\u1eadp KM cu\u1ed1i h\u1ee3p l\u1ec7 tr\u01b0\u1edbc khi ch\u1ed1t ph\u01a1i.'
     return None
 
 
@@ -362,7 +355,6 @@ def create():
         try:
             driver, truck, is_substitute = _selected_driver_and_truck()
             _ensure_truck_has_no_other_active_phoi(truck.id)
-            baseline_km = truck.current_km or 0
             phoi = Phoi()
             phoi.phoi_number = generate_phoi_number()
             phoi.driver_id = driver.id
@@ -382,11 +374,9 @@ def create():
             phoi.destination = request.form.get('destination', '').strip()
             phoi.cargo_description = request.form.get('cargo_description', '').strip()
 
-            # Mặc định lấy KM hiện tại của xe; tài xế được phép điều chỉnh khi cần.
-            phoi.km_start = int(request.form.get('km_start', baseline_km) or 0)
+            # Xe reset KM theo từng phơi; chỉ ghi KM cuối khi xe về bãi.
+            phoi.km_start = 0
             phoi.km_end = int(request.form.get('km_end', 0) or 0)
-            if phoi.km_end and phoi.km_end < phoi.km_start:
-                raise ValueError('KM cuối không thể nhỏ hơn KM đầu.')
             phoi.calculate_km_total()
             phoi.weigh_ticket_number = request.form.get('weigh_ticket_number', '').strip() or None
             phoi.payment_method = request.form.get('payment_method', 'fixed')
@@ -405,20 +395,14 @@ def create():
 
             db.session.add(phoi)
             db.session.flush()
-            _record_km_start_warning(phoi, baseline_km, phoi.km_start)
             _sync_return_trips(phoi)
 
             for attachment_type, field_name, maximum_files in (
-                ('km_start', 'km_start_images', 1),
                 ('weigh_ticket', 'weigh_ticket_images', 5),
             ):
                 files = [file for file in request.files.getlist(field_name) if file and file.filename]
                 if len(files) > maximum_files:
-                    raise ValueError(
-                        'Ảnh đồng hồ KM đầu chỉ được tải 1 ảnh.'
-                        if attachment_type == 'km_start'
-                        else 'Ảnh phiếu cân chỉ được tải tối đa 5 ảnh khi tạo phơi.'
-                    )
+                    raise ValueError('Ảnh phiếu cân chỉ được tải tối đa 5 ảnh khi tạo phơi.')
                 for file in files:
                     metadata = save_phoi_attachment(file, phoi.id)
                     saved_keys.append(metadata['storage_key'])
@@ -433,8 +417,6 @@ def create():
             repairs = _sync_repair_expenses(phoi)
             _save_repair_receipts(phoi, repairs, saved_keys)
 
-            if phoi.km_end:
-                truck.current_km = max(truck.current_km, phoi.km_end)
             truck.status = 'in_trip'
 
             db.session.commit()
@@ -486,8 +468,8 @@ def upload_attachment(id):
         return redirect(url_for('phoi.detail', id=id))
 
     attachment_type = request.form.get('attachment_type', '')
-    if attachment_type not in PhoiAttachment.TYPES:
-        flash('Loại chứng từ không hợp lệ.', 'danger')
+    if attachment_type not in ('weigh_ticket', 'other'):
+        flash('Chỉ có thể tải phiếu cân hoặc chứng từ khác.', 'danger')
         return redirect(url_for('phoi.detail', id=id))
     files = [file for file in request.files.getlist('images') if file and file.filename]
     if not files or len(files) > 5:
@@ -589,7 +571,6 @@ def edit(id):
         saved_keys = []
         try:
             old_truck = phoi.truck
-            previous_km_start = phoi.km_start or 0
             driver, truck, is_substitute = _selected_driver_and_truck()
             _ensure_truck_has_no_other_active_phoi(truck.id, excluded_phoi_id=phoi.id)
             phoi.driver_id = driver.id
@@ -609,12 +590,9 @@ def edit(id):
             phoi.origin = request.form.get('origin', '').strip()
             phoi.destination = request.form.get('destination', '').strip()
             phoi.cargo_description = request.form.get('cargo_description', '').strip()
-            phoi.km_start = int(request.form.get('km_start', 0) or 0)
+            phoi.km_start = 0
             phoi.km_end = int(request.form.get('km_end', 0) or 0)
-            if phoi.km_end and phoi.km_end < phoi.km_start:
-                raise ValueError('KM cuối không thể nhỏ hơn KM đầu.')
             phoi.calculate_km_total()
-            _record_km_start_warning(phoi, previous_km_start, phoi.km_start)
             phoi.weigh_ticket_number = request.form.get('weigh_ticket_number', '').strip() or None
             phoi.payment_method = request.form.get('payment_method', 'fixed')
             phoi.revenue_full, cargo_weight_tons, phoi.price_per_ton = _revenue_from_form(
@@ -657,8 +635,6 @@ def edit(id):
                     status_code=200,
                 ))
 
-            if phoi.km_end:
-                truck.current_km = max(truck.current_km, phoi.km_end)
             update_truck_status(old_truck)
             update_truck_status(truck)
             db.session.commit()

@@ -253,3 +253,56 @@
 - Do-not-repeat notes:
   - Never delete, rewrite, or manually stamp already-deployed migration revisions to resolve a branch; add a merge revision instead.
   - Retain the pre-deploy single-head gate when modifying deployment workflows.
+
+## 2026-10-05 - Reset KM workflow per phơi
+
+- Status: done
+- Goal: Hide KM đầu and all new KM-photo uploads. Each new or edited phơi starts at KM 0 and requires only KM cuối before it can be chốt.
+- Files changed:
+  - `app/routes/phoi.py` — sets `km_start = 0`, accepts only `km_end`, removes truck odometer advancement and KM-start alerts, removes KM-photo submission requirements, and rejects new KM-photo attachment uploads.
+  - `app/models.py` — calculates total KM correctly when `km_start` is zero.
+  - `app/templates/phoi/create.html` and `app/templates/phoi/edit.html` — show only the KM cuối input and remove the KM-đầu upload control.
+  - `app/templates/phoi/detail.html` and `app/templates/phoi/detail_print.html` — hide KM đầu and remove KM image choices/checklist while continuing to list historical attachments.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: A driver records KM cuối after returning to the yard. Chốt still requires a return trip, linked fuel log, and positive KM cuối, but no longer requires KM-start/end photos. Existing attachment records, including historical KM photos, are neither deleted nor altered. `Truck.current_km` is no longer updated from a phơi because the vehicle resets its KM per trip.
+- Key decisions:
+  - The server assigns KM đầu to zero rather than relying on the hidden form field.
+  - New attachment uploads allow only phiếu cân or chứng từ khác; existing KM attachments stay readable in the evidence list.
+  - No schema, migration, financial formula, role, or fuel-link behavior was changed.
+- Validation:
+  - Ran `python -m compileall -q app` successfully using the configured virtual environment.
+  - Loaded the four changed phơi templates in the Flask/Jinja environment and checked reset-KM total calculation (`0 → 125` yields `125`).
+  - Ran `git diff --check` successfully; only existing LF-to-CRLF warnings were emitted.
+  - Editor diagnostics report no errors in the changed route, model, or templates. No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - Saving an existing phơi through the edit form normalizes its stored KM đầu to zero, as required by the reset-per-trip rule.
+  - The application retains historical KM evidence for audit/viewing, but no new KM evidence can be uploaded from the UI or attachment endpoint.
+- Do-not-repeat notes:
+  - Keep the positive KM cuối validation server-side in `submission_error`; do not depend solely on the input control.
+  - Do not reintroduce `Truck.current_km` advancement unless the per-trip reset policy changes explicitly.
+
+## 2026-10-05 - Treat porter fees as driver advances
+
+- Status: done
+- Goal: Ensure every outbound and return-trip bốc vác (porter fee) is treated as money advanced by the driver and added to the driver's settlement alongside wage.
+- Files changed:
+  - `app/models.py` — includes outbound `porter_fee` expenses and every return-trip `porter_fee` in `driver_out_of_pocket_expenses()`; `balance()` therefore reimburses them through the established settlement formula.
+  - `app/templates/phoi/create.html` and `app/templates/phoi/edit.html` — label bốc vác inputs as driver advances for both outbound and return trips.
+  - `app/templates/phoi/detail.html` — itemizes the total porter-fee advance in the driver settlement card.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: Phơi create/edit data storage is unchanged. For current and historical phơi with porter fees, the settlement amount now includes those fees as a driver advance. `total_expenses()` still includes the same fees, so owner profit continues to deduct them exactly once.
+- Key decisions:
+  - No migration or persisted-data rewrite is needed because existing outbound fees already use `PhoiExpense.category='porter_fee'` and return-trip fees already use `PhoiReturnTrip.porter_fee`.
+  - Fees are added only to the driver's advance side of `balance()`; they are not added to driver-collected revenue.
+  - The financial source of truth remains `Phoi.balance() = driver_out_of_pocket_expenses() + driver_wage - total_revenue_collected()`.
+- Validation:
+  - Ran `python -m compileall -q app` successfully using the configured virtual environment.
+  - Ran an isolated in-memory database calculation: wage 500,000, outbound bốc vác 200,000, return bốc vác 150,000, and other driver advance 30,000 yields driver advances 380,000, balance -520,000, and total expense 380,000.
+  - Ran `git diff --check` successfully and editor diagnostics found no errors in all four changed application files.
+  - No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - Historical phơi with porter fees will display a different settlement balance by the full fee amount, as explicitly approved.
+  - Owner profit is intentionally unchanged by this update because porter fees were already included in total expenses.
+- Do-not-repeat notes:
+  - Keep every new porter-fee input included in both `total_expenses()` and `driver_out_of_pocket_expenses()` while the policy remains that the driver always advances it.
+  - Do not add porter fees to `total_revenue_collected()`; that field is solely cash held from customers by the driver.

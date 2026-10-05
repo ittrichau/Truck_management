@@ -217,8 +217,7 @@
             <hr style="margin: 6px 0;">
             <table class="phoi-info-table">
                 <tr>
-                    <td class="label">KM đầu</td><td class="value">{{ phoi.km_start }}</td>
-                    <td class="label">KM cuối</td><td class="value">{{ phoi.km_end }}</td>
+                    <td class="label">KM cuối</td><td class="value">{{ phoi.km_end or '--' }}</td>
                     <td class="label">Tổng KM</td><td class="value" style="color:#0d6efd;">{{ phoi.km_total }}</td>
                 </tr>
             </table>

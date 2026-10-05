@@ -77,9 +77,10 @@ async function onCustomerChange(select) {
                 <div class="col-6"><label class="form-label">Ngày đi</label><input type="date" name="departure_date" class="form-control" value="{{ phoi.departure_date.strftime('%Y-%m-%d') if phoi.departure_date }}"></div>
                 <div class="col-6"><label class="form-label">Ngày về</label><input type="date" name="return_date" class="form-control" value="{{ phoi.return_date.strftime('%Y-%m-%d') if phoi.return_date }}"></div>
             </div>
-            <div class="row g-2">
-                <div class="col-6"><label class="form-label">KM đầu (cả chuyến đi-về)</label><input type="number" name="km_start" class="form-control" value="{{ phoi.km_start }}" min="0"></div>
-                <div class="col-6"><label class="form-label">KM cuối (sau khi về)</label><input type="number" name="km_end" class="form-control" value="{{ phoi.km_end if phoi.km_end else '' }}" min="0" placeholder="Nhập khi hoàn tất chuyến đi-về"></div>
+            <div>
+                <label class="form-label">KM cuối (sau khi về)</label>
+                <input type="number" name="km_end" class="form-control" value="{{ phoi.km_end if phoi.km_end else '' }}" min="0" placeholder="Nhập khi xe về bãi">
+                <small class="text-muted">Xe reset KM theo từng chuyến. Nhập KM cuối trước khi chốt phơi.</small>
             </div>
         </div></div>
 
@@ -108,7 +109,7 @@ async function onCustomerChange(select) {
                 {% set _ = expenses.update({exp.category: exp.amount}) %}
             {% endfor %}
             <div class="row g-2 mb-2">
-                <div class="col-6"><label class="form-label">Bồi dưỡng bốc vác</label><input type="text" name="expense_porter_fee" class="form-control currency-input" value="{{ '{:,.0f}'.format(expenses.get('porter_fee', 0)) }}" inputmode="numeric"></div>
+                <div class="col-6"><label class="form-label">Bồi dưỡng bốc vác <small class="text-muted">(tài xế ứng trước)</small></label><input type="text" name="expense_porter_fee" class="form-control currency-input" value="{{ '{:,.0f}'.format(expenses.get('porter_fee', 0)) }}" inputmode="numeric"></div>
                 {% if current_user.is_manager_or_admin() %}
                 <div class="col-6"><label class="form-label">Phí đường <small class="text-muted">(chủ xe quản lý)</small></label><input type="text" name="expense_toll_fee" class="form-control currency-input" value="{{ '{:,.0f}'.format(expenses.get('toll_fee', 0)) }}" inputmode="numeric"></div>
                 {% endif %}
@@ -143,7 +144,7 @@ async function onCustomerChange(select) {
                         <div class="col-12"><label class="form-label">Mô tả hàng hóa</label><input type="text" name="return_trip_cargo[]" class="form-control form-control-sm" value="{{ trip.cargo_description or '' }}"></div>
                         <div class="col-12" data-payment-calculator><label class="form-label">Cách tính tiền *</label><select name="return_trip_payment_method[]" class="form-select form-select-sm payment-method"><option value="fixed" {% if trip.payment_method != 'per_ton' %}selected{% endif %}>Bao chuyến — tiền cố định</option><option value="per_ton" {% if trip.payment_method == 'per_ton' %}selected{% endif %}>Theo tấn — số tấn × giá/tấn</option></select><div class="row g-2 mt-1"><div class="col-6 fixed-revenue-field"><label class="form-label">Tiền bao chuyến (VNĐ)</label><input type="text" name="return_trip_revenue_full[]" class="form-control form-control-sm currency-input calculated-revenue" inputmode="numeric" value="{{ '{:,.0f}'.format(trip.revenue_full) }}"></div><div class="col-6 per-ton-field d-none"><label class="form-label">Số tấn</label><input type="number" name="return_trip_cargo_weight_tons[]" class="form-control form-control-sm cargo-weight" min="0" step="0.001" value="{{ trip.cargo_weight_tons or '' }}"></div><div class="col-6 per-ton-field d-none"><label class="form-label">Giá 1 tấn (VNĐ)</label><input type="text" name="return_trip_price_per_ton[]" class="form-control form-control-sm currency-input price-per-ton" inputmode="numeric" value="{{ '{:,.0f}'.format(trip.price_per_ton or 0) }}"></div></div></div>
                         <div class="col-6"><label class="form-label">Tài xế đã thu (VNĐ)</label><input type="text" name="return_trip_revenue_collected[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="{{ '{:,.0f}'.format(trip.revenue_collected) }}"></div>
-                        <div class="col-12"><label class="form-label">Tiền bốc vác (VNĐ)</label><input type="text" name="return_trip_porter_fee[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="{{ '{:,.0f}'.format(trip.porter_fee) }}"></div>
+                        <div class="col-12"><label class="form-label">Tiền bốc vác <small class="text-muted">(tài xế ứng trước)</small></label><input type="text" name="return_trip_porter_fee[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="{{ '{:,.0f}'.format(trip.porter_fee) }}"></div>
                         <div class="col-12"><label class="form-label">Ghi chú</label><input type="text" name="return_trip_notes[]" class="form-control form-control-sm" value="{{ trip.notes or '' }}"></div>
                     </div>
                 </div>

@@ -20,16 +20,6 @@ async function onCustomerChange(select) {
     } catch(e) { console.error(e); }
 }
 
-// Tự động tính km_total
-function calcKm() {
-    const kmStart = parseInt(document.getElementById('km_start').value) || 0;
-    const kmEnd = parseInt(document.getElementById('km_end').value) || 0;
-    if (kmEnd > kmStart) {
-        document.getElementById('km_total_display').textContent = (kmEnd - kmStart).toLocaleString() + ' km';
-    } else {
-        document.getElementById('km_total_display').textContent = '0 km';
-    }
-}
 </script>
 {% endblock %}
 {% block content %}
@@ -127,31 +117,16 @@ function calcKm() {
                         <input type="date" name="return_date" class="form-control">
                     </div>
                 </div>
-                <div class="row g-2 mb-2">
-                    <div class="col-6">
-                        <label class="form-label">KM đầu (cả chuyến đi-về)</label>
-                        <input type="number" name="km_start" id="km_start" class="form-control" value="{{ current_user.current_truck.current_km if current_user.current_truck else '' }}" min="0" oninput="calcKm()">
-                        <small class="text-muted">Tự lấy theo KM hiện tại của xe. Nếu tài xế sửa lệch quá 50 km, quản lý sẽ được cảnh báo trong nhật ký hoạt động.</small>
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label">KM cuối (sau khi về)</label>
-                        <input type="number" name="km_end" id="km_end" class="form-control" placeholder="Nhập khi hoàn tất chuyến đi-về" min="0" oninput="calcKm()">
-                        <small class="text-muted">Nhập một lần sau khi hoàn tất cả chuyến đi và về.</small>
-                    </div>
-                </div>
-                <div class="text-end">
-                    <small class="text-muted">Tổng KM đi-về: <strong id="km_total_display">0 km</strong></small>
+                <div class="mb-2">
+                    <label class="form-label">KM cuối (sau khi về)</label>
+                    <input type="number" name="km_end" id="km_end" class="form-control" placeholder="Nhập khi xe về bãi" min="0">
+                    <small class="text-muted">Xe reset KM theo từng chuyến. Nhập KM cuối trước khi chốt phơi.</small>
                 </div>
             </div>
         </div>
 
         <span class="section-title"><i class="bi bi-camera"></i> Ảnh chứng từ</span>
         <div class="card mb-3"><div class="card-body">
-            <div class="mb-3">
-                <label class="form-label">Ảnh đồng hồ KM đầu</label>
-                <input type="file" name="km_start_images" class="form-control" accept="image/jpeg,image/png,image/webp">
-                <small class="text-muted">Chụp ngay khi bắt đầu chuyến. Chỉ được tải 1 ảnh.</small>
-            </div>
             <div class="row g-2">
                 <div class="col-6"><label class="form-label">Khối lượng (tấn)</label><input type="number" name="cargo_weight_tons" class="form-control" min="0" step="0.001" placeholder="Ví dụ: 18.500"></div>
                 <div class="col-6"><label class="form-label">Số phiếu cân</label><input type="text" name="weigh_ticket_number" class="form-control" maxlength="100" placeholder="Nếu có"></div>
@@ -198,7 +173,7 @@ function calcKm() {
             <div class="card-body">
                 <div class="row g-2 mb-2">
                     <div class="col-6">
-                        <label class="form-label">Bồi dưỡng bốc vác</label>
+                        <label class="form-label">Bồi dưỡng bốc vác <small class="text-muted">(tài xế ứng trước)</small></label>
                         <input type="text" name="expense_porter_fee" class="form-control currency-input" value="0" inputmode="numeric">
                     </div>
                     {% if current_user.is_manager_or_admin() %}
@@ -272,12 +247,6 @@ const defaultTruckId = '{{ current_user.current_truck_id or "" }}';
 
 function syncAssignmentControls() {
     const truckSelect = document.getElementById('truck_id');
-    const selectedTruck = truckSelect.options[truckSelect.selectedIndex];
-    const kmStart = document.getElementById('km_start');
-    if (selectedTruck && selectedTruck.dataset.currentKm !== undefined) {
-        kmStart.value = selectedTruck.dataset.currentKm;
-        calcKm();
-    }
     const substituteMode = document.getElementById('substitute-mode');
     const driverSelect = document.getElementById('driver_id');
     const substituteNote = document.getElementById('substitute-note');
@@ -346,7 +315,7 @@ function addReturnTrip(values = {}) {
                 <div class="col-12"><label class="form-label">Mô tả hàng hóa</label><input type="text" name="return_trip_cargo[]" class="form-control form-control-sm" value="${values.cargo || ''}"></div>
                 <div class="col-12" data-payment-calculator><label class="form-label">Cách tính tiền *</label><select name="return_trip_payment_method[]" class="form-select form-select-sm payment-method"><option value="fixed" ${values.paymentMethod === 'per_ton' ? '' : 'selected'}>Bao chuyến — tiền cố định</option><option value="per_ton" ${values.paymentMethod === 'per_ton' ? 'selected' : ''}>Theo tấn — số tấn × giá/tấn</option></select><div class="row g-2 mt-1"><div class="col-6 fixed-revenue-field"><label class="form-label">Tiền bao chuyến (VNĐ)</label><input type="text" name="return_trip_revenue_full[]" class="form-control form-control-sm currency-input calculated-revenue" inputmode="numeric" value="${values.revenueFull || ''}"></div><div class="col-6 per-ton-field d-none"><label class="form-label">Số tấn</label><input type="number" name="return_trip_cargo_weight_tons[]" class="form-control form-control-sm cargo-weight" min="0" step="0.001" value="${values.cargoWeightTons || ''}"></div><div class="col-6 per-ton-field d-none"><label class="form-label">Giá 1 tấn (VNĐ)</label><input type="text" name="return_trip_price_per_ton[]" class="form-control form-control-sm currency-input price-per-ton" inputmode="numeric" value="${values.pricePerTon || ''}"></div></div></div>
                 <div class="col-6"><label class="form-label">Đã thu tạm (VNĐ)</label><input type="text" name="return_trip_revenue_collected[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="${values.revenueCollected || ''}"></div>
-                <div class="col-12"><label class="form-label">Tiền bốc vác (VNĐ)</label><input type="text" name="return_trip_porter_fee[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="${values.porterFee || '0'}"></div>
+                <div class="col-12"><label class="form-label">Tiền bốc vác <small class="text-muted">(tài xế ứng trước)</small></label><input type="text" name="return_trip_porter_fee[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="${values.porterFee || '0'}"></div>
                 <div class="col-12"><label class="form-label">Ghi chú</label><input type="text" name="return_trip_notes[]" class="form-control form-control-sm" value="${values.notes || ''}"></div>
             </div>
         </div>`;
