@@ -357,3 +357,84 @@
 - Do-not-repeat notes:
   - Keep historical multi-link allocation in `fuel_expenses()` until those rows are explicitly migrated or reconciled.
   - Keep fuel inside `total_expenses()` so `owner_profit()` deducts it via the established formula; do not add fuel to driver settlement unless the payment policy is changed explicitly.
+
+## 2026-10-05 - Collapsible create-phơi form sections
+
+- Status: done
+- Goal: Let users hide or show each section of the create-phơi form by clicking its title, while keeping every section expanded by default.
+- Files changed:
+  - `app/templates/phoi/create.html` — added accessible clickable titles and expand/collapse behavior for Chọn hàng, Tuyến đường, Thông tin chuyến, Ảnh chứng từ, Doanh thu chuyến đi, Chi phí chuyến, Ghi chú, and Các chuyến về.
+  - `app/static/css/style.css` — added pointer, keyboard-focus, and icon alignment styling for collapsible section titles.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: Presentation-only change to the create-phơi form. All fields stay in the form and retain their values when hidden. The creation route, persisted data, financial calculations, validation, return-trip handling, fuel association, roles, and URLs are unchanged. Fuel entry remains unchanged as requested.
+- Key decisions:
+  - Every section starts expanded; a title click or keyboard Enter/Space toggles only its paired card.
+  - `aria-expanded`, `aria-controls`, focus indication, and directional chevrons provide accessible state feedback.
+  - Visibility uses Bootstrap `d-none`, so hiding a section does not disable or omit its fields from form submission.
+- Validation:
+  - Reviewed the create route, create template, existing dynamic return-trip/repair scripts, fuel route/template, and shared CSS before editing.
+  - Editor diagnostics found no errors in `app/templates/phoi/create.html`, `app/static/css/style.css`, or the application folder.
+  - Ran `git diff --check` successfully; Git only reported existing LF-to-CRLF conversion warnings. No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - Browser-based interaction was not launched; the behavior is limited to standard DOM click/keyboard toggles and preserves all existing inputs.
+- Do-not-repeat notes:
+  - Keep new create-form section cards paired with unique title `data-collapse-target` values and default `aria-expanded="true"` unless an explicit default-collapsed requirement is approved.
+  - Do not hide, disable, or remove fields solely to implement visual collapsing.
+
+## 2026-10-05 - Add return-trip weigh-ticket evidence
+
+- Status: done
+- Goal: Record a weigh-ticket number and image evidence for each return trip, with create, edit, detail, and print support.
+- Files changed:
+  - `app/models.py` — added nullable `PhoiReturnTrip.weigh_ticket_number`, the per-return-trip attachment relationship, and nullable `PhoiAttachment.return_trip_id`.
+  - `migrations/versions/aa1b2c3d4e5f_add_return_trip_weigh_tickets.py` — adds the return-trip ticket number plus indexed, cascading attachment foreign key.
+  - `app/routes/phoi.py` — preserves retained return-trip IDs during edits, saves up to five images per return trip, and permits later per-trip ticket upload on the detail page.
+  - `app/templates/phoi/create.html` and `app/templates/phoi/edit.html` — add ticket number/image inputs to every return-trip card and retain aligned upload indexes when cards are removed.
+  - `app/templates/phoi/detail.html` and `app/templates/phoi/detail_print.html` — show each return trip's ticket number, weight, and evidence summary separately from outbound evidence.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: This is a schema and attachment-workflow addition. Existing outbound attachments remain valid with `return_trip_id = NULL`; existing return trips receive a nullable ticket number. Retained return trips are updated in place so their evidence is not erased by an ordinary phơi edit. Financial methods, roles, fuel rules, confirmation eligibility, and existing outbound attachment behavior are unchanged.
+- Key decisions:
+  - A ticket image is attached to exactly one `PhoiReturnTrip` through `PhoiAttachment.return_trip_id`; it also keeps the parent `phoi_id` for existing authorization and file routes.
+  - Each create/edit card accepts at most five JPG, PNG, or WEBP images. The existing compression and rollback cleanup helper is reused.
+  - Removing a return trip deletes its attachment database rows through the relationship/database cascade; stored files for those cascade-deleted rows may require storage cleanup review in a future maintenance task.
+- Validation:
+  - Reviewed the model, create/edit/detail routes, dynamic return-trip templates, existing attachment handler, print template, and migration head before editing.
+  - Editor diagnostics report no errors in all changed application files and the migration.
+  - Ran `python -m compileall -q app migrations` successfully using the configured virtual environment.
+  - Ran `git diff --check` successfully; output contained only existing LF-to-CRLF conversion warnings.
+  - Validated SQLAlchemy mappings and requested Alembic heads through Flask; the command emitted only application startup log matches, so migration-head output should be rechecked during deployment.
+  - No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - Run `flask --app run:app db upgrade` before deploying this application version; the new model fields require migration `aa1b2c3d4e5f`.
+  - Physical files tied to a trip removed during edit are not currently explicitly deleted after the database cascade; do not add synchronous pre-commit deletion because a rolled-back edit would lose evidence.
+- Do-not-repeat notes:
+  - Do not restore delete-and-recreate synchronization for `PhoiReturnTrip`; it destroys child evidence associations.
+  - Keep return-ticket image field names synchronized with each displayed card index, and verify a submitted return-trip ID belongs to the current phơi before updating it.
+
+## 2026-10-05 - Phơi form validation feedback and unsaved-change warnings
+
+- Status: done
+- Goal: Make missing native form fields visibly invalid on create/edit, validate invalid partial manager collections before confirmation, and warn before a user leaves a changed phơi form without saving.
+- Files changed:
+  - `app/static/js/app.js` — added shared dirty-form tracking for opt-in phơi forms, Vietnamese navigation confirmation, and browser unload protection.
+  - `app/templates/phoi/create.html` — opts into unsaved-change protection and adds Bootstrap invalid-state feedback for native required inputs.
+  - `app/templates/phoi/edit.html` — opts into unsaved-change protection and adds Bootstrap invalid-state feedback for native required inputs.
+  - `app/templates/phoi/confirm.html` — opts into unsaved-change protection and rejects/marks a partial collection that is empty, non-positive, or above the displayed remaining revenue.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: Presentation and browser-side validation only. Existing create/edit/save/chốt/xác nhận routes remain authoritative; no models, data, schema, financial methods, fuel association, confirmation eligibility, role checks, URLs, or server validation logic changed. The detail page already shows each chốt prerequisite with a visible pass/fail indicator; source fields remain on the create/edit forms.
+- Key decisions:
+  - The leave warning is activated only after user input/change and is disabled once a form starts submitting; dynamic return-trip inputs are covered through delegated form events.
+  - In-page navigation uses the requested Vietnamese confirmation text. Browser close/reload dialogs are controlled by the browser and may show generic wording.
+  - Partial collection checks are convenience feedback only; `confirm()` keeps the server-side over-collection validation as the final source of truth.
+- Validation:
+  - Reviewed the phơi submit/confirm routes, detail-page chốt conditions, all affected form templates, and existing shared submit/currency behavior before editing.
+  - Editor diagnostics found no errors in the changed JavaScript and templates.
+  - Ran `python -m compileall -q app migrations` successfully with the configured virtual environment.
+  - Ran `git diff --check` successfully; Git only reported repository LF-to-CRLF conversion warnings.
+  - No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - The native browser close/reload prompt cannot guarantee custom Vietnamese text because modern browsers intentionally control that dialog.
+  - Server-side flashes remain the feedback mechanism for chốt prerequisites that have no input on the detail page (such as an absent fuel log); the detail condition card continues to expose those failures before chốt.
+- Do-not-repeat notes:
+  - Keep final chốt/xác nhận rules on the server; JavaScript must not become the only enforcement layer.
+  - Ensure any new editable phơi form explicitly opts into `warn-unsaved-changes` only when its fields can be lost by navigation.

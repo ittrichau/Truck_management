@@ -11,7 +11,7 @@
         <i class="bi bi-info-circle"></i> Chọn <strong>Chưa thu</strong> nếu số còn lại sẽ vào công nợ. Chọn <strong>Đã thu đủ</strong> nếu quản lý/chủ xe đã nhận phần còn lại. Chỉ nhập số tiền khi thu một phần.
     </div>
 
-    <form method="POST">
+        <form method="POST" class="warn-unsaved-changes" data-unsaved-message="Phơi chưa được xác nhận. Nếu thoát, các lựa chọn thu tiền sẽ mất.">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="d-flex justify-content-end mb-2">
             <button type="button" class="btn btn-outline-success btn-sm" onclick="markAllPaidInFull()"><i class="bi bi-check2-all"></i> Đã thu đủ tất cả</button>
@@ -22,7 +22,7 @@
         {% set manager_received = trip.manager_revenue_collected or 0 %}
         {% set status_name = 'outbound_collection_status' if trip.kind == 'outbound' else 'return_collection_status_' ~ trip.id %}
         {% set amount_name = 'outbound_manager_revenue_collected' if trip.kind == 'outbound' else 'return_manager_revenue_collected_' ~ trip.id %}
-        <div class="card mb-3 collection-card" data-status-name="{{ status_name }}" data-amount-name="{{ amount_name }}">
+        <div class="card mb-3 collection-card" data-status-name="{{ status_name }}" data-amount-name="{{ amount_name }}" data-remaining="{{ remaining }}">
             <div class="card-body">
                 <div class="d-flex justify-content-between gap-2 mb-2">
                     <strong>{{ trip.label }}</strong>
@@ -42,6 +42,7 @@
                 <div class="partial-amount mt-3 {% if not (manager_received > 0 and manager_received != remaining) %}d-none{% endif %}">
                     <label class="form-label small mb-1">Quản lý/chủ xe đã nhận (VNĐ)</label>
                     <input type="text" class="form-control currency-input" name="{{ amount_name }}" value="{{ '{:,.0f}'.format(manager_received) if manager_received > 0 else '' }}" inputmode="numeric" placeholder="Nhập số tiền thực nhận">
+                    <div class="invalid-feedback">Nhập số tiền từ 0 đến số tiền còn lại của chuyến này.</div>
                 </div>
             </div>
         </div>
@@ -69,8 +70,33 @@ function markAllPaidInFull() {
     document.querySelectorAll('.collection-card').forEach(card => {
         const fullOption = card.querySelector('.collection-status[value="full"]');
         fullOption.checked = true;
-        updatePartialField(card);
+        fullOption.dispatchEvent(new Event('change', { bubbles: true }));
     });
 }
+
+function collectionAmount(card) {
+    return Number((card.querySelector('.currency-input').value || '').replace(/,/g, ''));
+}
+
+document.querySelector('form').addEventListener('submit', event => {
+    let firstInvalid = null;
+    document.querySelectorAll('.collection-card').forEach(card => {
+        const amount = card.querySelector('.currency-input');
+        const isPartial = card.querySelector('.collection-status:checked').value === 'partial';
+        const remaining = Number(card.dataset.remaining || 0);
+        const invalid = isPartial && (!Number.isFinite(collectionAmount(card)) || collectionAmount(card) <= 0 || collectionAmount(card) > remaining);
+        amount.classList.toggle('is-invalid', invalid);
+        if (invalid && !firstInvalid) firstInvalid = amount;
+    });
+    if (firstInvalid) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        firstInvalid.focus();
+    }
+}, true);
+
+document.addEventListener('input', event => {
+    if (event.target.matches('.collection-card .currency-input')) event.target.classList.remove('is-invalid');
+});
 </script>
 {% endblock %}

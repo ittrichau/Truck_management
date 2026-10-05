@@ -357,6 +357,7 @@ class PhoiReturnTrip(db.Model):
     destination = db.Column(db.String(200), nullable=False)
     cargo_description = db.Column(db.String(300))
     cargo_weight_tons = db.Column(db.Numeric(10, 3), nullable=True, comment='Khối lượng hàng chuyến về (tấn)')
+    weigh_ticket_number = db.Column(db.String(100), nullable=True, comment='Số phiếu cân chuyến về')
     payment_method = db.Column(db.String(20), nullable=False, default='fixed', comment='fixed hoặc per_ton')
     price_per_ton = db.Column(db.Numeric(12, 2), nullable=True, comment='Đơn giá vận chuyển mỗi tấn')
     km_start = db.Column(db.Integer)
@@ -370,6 +371,16 @@ class PhoiReturnTrip(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     customer = db.relationship('Customer', backref=db.backref('return_trips', lazy='dynamic'))
+    attachments = db.relationship(
+        'PhoiAttachment',
+        backref='return_trip',
+        lazy='dynamic',
+        cascade='all, delete-orphan',
+        foreign_keys='PhoiAttachment.return_trip_id'
+    )
+
+    def attachment_count(self, attachment_type):
+        return self.attachments.filter_by(attachment_type=attachment_type).count()
 
     def calculate_km_total(self):
         if self.km_start is not None and self.km_end is not None and self.km_end >= self.km_start:
@@ -385,6 +396,7 @@ class PhoiAttachment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     phoi_id = db.Column(db.Integer, db.ForeignKey('phoi.id', ondelete='CASCADE'), nullable=False, index=True)
     expense_id = db.Column(db.Integer, db.ForeignKey('phoi_expenses.id', ondelete='CASCADE'), nullable=True, index=True)
+    return_trip_id = db.Column(db.Integer, db.ForeignKey('phoi_return_trips.id', ondelete='CASCADE'), nullable=True, index=True)
     attachment_type = db.Column(db.String(30), nullable=False, index=True)
     original_filename = db.Column(db.String(255), nullable=False)
     storage_key = db.Column(db.String(500), nullable=False, unique=True)

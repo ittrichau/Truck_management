@@ -30,12 +30,12 @@ async function onCustomerChange(select) {
     <h5 class="mb-1"><i class="bi bi-plus-circle"></i> Tạo Phơi Đang Thực Hiện</h5>
     <p class="text-muted small mb-3">Chuyến về và lần đổ xăng có thể ghi nhận ngay hoặc bổ sung sau trước khi chốt phơi.</p>
     
-    <form method="POST" id="phoi-form" enctype="multipart/form-data">
+    <form method="POST" id="phoi-form" enctype="multipart/form-data" class="warn-unsaved-changes">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <!-- 📋 CHỌN HÀNG -->
-        <span class="section-title"><i class="bi bi-box-seam"></i> Chọn hàng</span>
-        <div class="card mb-3">
+        <span class="section-title collapsible-section-title" data-collapse-target="cargo-selection-section" role="button" tabindex="0" aria-controls="cargo-selection-section" aria-expanded="true"><i class="bi bi-box-seam"></i> Chọn hàng <i class="bi bi-chevron-up section-toggle-icon" aria-hidden="true"></i></span>
+        <div class="card mb-3" id="cargo-selection-section">
             <div class="card-body">
                 <div class="mb-2">
                     <label class="form-label">Khách hàng / Hàng hóa</label>
@@ -51,8 +51,8 @@ async function onCustomerChange(select) {
         </div>
 
         <!-- 📍 TUYẾN ĐƯỜNG -->
-        <span class="section-title"><i class="bi bi-geo-alt"></i> Tuyến đường</span>
-        <div class="card mb-3">
+        <span class="section-title collapsible-section-title" data-collapse-target="route-section" role="button" tabindex="0" aria-controls="route-section" aria-expanded="true"><i class="bi bi-geo-alt"></i> Tuyến đường <i class="bi bi-chevron-up section-toggle-icon" aria-hidden="true"></i></span>
+        <div class="card mb-3" id="route-section">
             <div class="card-body">
                 <div class="row g-2 mb-2">
                     <div class="col-6">
@@ -72,8 +72,8 @@ async function onCustomerChange(select) {
         </div>
 
         <!-- 🚛 THÔNG TIN CHUYẾN -->
-        <span class="section-title"><i class="bi bi-truck"></i> Thông tin chuyến</span>
-        <div class="card mb-3">
+        <span class="section-title collapsible-section-title" data-collapse-target="trip-information-section" role="button" tabindex="0" aria-controls="trip-information-section" aria-expanded="true"><i class="bi bi-truck"></i> Thông tin chuyến <i class="bi bi-chevron-up section-toggle-icon" aria-hidden="true"></i></span>
+        <div class="card mb-3" id="trip-information-section">
             <div class="card-body">
                 <div class="mb-2">
                     <label class="form-label">Xe *</label>
@@ -125,8 +125,8 @@ async function onCustomerChange(select) {
             </div>
         </div>
 
-        <span class="section-title"><i class="bi bi-camera"></i> Ảnh chứng từ</span>
-        <div class="card mb-3"><div class="card-body">
+        <span class="section-title collapsible-section-title" data-collapse-target="attachments-section" role="button" tabindex="0" aria-controls="attachments-section" aria-expanded="true"><i class="bi bi-camera"></i> Ảnh chứng từ <i class="bi bi-chevron-up section-toggle-icon" aria-hidden="true"></i></span>
+        <div class="card mb-3" id="attachments-section"><div class="card-body">
             <div class="row g-2">
                 <div class="col-6"><label class="form-label">Khối lượng (tấn)</label><input type="number" name="cargo_weight_tons" class="form-control" min="0" step="0.001" placeholder="Ví dụ: 18.500"></div>
                 <div class="col-6"><label class="form-label">Số phiếu cân</label><input type="text" name="weigh_ticket_number" class="form-control" maxlength="100" placeholder="Nếu có"></div>
@@ -139,8 +139,8 @@ async function onCustomerChange(select) {
         </div></div>
 
         <!-- 💰 DOANH THU CHUYẾN ĐI -->
-        <span class="section-title"><i class="bi bi-cash-stack"></i> Doanh thu chuyến đi</span>
-        <div class="card mb-3" data-payment-calculator>
+        <span class="section-title collapsible-section-title" data-collapse-target="outbound-revenue-section" role="button" tabindex="0" aria-controls="outbound-revenue-section" aria-expanded="true"><i class="bi bi-cash-stack"></i> Doanh thu chuyến đi <i class="bi bi-chevron-up section-toggle-icon" aria-hidden="true"></i></span>
+        <div class="card mb-3" id="outbound-revenue-section" data-payment-calculator>
             <div class="card-body">
                 <div class="mb-2">
                     <label class="form-label">Cách tính tiền *</label>
@@ -168,8 +168,8 @@ async function onCustomerChange(select) {
         </div>
 
         <!-- 💸 CHI PHÍ -->
-        <span class="section-title"><i class="bi bi-receipt"></i> Chi phí chuyến</span>
-        <div class="card mb-3">
+        <span class="section-title collapsible-section-title" data-collapse-target="trip-expenses-section" role="button" tabindex="0" aria-controls="trip-expenses-section" aria-expanded="true"><i class="bi bi-receipt"></i> Chi phí chuyến <i class="bi bi-chevron-up section-toggle-icon" aria-hidden="true"></i></span>
+        <div class="card mb-3" id="trip-expenses-section">
             <div class="card-body">
                 <div class="row g-2 mb-2">
                     <div class="col-6">
@@ -192,14 +192,15 @@ async function onCustomerChange(select) {
         </div>
 
         <!-- GHI CHÚ -->
-        <div class="mb-3">
+        <span class="section-title collapsible-section-title" data-collapse-target="notes-section" role="button" tabindex="0" aria-controls="notes-section" aria-expanded="true"><i class="bi bi-chat-left-text"></i> Ghi chú <i class="bi bi-chevron-up section-toggle-icon" aria-hidden="true"></i></span>
+        <div class="card mb-3" id="notes-section"><div class="card-body">
             <label class="form-label">Ghi chú thêm</label>
             <textarea name="notes" class="form-control" rows="2" placeholder="Ghi chú nếu có..."></textarea>
-        </div>
+        </div></div>
 
         <!-- CÁC CHUYẾN VỀ: luôn hiển thị cuối biểu mẫu -->
-        <span class="section-title"><i class="bi bi-arrow-return-left"></i> Các chuyến về</span>
-        <div class="card mb-3">
+        <span class="section-title collapsible-section-title" data-collapse-target="return-trips-section" role="button" tabindex="0" aria-controls="return-trips-section" aria-expanded="true"><i class="bi bi-arrow-return-left"></i> Các chuyến về <i class="bi bi-chevron-up section-toggle-icon" aria-hidden="true"></i></span>
+        <div class="card mb-3" id="return-trips-section">
             <div class="card-body">
                 <p class="small text-muted">Mỗi chuyến về có thể chọn khách hàng để tự điền tuyến đường và hàng hóa, giống khi tạo phơi.</p>
                 <div id="return-trips"></div>
@@ -303,6 +304,7 @@ function addReturnTrip(values = {}) {
     const today = new Date().toISOString().split('T')[0];
     const html = `
         <div class="return-trip border rounded p-3 mb-3 bg-light">
+            <input type="hidden" name="return_trip_id[]" value="${values.id || ''}">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <strong><i class="bi bi-arrow-return-left"></i> Chuyến về #${number}</strong>
                 <button type="button" class="btn btn-outline-danger btn-sm py-0" onclick="this.closest('.return-trip').remove(); renumberReturnTrips()">Xóa</button>
@@ -313,6 +315,8 @@ function addReturnTrip(values = {}) {
                 <div class="col-6"><label class="form-label">Điểm đi *</label><input type="text" name="return_trip_origin[]" class="form-control form-control-sm" required value="${values.origin || ''}"></div>
                 <div class="col-6"><label class="form-label">Điểm đến *</label><input type="text" name="return_trip_destination[]" class="form-control form-control-sm" required value="${values.destination || ''}"></div>
                 <div class="col-12"><label class="form-label">Mô tả hàng hóa</label><input type="text" name="return_trip_cargo[]" class="form-control form-control-sm" value="${values.cargo || ''}"></div>
+                <div class="col-6"><label class="form-label">Số phiếu cân</label><input type="text" name="return_trip_weigh_ticket_number[]" class="form-control form-control-sm" value="${values.weighTicketNumber || ''}"></div>
+                <div class="col-6"><label class="form-label">Ảnh phiếu cân</label><input type="file" data-return-ticket-upload class="form-control form-control-sm" name="return_trip_weigh_ticket_images_${number - 1}" accept="image/jpeg,image/png,image/webp" multiple><small class="text-muted">Tối đa 5 ảnh.</small></div>
                 <div class="col-12" data-payment-calculator><label class="form-label">Cách tính tiền *</label><select name="return_trip_payment_method[]" class="form-select form-select-sm payment-method"><option value="fixed" ${values.paymentMethod === 'per_ton' ? '' : 'selected'}>Bao chuyến — tiền cố định</option><option value="per_ton" ${values.paymentMethod === 'per_ton' ? 'selected' : ''}>Theo tấn — số tấn × giá/tấn</option></select><div class="row g-2 mt-1"><div class="col-6 fixed-revenue-field"><label class="form-label">Tiền bao chuyến (VNĐ)</label><input type="text" name="return_trip_revenue_full[]" class="form-control form-control-sm currency-input calculated-revenue" inputmode="numeric" value="${values.revenueFull || ''}"></div><div class="col-6 per-ton-field d-none"><label class="form-label">Số tấn</label><input type="number" name="return_trip_cargo_weight_tons[]" class="form-control form-control-sm cargo-weight" min="0" step="0.001" value="${values.cargoWeightTons || ''}"></div><div class="col-6 per-ton-field d-none"><label class="form-label">Giá 1 tấn (VNĐ)</label><input type="text" name="return_trip_price_per_ton[]" class="form-control form-control-sm currency-input price-per-ton" inputmode="numeric" value="${values.pricePerTon || ''}"></div></div></div>
                 <div class="col-6"><label class="form-label">Đã thu tạm (VNĐ)</label><input type="text" name="return_trip_revenue_collected[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="${values.revenueCollected || ''}"></div>
                 <div class="col-12"><label class="form-label">Tiền bốc vác <small class="text-muted">(tài xế ứng trước)</small></label><input type="text" name="return_trip_porter_fee[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="${values.porterFee || '0'}"></div>
@@ -323,9 +327,42 @@ function addReturnTrip(values = {}) {
 }
 
 function renumberReturnTrips() {
-    document.querySelectorAll('.return-trip strong').forEach((element, index) => {
-        element.innerHTML = `<i class="bi bi-arrow-return-left"></i> Chuyến về #${index + 1}`;
+    document.querySelectorAll('.return-trip').forEach((trip, index) => {
+        trip.querySelector('strong').innerHTML = `<i class="bi bi-arrow-return-left"></i> Chuyến về #${index + 1}`;
+        const upload = trip.querySelector('[data-return-ticket-upload]');
+        if (upload) upload.name = `return_trip_weigh_ticket_images_${index}`;
     });
 }
+
+document.querySelector('form').addEventListener('submit', renumberReturnTrips);
+
+document.getElementById('phoi-form').addEventListener('invalid', event => {
+    event.target.classList.add('is-invalid');
+}, true);
+document.getElementById('phoi-form').addEventListener('input', event => {
+    if (event.target.matches('[required]')) event.target.classList.remove('is-invalid');
+});
+
+function toggleCreatePhoiSection(title) {
+    const section = document.getElementById(title.dataset.collapseTarget);
+    if (!section) return;
+
+    const isExpanded = title.getAttribute('aria-expanded') === 'true';
+    section.classList.toggle('d-none', isExpanded);
+    title.setAttribute('aria-expanded', String(!isExpanded));
+    const icon = title.querySelector('.section-toggle-icon');
+    icon.classList.toggle('bi-chevron-up', isExpanded);
+    icon.classList.toggle('bi-chevron-down', !isExpanded);
+}
+
+document.querySelectorAll('.collapsible-section-title').forEach(title => {
+    title.addEventListener('click', () => toggleCreatePhoiSection(title));
+    title.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            toggleCreatePhoiSection(title);
+        }
+    });
+});
 </script>
 {% endblock %}

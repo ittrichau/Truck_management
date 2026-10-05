@@ -248,6 +248,20 @@
         {% endif %}
     </div>
 
+    <div class="phoi-block phoi-block-full" style="margin-bottom:12px;">
+        <h5>🔁 Chuyến về và phiếu cân</h5>
+        <table class="phoi-info-table">
+            {% for trip in phoi.return_trips.all() %}
+            <tr>
+                <td class="label">Chuyến về #{{ trip.trip_order }} · {{ trip.origin }} → {{ trip.destination }}</td>
+                <td class="value">{{ trip.cargo_description or '--' }} · {{ trip.cargo_weight_tons or '--' }} tấn · Phiếu cân: {{ trip.weigh_ticket_number or '--' }}{% if trip.attachment_count('weigh_ticket') %} · {{ trip.attachment_count('weigh_ticket') }} ảnh{% endif %}</td>
+            </tr>
+            {% else %}
+            <tr><td class="label">Chuyến về</td><td class="value">Chưa có dữ liệu</td></tr>
+            {% endfor %}
+        </table>
+    </div>
+
     <!-- GRID: Kết quả đối chiếu + Kết luận -->
     <div class="phoi-grid">
         <!-- Block 3: Đối chiếu -->

@@ -92,6 +92,16 @@
                 <div class="d-flex justify-content-between"><strong>Chuyến về #{{ trip.trip_order }}</strong><small class="text-muted">{{ trip.return_date.strftime('%d/%m/%Y') if trip.return_date else 'Chưa có ngày' }}</small></div>
                 <div><i class="bi bi-geo-alt"></i> {{ trip.origin }} → {{ trip.destination }}</div>
                 <div class="small text-muted">Hàng: {{ trip.cargo_description or '--' }}{% if current_user.is_manager_or_admin() %} · Full: {{ '{:,.0f}'.format(trip.revenue_full) }} VNĐ{% if trip.payment_method == 'per_ton' %} · {{ trip.cargo_weight_tons }} tấn × {{ '{:,.0f}'.format(trip.price_per_ton or 0) }} VNĐ/tấn{% else %} · Bao chuyến{% endif %}{% endif %}</div>
+                <div class="small mt-1"><strong>Phiếu cân:</strong> {{ trip.weigh_ticket_number or '--' }} · <strong>Khối lượng:</strong> {{ trip.cargo_weight_tons or '--' }} tấn</div>
+                {% for attachment in trip.attachments.filter_by(attachment_type='weigh_ticket').all() %}
+                <div class="small mt-1"><a target="_blank" href="{{ url_for('phoi.view_attachment', id=phoi.id, attachment_id=attachment.id) }}"><i class="bi bi-image"></i> {{ attachment.original_filename }}</a></div>
+                {% else %}<div class="small text-muted">Chưa có ảnh phiếu cân.</div>{% endfor %}
+                {% if (phoi.status == 'draft' and (current_user.is_manager_or_admin() or (current_user.is_driver() and phoi.driver_id == current_user.id))) or (phoi.status == 'submitted' and current_user.is_manager_or_admin()) %}
+                <form action="{{ url_for('phoi.upload_attachment', id=phoi.id) }}" method="POST" enctype="multipart/form-data" class="mt-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="attachment_type" value="weigh_ticket"><input type="hidden" name="return_trip_id" value="{{ trip.id }}">
+                    <div class="input-group input-group-sm"><input type="file" name="images" class="form-control" accept="image/jpeg,image/png,image/webp" multiple required><button class="btn btn-outline-primary" type="submit">Tải phiếu cân</button></div>
+                </form>
+                {% endif %}
                 {% if trip.notes %}<div class="small text-muted">Ghi chú: {{ trip.notes }}</div>{% endif %}
             </div>
             {% else %}
@@ -131,7 +141,7 @@
                 </div>
             </form>
             {% endif %}
-            {% for attachment in phoi.attachments.all() %}
+            {% for attachment in phoi.attachments.filter_by(return_trip_id=None).all() %}
             <div class="d-flex align-items-center justify-content-between border-bottom py-2 gap-2">
                 <a class="text-decoration-none" target="_blank" href="{{ url_for('phoi.view_attachment', id=phoi.id, attachment_id=attachment.id) }}"><i class="bi bi-image"></i> <strong>{{ attachment.type_label() }}</strong>{% if attachment.expense %}<br><small class="text-warning">Sửa xe: {{ attachment.expense.description }}</small>{% endif %}<br><small class="text-muted">{{ attachment.original_filename }} · {{ '%.1f'|format(attachment.file_size / 1024) }} KB · {{ attachment.created_at.strftime('%d/%m/%Y %H:%M') }}</small></a>
                 {% if (phoi.status == 'draft' and (current_user.is_manager_or_admin() or (current_user.is_driver() and phoi.driver_id == current_user.id))) or (phoi.status == 'submitted' and current_user.is_manager_or_admin()) %}<form action="{{ url_for('phoi.delete_attachment', id=phoi.id, attachment_id=attachment.id) }}" method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-danger btn-sm" onclick="return confirm('Xóa ảnh này?')">Xóa</button></form>{% endif %}

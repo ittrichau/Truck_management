@@ -170,6 +170,37 @@ document.addEventListener('input', function(event) {
     if (event.target.matches('.price-per-ton, .cargo-weight, [name="cargo_weight_tons"]')) syncAllPaymentCalculators();
 });
 
+// Cảnh báo trước khi rời biểu mẫu phơi có dữ liệu chưa lưu.
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('form.warn-unsaved-changes').forEach(function(form) {
+        let isDirty = false;
+        let isSubmitting = false;
+        const message = form.dataset.unsavedMessage || 'Phơi chưa lưu. Nếu thoát, dữ liệu sẽ mất hết. Bạn có đồng ý thoát không?';
+
+        form.addEventListener('input', function() { isDirty = true; });
+        form.addEventListener('change', function() { isDirty = true; });
+        form.addEventListener('submit', function() { isSubmitting = true; });
+
+        window.addEventListener('beforeunload', function(event) {
+            if (!isDirty || isSubmitting) return;
+            event.preventDefault();
+            event.returnValue = message;
+            return message;
+        });
+
+        document.addEventListener('click', function(event) {
+            const link = event.target.closest('a[href]');
+            if (!isDirty || isSubmitting || !link || link.target === '_blank' || event.defaultPrevented) return;
+            const href = link.getAttribute('href');
+            if (!href || href.startsWith('#') || !confirm(message)) {
+                event.preventDefault();
+                return;
+            }
+            isDirty = false;
+        });
+    });
+});
+
 // Keyboard shortcuts
 window.addEventListener('keydown', function(e) {
     // Ctrl+N to create new

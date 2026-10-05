@@ -26,7 +26,7 @@ async function onCustomerChange(select) {
     <div class="alert alert-warning py-2">Đây là bước đối soát của chủ xe. Hãy hoàn tất doanh thu/đơn giá, chi phí, phí công và tiền đã nhận từ chủ hàng trước khi xác nhận cuối cùng.</div>
     {% endif %}
 
-    <form method="POST" id="phoi-form" enctype="multipart/form-data">
+    <form method="POST" id="phoi-form" enctype="multipart/form-data" class="warn-unsaved-changes">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <span class="section-title"><i class="bi bi-fuel-pump"></i> Đổ xăng đã gắn ({{ phoi.fuel_logs|length }} lần)</span>
         <div class="card mb-3"><div class="card-body py-2">
@@ -150,12 +150,15 @@ async function onCustomerChange(select) {
             <div id="return-trips">
                 {% for trip in phoi.return_trips.all() %}
                 <div class="return-trip border rounded p-3 mb-3 bg-light">
+                    <input type="hidden" name="return_trip_id[]" value="{{ trip.id }}">
                     <div class="d-flex justify-content-between align-items-center mb-2"><strong><i class="bi bi-arrow-return-left"></i> Chuyến về #{{ loop.index }}</strong><button type="button" class="btn btn-outline-danger btn-sm py-0" onclick="this.closest('.return-trip').remove(); renumberReturnTrips()">Xóa</button></div>
                     <div class="mb-2"><label class="form-label">Khách hàng / Hàng hóa</label><select name="return_trip_customer_id[]" class="form-select form-select-sm" onchange="onReturnCustomerChange(this)"><option value="">-- Chọn khách hàng / hàng hóa --</option>{% for customer in customers %}<option value="{{ customer.id }}" {% if trip.customer_id == customer.id %}selected{% endif %}>{{ customer.name }} ({{ customer.cargo_type or '...' }})</option>{% endfor %}</select></div>
                     <div class="row g-2">
                         <div class="col-12"><label class="form-label">Ngày về</label><input type="date" name="return_trip_date[]" class="form-control form-control-sm" value="{{ trip.return_date.strftime('%Y-%m-%d') if trip.return_date else '' }}"></div>
                         <div class="col-6"><label class="form-label">Điểm đi *</label><input type="text" name="return_trip_origin[]" class="form-control form-control-sm" required value="{{ trip.origin }}"></div><div class="col-6"><label class="form-label">Điểm đến *</label><input type="text" name="return_trip_destination[]" class="form-control form-control-sm" required value="{{ trip.destination }}"></div>
                         <div class="col-12"><label class="form-label">Mô tả hàng hóa</label><input type="text" name="return_trip_cargo[]" class="form-control form-control-sm" value="{{ trip.cargo_description or '' }}"></div>
+                        <div class="col-6"><label class="form-label">Số phiếu cân</label><input type="text" name="return_trip_weigh_ticket_number[]" class="form-control form-control-sm" value="{{ trip.weigh_ticket_number or '' }}"></div>
+                        <div class="col-6"><label class="form-label">Ảnh phiếu cân</label><input type="file" data-return-ticket-upload name="return_trip_weigh_ticket_images_{{ loop.index0 }}" class="form-control form-control-sm" accept="image/jpeg,image/png,image/webp" multiple><small class="text-muted">Tối đa 5 ảnh; ảnh đã tải xem ở trang chi tiết.</small></div>
                         <div class="col-12" data-payment-calculator><label class="form-label">Cách tính tiền *</label><select name="return_trip_payment_method[]" class="form-select form-select-sm payment-method"><option value="fixed" {% if trip.payment_method != 'per_ton' %}selected{% endif %}>Bao chuyến — tiền cố định</option><option value="per_ton" {% if trip.payment_method == 'per_ton' %}selected{% endif %}>Theo tấn — số tấn × giá/tấn</option></select><div class="row g-2 mt-1"><div class="col-6 fixed-revenue-field"><label class="form-label">Tiền bao chuyến (VNĐ)</label><input type="text" name="return_trip_revenue_full[]" class="form-control form-control-sm currency-input calculated-revenue" inputmode="numeric" value="{{ '{:,.0f}'.format(trip.revenue_full) }}"></div><div class="col-6 per-ton-field d-none"><label class="form-label">Số tấn</label><input type="number" name="return_trip_cargo_weight_tons[]" class="form-control form-control-sm cargo-weight" min="0" step="0.001" value="{{ trip.cargo_weight_tons or '' }}"></div><div class="col-6 per-ton-field d-none"><label class="form-label">Giá 1 tấn (VNĐ)</label><input type="text" name="return_trip_price_per_ton[]" class="form-control form-control-sm currency-input price-per-ton" inputmode="numeric" value="{{ '{:,.0f}'.format(trip.price_per_ton or 0) }}"></div></div></div>
                         <div class="col-6"><label class="form-label">Tài xế đã thu (VNĐ)</label><input type="text" name="return_trip_revenue_collected[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="{{ '{:,.0f}'.format(trip.revenue_collected) }}"></div>
                         <div class="col-12"><label class="form-label">Tiền bốc vác <small class="text-muted">(tài xế ứng trước)</small></label><input type="text" name="return_trip_porter_fee[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="{{ '{:,.0f}'.format(trip.porter_fee) }}"></div>
@@ -246,9 +249,33 @@ function addReturnTrip() {
     document.getElementById('return-trips').insertAdjacentHTML('beforeend', `<div class="return-trip border rounded p-3 mb-3 bg-light"><div class="d-flex justify-content-between align-items-center mb-2"><strong><i class="bi bi-arrow-return-left"></i> Chuyến về #${number}</strong><button type="button" class="btn btn-outline-danger btn-sm py-0" onclick="this.closest('.return-trip').remove(); renumberReturnTrips()">Xóa</button></div><div class="mb-2"><label class="form-label">Khách hàng / Hàng hóa</label><select name="return_trip_customer_id[]" class="form-select form-select-sm" onchange="onReturnCustomerChange(this)">${returnCustomerOptions()}</select></div><div class="row g-2"><div class="col-12"><label class="form-label">Ngày về</label><input type="date" name="return_trip_date[]" class="form-control form-control-sm" value="${today}"></div><div class="col-6"><label class="form-label">Điểm đi *</label><input type="text" name="return_trip_origin[]" class="form-control form-control-sm" required></div><div class="col-6"><label class="form-label">Điểm đến *</label><input type="text" name="return_trip_destination[]" class="form-control form-control-sm" required></div><div class="col-12"><label class="form-label">Mô tả hàng hóa</label><input type="text" name="return_trip_cargo[]" class="form-control form-control-sm"></div><div class="col-12" data-payment-calculator><label class="form-label">Cách tính tiền *</label><select name="return_trip_payment_method[]" class="form-select form-select-sm payment-method"><option value="fixed">Bao chuyến — tiền cố định</option><option value="per_ton">Theo tấn — số tấn × giá/tấn</option></select><div class="row g-2 mt-1"><div class="col-6 fixed-revenue-field"><label class="form-label">Tiền bao chuyến (VNĐ)</label><input type="text" name="return_trip_revenue_full[]" class="form-control form-control-sm currency-input calculated-revenue" inputmode="numeric"></div><div class="col-6 per-ton-field d-none"><label class="form-label">Số tấn</label><input type="number" name="return_trip_cargo_weight_tons[]" class="form-control form-control-sm cargo-weight" min="0" step="0.001"></div><div class="col-6 per-ton-field d-none"><label class="form-label">Giá 1 tấn (VNĐ)</label><input type="text" name="return_trip_price_per_ton[]" class="form-control form-control-sm currency-input price-per-ton" inputmode="numeric"></div></div></div><div class="col-6"><label class="form-label">Đã thu tạm (VNĐ)</label><input type="text" name="return_trip_revenue_collected[]" class="form-control form-control-sm currency-input" inputmode="numeric"></div><div class="col-12"><label class="form-label">Tiền bốc vác (VNĐ)</label><input type="text" name="return_trip_porter_fee[]" class="form-control form-control-sm currency-input" value="0" inputmode="numeric"></div><div class="col-12"><label class="form-label">Ghi chú</label><input type="text" name="return_trip_notes[]" class="form-control form-control-sm"></div></div></div>`);
 }
 function renumberReturnTrips() {
-    document.querySelectorAll('.return-trip strong').forEach((item, index) => {
-        item.innerHTML = `<i class="bi bi-arrow-return-left"></i> Chuyến về #${index + 1}`;
+    document.querySelectorAll('.return-trip').forEach((trip, index) => {
+        trip.querySelector('strong').innerHTML = `<i class="bi bi-arrow-return-left"></i> Chuyến về #${index + 1}`;
+        const upload = trip.querySelector('[data-return-ticket-upload]');
+        if (upload) upload.name = `return_trip_weigh_ticket_images_${index}`;
     });
 }
+
+document.getElementById('phoi-form').addEventListener('submit', renumberReturnTrips);
+
+document.getElementById('phoi-form').addEventListener('invalid', event => {
+    event.target.classList.add('is-invalid');
+}, true);
+document.getElementById('phoi-form').addEventListener('input', event => {
+    if (event.target.matches('[required]')) event.target.classList.remove('is-invalid');
+});
+
+new MutationObserver(() => {
+    document.querySelectorAll('.return-trip').forEach((trip, index) => {
+        if (trip.querySelector('[name="return_trip_weigh_ticket_number[]"]')) return;
+        trip.insertAdjacentHTML('afterbegin', '<input type="hidden" name="return_trip_id[]" value="">');
+        trip.insertAdjacentHTML('beforeend', `
+            <div class="row g-2 mt-1 return-ticket-fields">
+                <div class="col-6"><label class="form-label">Số phiếu cân</label><input type="text" name="return_trip_weigh_ticket_number[]" class="form-control form-control-sm"></div>
+                <div class="col-6"><label class="form-label">Ảnh phiếu cân</label><input type="file" data-return-ticket-upload name="return_trip_weigh_ticket_images_${index}" class="form-control form-control-sm" accept="image/jpeg,image/png,image/webp" multiple><small class="text-muted">Tối đa 5 ảnh.</small></div>
+            </div>`);
+    });
+    renumberReturnTrips();
+}).observe(document.getElementById('return-trips'), { childList: true });
 </script>
 {% endblock %}
