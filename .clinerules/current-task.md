@@ -438,3 +438,24 @@
 - Do-not-repeat notes:
   - Keep final chốt/xác nhận rules on the server; JavaScript must not become the only enforcement layer.
   - Ensure any new editable phơi form explicitly opts into `warn-unsaved-changes` only when its fields can be lost by navigation.
+
+## 2026-10-06 - Merge parallel Alembic migration heads
+
+- Status: done
+- Goal: Restore one deterministic Alembic migration head so the deployment topology gate permits safe database upgrades.
+- Files changed:
+  - `migrations/versions/b2c3d4e5f6a7_merge_driver_paid_and_return_trip_tickets.py` — empty merge revision joining `975a0bd04827` and `aa1b2c3d4e5f`.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: Migration history only. The merge revision has no DDL or data operations; it causes normal upgrade traversal to apply both existing branch migrations, then records one shared head. Application data, schema definitions, financial calculations, roles, fuel rules, URLs, and phơi workflows are unchanged.
+- Key decisions:
+  - Used the standard Alembic empty merge revision rather than rewriting or deleting already-created revisions.
+  - Kept the workflow's exactly-one-head CI gate; it correctly prevents ambiguous production deployments.
+- Validation:
+  - Ran `python -m compileall -q migrations` successfully with the configured virtual environment.
+  - Ran `python -m flask --app run:app db heads`; output is exactly `b2c3d4e5f6a7 (head)`.
+  - Ran `git diff --check` successfully. No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - Production must receive all three revisions (`975a0bd04827`, `aa1b2c3d4e5f`, and this merge revision); deployment's standard `db upgrade` handles the ordering.
+- Do-not-repeat notes:
+  - Before generating any migration, update from `main` and verify there is exactly one Alembic head.
+  - If parallel migrations are already committed, add an empty merge revision; never rewrite or delete deployed revision history.
