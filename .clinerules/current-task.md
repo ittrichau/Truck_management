@@ -459,3 +459,27 @@
 - Do-not-repeat notes:
   - Before generating any migration, update from `main` and verify there is exactly one Alembic head.
   - If parallel migrations are already committed, add an empty merge revision; never rewrite or delete deployed revision history.
+
+## 2026-10-06 - Normalize decimal values in edit inputs
+
+- Status: done
+- Goal: Prevent fixed-scale database values from making weight or fuel-quantity edit inputs look like they were changed (for example, show `15` instead of `15.000` while preserving `15.245`).
+- Files changed:
+  - `app/templates/phoi/edit.html` — formats outbound and return-trip tonnage values with up to three decimals, removing only trailing zeros before setting their `type="number"` input values.
+  - `app/templates/fuel/edit.html` — formats fuel-liter values with up to two decimals, removing only trailing zeros before setting the edit input value.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: Presentation-only change to existing edit forms. The existing `Numeric(10, 3)` tonnage storage, `Numeric(12, 2)` fuel-liter storage, form field names, server parsers, per-ton revenue calculation, financial source-of-truth methods, confirmation eligibility, roles, URLs, and schema remain unchanged. Values such as `15.245` stay `15.245`; padded database values `15.000`, `15.200`, and `20.00` display as `15`, `15.2`, and `20`.
+- Key decisions:
+  - Keep `type="number"`, `step`, and the period (`.`) decimal submission convention unchanged to preserve browser validation and the existing server parsing path.
+  - Apply the formatting only to persisted values shown on edit; creation fields and currency formatting are not changed.
+  - Cover both outbound and return-trip tonnage to prevent the same confusion in either phơi flow.
+- Validation:
+  - Ran `python -m compileall -q app` successfully with the configured virtual environment.
+  - Loaded `phoi/edit.html` and `fuel/edit.html` through Flask/Jinja successfully.
+  - Verified display expressions: `15.245 → 15.245`, `15.000 → 15`, and `20.00 → 20`.
+  - Editor diagnostics found no errors and `git diff --check` passed. No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - Browser locale rendering of a standard numeric input remains browser-controlled; the HTML value sent to the existing server parser continues to use `.` as the decimal separator.
+- Do-not-repeat notes:
+  - For decimal edit inputs backed by fixed-scale `Numeric` columns, remove display-only trailing zeros without changing stored precision or switching to currency/thousand-separator handling.
+  - Keep a three-decimal display limit for cargo weight and a two-decimal display limit for fuel liters, matching their existing database columns.
