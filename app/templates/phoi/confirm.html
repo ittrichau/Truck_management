@@ -20,6 +20,7 @@
         {% for trip in trips %}
         {% set remaining = trip.revenue_full - trip.revenue_collected %}
         {% set manager_received = trip.manager_revenue_collected or 0 %}
+        {% set driver_collected_all = remaining <= 0 %}
         {% set status_name = 'outbound_collection_status' if trip.kind == 'outbound' else 'return_collection_status_' ~ trip.id %}
         {% set amount_name = 'outbound_manager_revenue_collected' if trip.kind == 'outbound' else 'return_manager_revenue_collected_' ~ trip.id %}
         <div class="card mb-3 collection-card" data-status-name="{{ status_name }}" data-amount-name="{{ amount_name }}" data-remaining="{{ remaining }}">
@@ -30,16 +31,17 @@
                 </div>
                 <div class="small text-muted mb-3">
                     {{ trip.customer.name if trip.customer else 'Chưa gán chủ hàng' }} · Tài xế đã thu: {{ '{:,.0f}'.format(trip.revenue_collected) }} đ · Còn lại: <strong>{{ '{:,.0f}'.format(remaining) }} đ</strong>
+                    {% if driver_collected_all %}<span class="badge text-bg-success ms-1">Tài xế đã thu đủ</span>{% endif %}
                 </div>
                 <div class="btn-group w-100" role="group">
-                    <input type="radio" class="btn-check collection-status" name="{{ status_name }}" id="{{ status_name }}-unpaid" value="unpaid" {% if manager_received == 0 %}checked{% endif %}>
-                    <label class="btn btn-outline-danger" for="{{ status_name }}-unpaid">Chưa thu</label>
-                    <input type="radio" class="btn-check collection-status" name="{{ status_name }}" id="{{ status_name }}-full" value="full" {% if remaining > 0 and manager_received == remaining %}checked{% endif %}>
+                    <input type="radio" class="btn-check collection-status" name="{{ status_name }}" id="{{ status_name }}-unpaid" value="unpaid" {% if driver_collected_all %}disabled{% elif manager_received == 0 %}checked{% endif %}>
+                    <label class="btn btn-outline-danger {% if driver_collected_all %}disabled{% endif %}" for="{{ status_name }}-unpaid">Chưa thu</label>
+                    <input type="radio" class="btn-check collection-status" name="{{ status_name }}" id="{{ status_name }}-full" value="full" {% if driver_collected_all or (remaining > 0 and manager_received == remaining) %}checked{% endif %}>
                     <label class="btn btn-outline-success" for="{{ status_name }}-full">Đã thu đủ</label>
-                    <input type="radio" class="btn-check collection-status" name="{{ status_name }}" id="{{ status_name }}-partial" value="partial" {% if manager_received > 0 and manager_received != remaining %}checked{% endif %}>
-                    <label class="btn btn-outline-primary" for="{{ status_name }}-partial">Thu một phần</label>
+                    <input type="radio" class="btn-check collection-status" name="{{ status_name }}" id="{{ status_name }}-partial" value="partial" {% if driver_collected_all %}disabled{% elif manager_received > 0 and manager_received != remaining %}checked{% endif %}>
+                    <label class="btn btn-outline-primary {% if driver_collected_all %}disabled{% endif %}" for="{{ status_name }}-partial">Thu một phần</label>
                 </div>
-                <div class="partial-amount mt-3 {% if not (manager_received > 0 and manager_received != remaining) %}d-none{% endif %}">
+                <div class="partial-amount mt-3 {% if driver_collected_all or not (manager_received > 0 and manager_received != remaining) %}d-none{% endif %}">
                     <label class="form-label small mb-1">Quản lý/chủ xe đã nhận (VNĐ)</label>
                     <input type="text" class="form-control currency-input" name="{{ amount_name }}" value="{{ '{:,.0f}'.format(manager_received) if manager_received > 0 else '' }}" inputmode="numeric" placeholder="Nhập số tiền thực nhận">
                     <div class="invalid-feedback">Nhập số tiền từ 0 đến số tiền còn lại của chuyến này.</div>

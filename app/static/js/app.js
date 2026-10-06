@@ -70,7 +70,9 @@ const currencyInputNames = new Set([
 ]);
 
 function isCurrencyInput(input) {
-    return input instanceof HTMLInputElement && currencyInputNames.has(input.name);
+    return input instanceof HTMLInputElement && (
+        input.classList.contains('currency-input') || currencyInputNames.has(input.name)
+    );
 }
 
 function currencyDigits(value) {

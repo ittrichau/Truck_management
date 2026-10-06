@@ -213,7 +213,6 @@ def _sync_return_trips(phoi):
     manager_collecteds = request.form.getlist('return_trip_manager_revenue_collected[]')
     porter_fees = request.form.getlist('return_trip_porter_fee[]')
     notes = request.form.getlist('return_trip_notes[]')
-    weigh_ticket_numbers = request.form.getlist('return_trip_weigh_ticket_number[]')
     synced_trips = []
 
     for index, origin in enumerate(origins):
@@ -248,10 +247,6 @@ def _sync_return_trips(phoi):
         trip.cargo_description = cargoes[index].strip() if index < len(cargoes) else ''
         trip.payment_method = payment_method
         trip.cargo_weight_tons = cargo_weight_tons
-        trip.weigh_ticket_number = (
-            weigh_ticket_numbers[index].strip() or None
-            if index < len(weigh_ticket_numbers) else None
-        )
         trip.price_per_ton = price_per_ton
         trip.revenue_full = revenue_full
         trip.revenue_collected = _money(collecteds[index] if index < len(collecteds) else 0)
@@ -408,7 +403,6 @@ def create():
             phoi.km_start = 0
             phoi.km_end = int(request.form.get('km_end', 0) or 0)
             phoi.calculate_km_total()
-            phoi.weigh_ticket_number = request.form.get('weigh_ticket_number', '').strip() or None
             phoi.payment_method = request.form.get('payment_method', 'fixed')
             phoi.revenue_full, cargo_weight_tons, phoi.price_per_ton = _revenue_from_form(
                 phoi.payment_method,
@@ -642,7 +636,6 @@ def edit(id):
             phoi.km_start = 0
             phoi.km_end = int(request.form.get('km_end', 0) or 0)
             phoi.calculate_km_total()
-            phoi.weigh_ticket_number = request.form.get('weigh_ticket_number', '').strip() or None
             phoi.payment_method = request.form.get('payment_method', 'fixed')
             phoi.revenue_full, cargo_weight_tons, phoi.price_per_ton = _revenue_from_form(
                 phoi.payment_method,
@@ -664,6 +657,20 @@ def edit(id):
             synced_return_trips = _sync_return_trips(phoi)
             db.session.flush()
             _save_return_trip_weigh_tickets(phoi, synced_return_trips, saved_keys)
+
+            files = [file for file in request.files.getlist('weigh_ticket_images') if file and file.filename]
+            if len(files) > 5:
+                raise ValueError('Ảnh phiếu cân chỉ được tải tối đa 5 ảnh mỗi lần.')
+            for file in files:
+                metadata = save_phoi_attachment(file, phoi.id)
+                saved_keys.append(metadata['storage_key'])
+                db.session.add(PhoiAttachment(
+                    phoi_id=phoi.id,
+                    attachment_type='weigh_ticket',
+                    uploaded_by_id=current_user.id,
+                    **metadata,
+                ))
+
             _sync_standard_expenses(phoi)
             repairs = _sync_repair_expenses(phoi)
             _save_repair_receipts(phoi, repairs, saved_keys)

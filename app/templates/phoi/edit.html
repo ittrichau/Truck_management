@@ -98,22 +98,18 @@ async function onCustomerChange(select) {
             </div>
         </div></div>
 
-        <span class="section-title"><i class="bi bi-speedometer2"></i> Thông tin phiếu cân</span>
-        <div class="card mb-3"><div class="card-body"><div class="row g-2">
-            <div class="col-6"><label class="form-label">Khối lượng (tấn)</label><input type="number" name="cargo_weight_tons" class="form-control" min="0" step="0.001" value="{{ '{:.3f}'.format(phoi.cargo_weight_tons).rstrip('0').rstrip('.') if phoi.cargo_weight_tons is not none else '' }}"></div>
-            <div class="col-6"><label class="form-label">Số phiếu cân</label><input type="text" name="weigh_ticket_number" class="form-control" maxlength="100" value="{{ phoi.weigh_ticket_number or '' }}"></div>
-        </div><small class="text-muted d-block mt-2">Tải ảnh phiếu cân tại trang chi tiết phơi.</small></div></div>
-
         <span class="section-title"><i class="bi bi-cash-stack"></i> Doanh thu chuyến đi</span>
         <div class="card mb-3" data-payment-calculator><div class="card-body">
             <div class="mb-2"><label class="form-label">Cách tính tiền *</label><select name="payment_method" class="form-select payment-method"><option value="fixed" {% if phoi.payment_method != 'per_ton' %}selected{% endif %}>Bao chuyến — nhập số tiền cố định</option><option value="per_ton" {% if phoi.payment_method == 'per_ton' %}selected{% endif %}>Theo tấn — số tấn × giá mỗi tấn</option></select></div>
             <div class="row g-2">
                 <div class="col-6 fixed-revenue-field"><label class="form-label">Tiền bao chuyến (VNĐ)</label><input type="text" name="revenue_full" class="form-control currency-input calculated-revenue" value="{{ '{:,.0f}'.format(phoi.revenue_full) }}" inputmode="numeric"></div>
+                <div class="col-6 per-ton-field d-none"><label class="form-label">Số tấn</label><input type="number" name="cargo_weight_tons" class="form-control cargo-weight" min="0" step="0.001" value="{{ '{:.3f}'.format(phoi.cargo_weight_tons).rstrip('0').rstrip('.') if phoi.cargo_weight_tons is not none else '' }}"></div>
                 <div class="col-6 per-ton-field d-none"><label class="form-label">Giá 1 tấn (VNĐ)</label><input type="text" name="price_per_ton" class="form-control currency-input price-per-ton" value="{{ '{:,.0f}'.format(phoi.price_per_ton or 0) }}" inputmode="numeric"></div>
                 <div class="col-6"><label class="form-label">Tài xế đã thu (VNĐ)</label><input type="text" name="revenue_collected" class="form-control currency-input" value="{{ '{:,.0f}'.format(phoi.revenue_collected) }}" inputmode="numeric"></div>
             </div>
+            <div class="mt-3"><label class="form-label">Ảnh phiếu cân</label><input type="file" name="weigh_ticket_images" class="form-control" accept="image/jpeg,image/png,image/webp" multiple><small class="text-muted">Tải thêm ảnh tại đây hoặc xem ảnh đã tải ở trang chi tiết phơi. Tối đa 5 ảnh/lần.</small></div>
             {% if current_user.is_manager_or_admin() and phoi.status == 'submitted' %}<small class="text-muted d-block mt-2">Tiền quản lý/chủ xe nhận trực tiếp được chọn ở bước <strong>Xác nhận nhanh</strong>.</small>{% endif %}
-            <small class="text-muted per-ton-field d-none">Tiền full chuyến được tự tính từ khối lượng (tấn) ở mục phiếu cân × giá 1 tấn.</small>
+            <small class="text-muted per-ton-field d-none">Tiền full chuyến được tự tính từ số tấn × giá 1 tấn.</small>
         </div></div>
 
         <span class="section-title"><i class="bi bi-receipt"></i> Chi phí chuyến</span>
@@ -157,8 +153,7 @@ async function onCustomerChange(select) {
                         <div class="col-12"><label class="form-label">Ngày về</label><input type="date" name="return_trip_date[]" class="form-control form-control-sm" value="{{ trip.return_date.strftime('%Y-%m-%d') if trip.return_date else '' }}"></div>
                         <div class="col-6"><label class="form-label">Điểm đi *</label><input type="text" name="return_trip_origin[]" class="form-control form-control-sm" required value="{{ trip.origin }}"></div><div class="col-6"><label class="form-label">Điểm đến *</label><input type="text" name="return_trip_destination[]" class="form-control form-control-sm" required value="{{ trip.destination }}"></div>
                         <div class="col-12"><label class="form-label">Mô tả hàng hóa</label><input type="text" name="return_trip_cargo[]" class="form-control form-control-sm" value="{{ trip.cargo_description or '' }}"></div>
-                        <div class="col-6"><label class="form-label">Số phiếu cân</label><input type="text" name="return_trip_weigh_ticket_number[]" class="form-control form-control-sm" value="{{ trip.weigh_ticket_number or '' }}"></div>
-                        <div class="col-6"><label class="form-label">Ảnh phiếu cân</label><input type="file" data-return-ticket-upload name="return_trip_weigh_ticket_images_{{ loop.index0 }}" class="form-control form-control-sm" accept="image/jpeg,image/png,image/webp" multiple><small class="text-muted">Tối đa 5 ảnh; ảnh đã tải xem ở trang chi tiết.</small></div>
+                        <div class="col-12"><label class="form-label">Ảnh phiếu cân</label><input type="file" data-return-ticket-upload name="return_trip_weigh_ticket_images_{{ loop.index0 }}" class="form-control form-control-sm" accept="image/jpeg,image/png,image/webp" multiple><small class="text-muted">Tối đa 5 ảnh; ảnh đã tải xem ở trang chi tiết.</small></div>
                         <div class="col-12" data-payment-calculator><label class="form-label">Cách tính tiền *</label><select name="return_trip_payment_method[]" class="form-select form-select-sm payment-method"><option value="fixed" {% if trip.payment_method != 'per_ton' %}selected{% endif %}>Bao chuyến — tiền cố định</option><option value="per_ton" {% if trip.payment_method == 'per_ton' %}selected{% endif %}>Theo tấn — số tấn × giá/tấn</option></select><div class="row g-2 mt-1"><div class="col-6 fixed-revenue-field"><label class="form-label">Tiền bao chuyến (VNĐ)</label><input type="text" name="return_trip_revenue_full[]" class="form-control form-control-sm currency-input calculated-revenue" inputmode="numeric" value="{{ '{:,.0f}'.format(trip.revenue_full) }}"></div><div class="col-6 per-ton-field d-none"><label class="form-label">Số tấn</label><input type="number" name="return_trip_cargo_weight_tons[]" class="form-control form-control-sm cargo-weight" min="0" step="0.001" value="{{ '{:.3f}'.format(trip.cargo_weight_tons).rstrip('0').rstrip('.') if trip.cargo_weight_tons is not none else '' }}"></div><div class="col-6 per-ton-field d-none"><label class="form-label">Giá 1 tấn (VNĐ)</label><input type="text" name="return_trip_price_per_ton[]" class="form-control form-control-sm currency-input price-per-ton" inputmode="numeric" value="{{ '{:,.0f}'.format(trip.price_per_ton or 0) }}"></div></div></div>
                         <div class="col-6"><label class="form-label">Tài xế đã thu (VNĐ)</label><input type="text" name="return_trip_revenue_collected[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="{{ '{:,.0f}'.format(trip.revenue_collected) }}"></div>
                         <div class="col-12"><label class="form-label">Tiền bốc vác <small class="text-muted">(tài xế ứng trước)</small></label><input type="text" name="return_trip_porter_fee[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="{{ '{:,.0f}'.format(trip.porter_fee) }}"></div>
@@ -265,17 +260,5 @@ document.getElementById('phoi-form').addEventListener('input', event => {
     if (event.target.matches('[required]')) event.target.classList.remove('is-invalid');
 });
 
-new MutationObserver(() => {
-    document.querySelectorAll('.return-trip').forEach((trip, index) => {
-        if (trip.querySelector('[name="return_trip_weigh_ticket_number[]"]')) return;
-        trip.insertAdjacentHTML('afterbegin', '<input type="hidden" name="return_trip_id[]" value="">');
-        trip.insertAdjacentHTML('beforeend', `
-            <div class="row g-2 mt-1 return-ticket-fields">
-                <div class="col-6"><label class="form-label">Số phiếu cân</label><input type="text" name="return_trip_weigh_ticket_number[]" class="form-control form-control-sm"></div>
-                <div class="col-6"><label class="form-label">Ảnh phiếu cân</label><input type="file" data-return-ticket-upload name="return_trip_weigh_ticket_images_${index}" class="form-control form-control-sm" accept="image/jpeg,image/png,image/webp" multiple><small class="text-muted">Tối đa 5 ảnh.</small></div>
-            </div>`);
-    });
-    renumberReturnTrips();
-}).observe(document.getElementById('return-trips'), { childList: true });
 </script>
 {% endblock %}

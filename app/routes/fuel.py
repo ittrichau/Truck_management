@@ -205,16 +205,22 @@ def view_receipt(id, receipt_id):
 @bp.route('/fuel/<int:id>/delete', methods=['POST'])
 @login_required
 def delete(id):
-    if not current_user.is_manager_or_admin():
-        flash('Không có quyền xóa.', 'danger')
-        return redirect(url_for('fuel.index'))
     log = FuelLog.query.get_or_404(id)
-    if log.phois.filter_by(status='confirmed').count() > 0:
+    linked_phois = log.phois.all()
+    if current_user.is_driver() and (
+        log.created_by_id != current_user.id
+        or any(phoi.driver_id != current_user.id for phoi in linked_phois)
+    ):
+        flash('Bạn không có quyền xóa lần đổ xăng này.', 'danger')
+        return redirect(url_for('fuel.index'))
+    if any(phoi.status == 'confirmed' for phoi in linked_phois):
         flash('Không thể xóa lần đổ xăng đã gắn với phơi được xác nhận.', 'danger')
         return redirect(url_for('fuel.index'))
     db.session.delete(log)
     db.session.commit()
-    flash('Đã xóa bản ghi đổ xăng.', 'success')
+    flash('Đã xóa bản ghi đổ xăng. Nếu đây là lần xăng cuối, hãy thêm lại trước khi xác nhận phơi.', 'success')
+    if len(linked_phois) == 1:
+        return redirect(url_for('phoi.detail', id=linked_phois[0].id))
     return redirect(url_for('fuel.index'))
 
 

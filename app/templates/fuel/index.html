@@ -81,12 +81,10 @@
                 <td>
                     {% if current_user.is_manager_or_admin() or (current_user.is_driver() and log.created_by_id == current_user.id) %}
                     <a href="{{ url_for('fuel.edit', id=log.id) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i></a>
-                    {% if current_user.is_manager_or_admin() %}
                     <form action="{{ url_for('fuel.delete', id=log.id) }}" method="POST" class="d-inline">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Xóa bản ghi này?')"><i class="bi bi-trash"></i></button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Xóa bản ghi này? Nếu là lần xăng cuối, phơi sẽ phải thêm xăng lại trước khi xác nhận.')"><i class="bi bi-trash"></i></button>
                     </form>
-                    {% endif %}
                     {% endif %}
                 </td>
             </tr>
