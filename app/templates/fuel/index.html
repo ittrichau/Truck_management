@@ -74,6 +74,9 @@
                             {{ p.phoi_number }}{% if not loop.last %}, {% endif %}
                         {% endfor %}
                         </small>
+                    {% elif log.allocation_status == 'unallocated' %}
+                        <span class="badge bg-warning text-dark">Chờ phân bổ</span>
+                        {% if log.unallocated_from_cancelled_phoi %}<small class="d-block text-muted">Từ phơi hủy {{ log.unallocated_from_cancelled_phoi.phoi_number }}</small>{% endif %}
                     {% else %}
                         <span class="text-muted">—</span>
                     {% endif %}

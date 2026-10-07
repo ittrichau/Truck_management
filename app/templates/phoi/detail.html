@@ -17,6 +17,9 @@
                 <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Chốt phơi {{ phoi.phoi_number }}? Sau khi chốt tài xế không thể sửa.')"><i class="bi bi-send-check"></i> Chốt phơi</button>
             </form>
             {% endif %}
+            {% if current_user.is_manager_or_admin() and phoi.status == 'draft' %}
+            <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#cancelPhoiModal"><i class="bi bi-x-circle"></i> Hủy phơi</button>
+            {% endif %}
             {% if current_user.is_manager_or_admin() and phoi.status == 'submitted' %}
             <a href="{{ url_for('phoi.edit', id=phoi.id) }}" class="btn btn-primary btn-sm"><i class="bi bi-clipboard-check"></i> Đối soát / Sửa phơi</a>
             <a href="{{ url_for('phoi.confirm', id=phoi.id) }}" class="btn btn-success btn-sm"><i class="bi bi-check-circle"></i> Xác nhận nhanh</a>
@@ -31,9 +34,11 @@
             <span class="badge badge-status fs-6
                 {% if phoi.status == 'confirmed' %}bg-success
                 {% elif phoi.status == 'submitted' %}bg-warning text-dark
+                {% elif phoi.status == 'cancelled' %}bg-danger
                 {% else %}bg-secondary{% endif %}">
                 {% if phoi.status == 'confirmed' %}✅ Đã xác nhận
                 {% elif phoi.status == 'submitted' %}� Đã chốt – chờ xác nhận
+                {% elif phoi.status == 'cancelled' %}⛔ Đã hủy
                 {% else %}🚚 Đang thực hiện{% endif %}
             </span>
             {% if phoi.is_substitute %}
@@ -45,7 +50,12 @@
         </div>
     </div>
 
-    {% if phoi.status == 'draft' %}
+    {% if phoi.status == 'cancelled' %}
+    <div class="alert alert-danger">
+        <strong>Phơi đã hủy.</strong> Không dùng để đối soát hay báo cáo tài chính.
+        <br><small>Lý do: {{ phoi.cancellation_reason }}{% if phoi.cancelled_at %} · {{ phoi.cancelled_at.strftime('%d/%m/%Y %H:%M') }}{% endif %}</small>
+    </div>
+    {% elif phoi.status == 'draft' %}
     <div class="card mb-3 border-primary">
         <div class="card-header bg-primary text-white">✅ Điều kiện để chốt phơi</div>
         <div class="card-body py-2">
@@ -236,4 +246,28 @@
     </div>
     {% endif %}
 </div>
+
+{% if current_user.is_manager_or_admin() and phoi.status == 'draft' %}
+<div class="modal fade" id="cancelPhoiModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" action="{{ url_for('phoi.cancel', id=phoi.id) }}" class="modal-content">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-x-circle"></i> Hủy phơi {{ phoi.phoi_number }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Phơi được giữ lại để tra cứu nhưng sẽ không được dùng để đối soát hoặc báo cáo tài chính.</p>
+                <p class="small text-muted">Lần đổ xăng chỉ gắn với phơi này sẽ chuyển sang chờ phân bổ; xăng dùng chung vẫn giữ ở các phơi còn lại.</p>
+                <label for="cancellation_reason" class="form-label">Lý do hủy *</label>
+                <textarea id="cancellation_reason" name="cancellation_reason" class="form-control" rows="3" required></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                <button type="submit" class="btn btn-danger">Xác nhận hủy phơi</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

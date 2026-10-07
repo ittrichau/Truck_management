@@ -60,6 +60,29 @@ def update_truck_status(truck):
 
 
 
+def _unallocated_fuel_logs(truck_id=None):
+    query = FuelLog.query.filter_by(allocation_status='unallocated')
+    if truck_id:
+        query = query.filter_by(truck_id=truck_id)
+    return query.order_by(FuelLog.refuel_date.desc(), FuelLog.id.desc()).all()
+
+def _assign_unallocated_fuel_logs(phoi):
+    """Manager assigns same-truck fuel fills released by a cancelled phơi."""
+    selected_ids = request.form.getlist('unallocated_fuel_log_ids', type=int)
+    if not selected_ids:
+        return
+    if not current_user.is_manager_or_admin():
+        raise ValueError('Chỉ quản lý mới được phân bổ lại lần đổ xăng từ phơi đã hủy.')
+    logs = FuelLog.query.filter(FuelLog.id.in_(selected_ids)).all()
+    if len(logs) != len(set(selected_ids)):
+        raise ValueError('Có lần đổ xăng chờ phân bổ không tồn tại.')
+    for log in logs:
+        if log.allocation_status != 'unallocated' or log.truck_id != phoi.truck_id:
+            raise ValueError('Chỉ được phân bổ lần đổ xăng chờ phân bổ của cùng xe.')
+        log.phois.append(phoi)
+        log.allocation_status = 'allocated'
+        log.unallocated_from_cancelled_phoi_id = None
+
 def _ensure_truck_has_no_other_active_phoi(truck_id, excluded_phoi_id=None):
     """A truck may have only one in-progress draft phơi at a time."""
     query = Phoi.query.filter(
@@ -293,7 +316,7 @@ def index():
         )
     if filter_status == 'active':
         query = query.filter(Phoi.status.in_(['draft', 'submitted']))
-    elif filter_status in ('draft', 'submitted', 'confirmed'):
+    elif filter_status in ('draft', 'submitted', 'confirmed', 'cancelled'):
         query = query.filter(Phoi.status == filter_status)
     if filter_truck_id:
         query = query.filter(Phoi.truck_id == filter_truck_id)
@@ -419,6 +442,7 @@ def create():
 
             db.session.add(phoi)
             db.session.flush()
+            _assign_unallocated_fuel_logs(phoi)
             synced_return_trips = _sync_return_trips(phoi)
             db.session.flush()
             _save_return_trip_weigh_tickets(phoi, synced_return_trips, saved_keys)
@@ -462,6 +486,7 @@ def create():
 
     return render_template(
         'phoi/create.html',
+        unallocated_fuel_logs=_unallocated_fuel_logs() if current_user.is_manager_or_admin() else [],
         trucks=trucks,
         customers=customers,
         drivers=drivers,
@@ -674,6 +699,7 @@ def edit(id):
             _sync_standard_expenses(phoi)
             repairs = _sync_repair_expenses(phoi)
             _save_repair_receipts(phoi, repairs, saved_keys)
+            _assign_unallocated_fuel_logs(phoi)
 
             if phoi.status == 'submitted' and current_user.is_manager_or_admin():
                 db.session.add(ActivityLog(
@@ -712,6 +738,7 @@ def edit(id):
 
     return render_template(
         'phoi/edit.html',
+        unallocated_fuel_logs=_unallocated_fuel_logs(phoi.truck_id) if current_user.is_manager_or_admin() else [],
         phoi=phoi,
         trucks=trucks,
         customers=customers,
@@ -719,6 +746,61 @@ def edit(id):
         driver_by_truck_id=driver_by_truck_id
     )
 
+
+@bp.route('/phoi/<int:id>/cancel', methods=['POST'])
+@login_required
+def cancel(id):
+    phoi = Phoi.query.get_or_404(id)
+    if not current_user.is_manager_or_admin():
+        flash('Chỉ quản lý mới có quyền hủy phơi.', 'danger')
+        return redirect(url_for('phoi.detail', id=id))
+    if phoi.status != 'draft':
+        flash('Chỉ có thể hủy phơi đang thực hiện.', 'warning')
+        return redirect(url_for('phoi.detail', id=id))
+
+    reason = request.form.get('cancellation_reason', '').strip()
+    if not reason:
+        flash('Vui lòng nhập lý do hủy phơi.', 'danger')
+        return redirect(url_for('phoi.detail', id=id))
+
+    try:
+        released_count = 0
+        for fuel_log in list(phoi.fuel_logs):
+            fuel_log.phois.remove(phoi)
+            if fuel_log.attached_phoi_count() == 0:
+                fuel_log.allocation_status = 'unallocated'
+                fuel_log.unallocated_from_cancelled_phoi_id = phoi.id
+                released_count += 1
+
+        phoi.status = 'cancelled'
+        phoi.cancelled_by_id = current_user.id
+        phoi.cancelled_at = datetime.utcnow()
+        phoi.cancellation_reason = reason
+        update_truck_status(phoi.truck)
+        db.session.add(ActivityLog(
+            user_id=current_user.id,
+            username=current_user.username,
+            action='CANCEL',
+            resource_type='phoi',
+            resource_id=str(phoi.id),
+            details=(
+                f'Đã hủy phơi {phoi.phoi_number}. Lý do: {reason}. '
+                f'{released_count} lần đổ xăng chuyển sang chờ phân bổ.'
+            ),
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')[:200],
+            method=request.method,
+            endpoint=request.endpoint,
+            status_code=200,
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        flash('Không thể hủy phơi. Vui lòng thử lại.', 'danger')
+        return redirect(url_for('phoi.detail', id=id))
+
+    flash(f'Đã hủy phơi {phoi.phoi_number}. {released_count} lần đổ xăng đang chờ phân bổ lại.', 'success')
+    return redirect(url_for('phoi.detail', id=id))
 
 @bp.route('/phoi/<int:id>/submit', methods=['POST'])
 @login_required

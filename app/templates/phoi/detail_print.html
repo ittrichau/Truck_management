@@ -37,6 +37,7 @@
 .badge-confirmed { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
 .badge-submitted { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
 .badge-draft    { background: #e2e3e5; color: #383d41; border: 1px solid #d6d8db; }
+.badge-cancelled { background: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
 
 /* Grid layout 2 cột chính */
 .phoi-grid {
@@ -183,6 +184,8 @@
                 <span class="print-badge badge-confirmed">✅ Đã xác nhận</span>
             {% elif phoi.status == 'submitted' %}
                 <span class="print-badge badge-submitted">� Đã chốt – chờ xác nhận</span>
+            {% elif phoi.status == 'cancelled' %}
+                <span class="print-badge badge-cancelled">⛔ ĐÃ HỦY — KHÔNG HỢP LỆ ĐỐI SOÁT</span>
             {% else %}
                 <span class="print-badge badge-draft">🚚 Đang thực hiện</span>
             {% endif %}

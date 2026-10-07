@@ -56,6 +56,7 @@
                     <option value="draft" {% if filter_status == 'draft' %}selected{% endif %}>Đang thực hiện</option>
                     <option value="submitted" {% if filter_status == 'submitted' %}selected{% endif %}>Tài xế đã chốt</option>
                     <option value="confirmed" {% if filter_status == 'confirmed' %}selected{% endif %}>Quản lý đã chốt</option>
+                    <option value="cancelled" {% if filter_status == 'cancelled' %}selected{% endif %}>Đã hủy</option>
                 </select>
             </div>
             <div class="col-6 col-md-2">
@@ -105,6 +106,7 @@
                             {% else %}bg-secondary{% endif %}">
                             {% if p.status == 'confirmed' %}✅ Đã xác nhận
                             {% elif p.status == 'submitted' %}� Đã chốt
+                            {% elif p.status == 'cancelled' %}⛔ Đã hủy
                             {% else %}🚚 Đang thực hiện{% endif %}
                         </span>
                     </div>

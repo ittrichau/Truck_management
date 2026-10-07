@@ -42,6 +42,19 @@ async function onCustomerChange(select) {
             {% endfor %}
         </div></div>
 
+        {% if current_user.is_manager_or_admin() and unallocated_fuel_logs %}
+        <span class="section-title"><i class="bi bi-fuel-pump"></i> Xăng chờ phân bổ</span>
+        <div class="card mb-3"><div class="card-body py-2">
+            <p class="small text-muted mb-2">Các lần đổ xăng dưới đây thuộc xe này và được tách khỏi phơi đã hủy.</p>
+            {% for fuel in unallocated_fuel_logs %}
+            <label class="form-check border rounded p-2 mb-2">
+                <input class="form-check-input ms-0 me-2" type="checkbox" name="unallocated_fuel_log_ids" value="{{ fuel.id }}">
+                <span class="form-check-label">{{ fuel.refuel_date.strftime('%d/%m/%Y') }} · {{ fuel.liters }} lít · {{ '{:,.0f}'.format(fuel.total_cost) }} VNĐ{% if fuel.unallocated_from_cancelled_phoi %}<small class="d-block text-muted">Từ phơi hủy {{ fuel.unallocated_from_cancelled_phoi.phoi_number }}</small>{% endif %}</span>
+            </label>
+            {% endfor %}
+        </div></div>
+        {% endif %}
+
         <span class="section-title"><i class="bi bi-box-seam"></i> Chọn hàng</span>
         <div class="card mb-3"><div class="card-body">
             <select class="form-select" name="customer_id" onchange="onCustomerChange(this)">
@@ -259,6 +272,21 @@ document.getElementById('phoi-form').addEventListener('invalid', event => {
 document.getElementById('phoi-form').addEventListener('input', event => {
     if (event.target.matches('[required]')) event.target.classList.remove('is-invalid');
 });
+
+new MutationObserver(() => {
+    document.querySelectorAll('.return-trip').forEach((trip, index) => {
+        if (!trip.querySelector('[name="return_trip_id[]"]')) {
+            trip.insertAdjacentHTML('afterbegin', '<input type="hidden" name="return_trip_id[]" value="">');
+        }
+        if (!trip.querySelector('[data-return-ticket-upload]')) {
+            trip.querySelector('.row.g-2').insertAdjacentHTML(
+                'beforeend',
+                `<div class="col-12"><label class="form-label">Ảnh phiếu cân</label><input type="file" data-return-ticket-upload name="return_trip_weigh_ticket_images_${index}" class="form-control form-control-sm" accept="image/jpeg,image/png,image/webp" multiple><small class="text-muted">Tối đa 5 ảnh.</small></div>`
+            );
+        }
+    });
+    renumberReturnTrips();
+}).observe(document.getElementById('return-trips'), { childList: true });
 
 </script>
 {% endblock %}

@@ -1,5 +1,117 @@
 # Current Task Record
 
+## 2026-10-07 - Retain cancelled phơi and reallocate released fuel
+
+- Status: done
+- Goal: Let only manager/admin users cancel a draft phơi while retaining its evidence/history, then explicitly reassign sole-linked fuel fills to a replacement phơi of the same truck.
+- Files changed:
+  - `app/models.py` — adds cancellation metadata to `Phoi` and allocation/source tracking to `FuelLog`; financial formulas are unchanged.
+  - `migrations/versions/e6f7a8b9c0d1_add_phoi_cancellation_and_fuel_allocation.py` — adds the new columns, foreign keys, and indexes; existing fuel rows default to `allocated`.
+  - `app/routes/phoi.py` — adds the manager/admin-only cancellation endpoint, fuel release/reassignment checks, cancellation audit log, cancelled filter, and form context.
+  - `app/templates/phoi/create.html`, `app/templates/phoi/edit.html` — manager/admin-only selection of same-truck fuel awaiting allocation.
+  - `app/templates/phoi/detail.html`, `app/templates/phoi/index.html`, `app/templates/phoi/detail_print.html` — cancellation action, retained-state display/filtering, and prominent printed cancellation marker.
+  - `app/templates/fuel/index.html` — identifies fuel waiting for allocation and the source cancelled phơi.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: Only a `draft` phơi may be cancelled, and only by manager/admin. Cancellation removes its fuel associations without deleting fuel logs, receipts, attachments, expenses, or trips. A fuel fill becomes `unallocated` only if the cancelled phơi was its final association; historic multi-linked fills retain their other links. A manager/admin can assign waiting fuel only to a phơi of the same truck. Cancelled phơi are excluded from the existing active list, fuel creation choices, truck active-state calculation, confirmation, and confirmed-only debt reporting.
+- Key decisions:
+  - Retain cancelled records for audit rather than deleting persisted operational/financial evidence.
+  - Require a cancellation reason and store actor/time/reason on the phơi.
+  - Do not auto-transfer fuel to a newly created phơi; allocation is explicit and server-validated to avoid incorrect cost attribution.
+  - Preserve `Phoi.balance()` and `Phoi.owner_profit()` exactly as the financial source of truth.
+- Validation:
+  - Reviewed the phơi lifecycle, fuel many-to-many association, truck status helper, fuel creation eligibility, confirmed-only reporting policy, templates, and Alembic graph before editing.
+  - Ran `python -m compileall -q app migrations` successfully with the configured virtual environment.
+  - Loaded all modified Jinja templates through Flask successfully.
+  - Editor diagnostics reported no errors in all changed models, route, templates, and migration.
+  - Verified the migration graph has one head: `e6f7a8b9c0d1`.
+  - Ran `git diff --check` successfully; Git reported only LF/CRLF working-copy warnings. No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - The schema migration must be applied before deploying this source change.
+  - The cancellation transaction is protected by request-time state validation but, like existing application-level lifecycle checks, concurrent requests could theoretically race.
+  - Cancelled records remain visible for audit; they are intentionally not deleted or included in normal active/confirmed reports.
+- Do-not-repeat notes:
+  - Never auto-assign released fuel to the newest phơi; require explicit manager/admin selection and validate the truck on the server.
+  - Do not mark a fuel log unallocated when it remains linked to another phơi.
+  - Keep cancellation restricted to draft phơi and retain the confirmed-fuel immutability policy.
+
+
+## 2026-10-06 - Improve quick-confirmation collection controls
+
+- Status: done
+- Goal: Format direct-manager collection inputs on the quick confirmation page and prevent non-applicable collection choices when a driver has already collected a trip in full.
+- Files changed:
+  - `app/static/js/app.js` — treats inputs marked with the existing `currency-input` class as currency fields, providing thousands separators while typing and number-only values at submit.
+  - `app/templates/phoi/confirm.html` — identifies each trip whose driver-collected amount leaves no remaining revenue; disables “Chưa thu” and “Thu một phần”, selects “Đã thu đủ”, hides the partial-amount input, and displays an explanatory badge.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: Presentation and client-side input handling for manager/admin quick confirmation only. Each outbound/return trip is evaluated independently using `revenue_full - revenue_collected`. The confirmation route, direct-manager collection storage, customer-debt calculation, fuel requirement, schema, migrations, and financial source-of-truth formulas remain unchanged.
+- Key decisions:
+  - Reused the existing `currency-input` semantic class rather than maintaining a second list of dynamic quick-confirmation input names.
+  - A driver-collected-full trip submits the already supported `full` choice; the server continues to compute a direct-manager amount of zero from the zero remaining amount.
+  - No server-side validation rule changed; existing validation remains authoritative for modified requests.
+- Validation:
+  - Editor diagnostics found no errors in `app/templates/phoi/confirm.html` and `app/static/js/app.js`.
+  - Ran `python -m compileall -q app` successfully using the configured virtual environment.
+  - Ran `git diff --check` successfully; output contained only pre-existing LF-to-CRLF conversion warnings.
+  - No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - The disabled controls are a usability safeguard, not a new authorization or backend validation boundary; the existing confirmation route still validates amounts.
+  - Currency formatting continues to support non-negative whole VND values only, consistent with all existing currency fields.
+- Do-not-repeat notes:
+  - Keep quick-confirmation collection decisions per trip; do not infer them from a phơi-wide total or `Phoi.balance()`.
+  - Do not add manager direct collections to driver settlement calculations.
+
+## 2026-10-06 - Simplify weigh-ticket inputs
+
+- Status: done
+- Goal: Remove the confusing weigh-ticket-number input from the phơi interface and combine outbound weight/evidence with outbound revenue, matching the simpler return-trip layout.
+- Files changed:
+  - `app/routes/phoi.py` — stops writing absent weigh-ticket-number form fields so existing values are preserved; allows outbound weigh-ticket images to be uploaded from the edit form.
+  - `app/templates/phoi/create.html` — moves outbound tonnage and weigh-ticket image upload into Doanh thu chuyến đi; removes number input from outbound and return trips.
+  - `app/templates/phoi/edit.html` — applies the same simplified layout and removes obsolete client-side ticket-field injection.
+  - `app/templates/phoi/detail.html` and `app/templates/phoi/detail_print.html` — no longer display weigh-ticket numbers; retain tonnage and attached image evidence.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: Create and edit forms no longer submit or overwrite `Phoi.weigh_ticket_number` or `PhoiReturnTrip.weigh_ticket_number`. Existing database columns and historical values are intentionally retained but hidden. Per-ton revenue calculation, attached weigh-ticket images, confirmation eligibility, fuel links, and financial formulas remain unchanged.
+- Key decisions:
+  - No migration or persisted-data rewrite was made.
+  - Existing ticket-number values remain intact when a phơi or return trip is edited.
+  - Outbound evidence supports up to five images per edit submission, consistent with existing upload limits.
+- Validation:
+  - Editor diagnostics found no errors in all changed routes and templates.
+  - Confirmed the only remaining `weigh_ticket_number` references are the two retained model columns.
+  - Ran Python compilation, template loading, and `git diff --check`; no validation failure was reported. No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - Historical ticket-number data is intentionally inaccessible through the UI; it remains available only at database level.
+  - Do not remove the retained columns without separate approval and a migration/data-retention plan.
+- Do-not-repeat notes:
+  - Keep cargo weight available for per-ton revenue calculations even when the ticket number is hidden.
+  - Preserve all existing attachment size/count checks and confirmation/fuel requirements.
+
+## 2026-10-06 - Correct and delete fuel fills before confirmation
+
+- Status: done
+- Goal: Allow authorized users to correct or delete mistakenly entered fuel fills while a phơi is in draft or submitted reconciliation, without permitting changes after confirmation.
+- Files changed:
+  - `app/routes/fuel.py` — allows a driver to delete only a fill they created when every linked phơi belongs to them; keeps manager/admin access, blocks confirmed phơi, and returns to the linked phơi after deletion.
+  - `app/templates/fuel/index.html` — shows the delete action to the same eligible user group as the edit action.
+  - `app/templates/phoi/detail.html` — adds a CSRF-protected delete action beside the existing liters/date correction action for non-confirmed phơi.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: A fuel fill attached to a draft or submitted phơi can be corrected through the existing edit flow or deleted by its authorized creator/manager/admin. A fill attached to any confirmed phơi remains immutable. Deleting the final fill is intentionally allowed; existing `submission_error()` then prevents confirmation until a replacement fill is recorded. No schema, migration, financial formula, fuel-to-phơi association policy, or persisted-data rewrite changed.
+- Key decisions:
+  - Server-side authorization remains authoritative: driver access requires ownership of both the fuel record and every linked phơi; manager/admin access is retained.
+  - Both the list and phơi detail page warn that deleting the final fill requires a new fill before confirmation.
+  - The delete route redirects to the linked phơi only when exactly one exists, preserving compatibility with historic multi-linked records.
+- Validation:
+  - Ran `python -m compileall -q app` successfully with the configured virtual environment.
+  - Loaded `fuel/index.html`, `fuel/edit.html`, and `phoi/detail.html` through Flask/Jinja successfully.
+  - Editor diagnostics found no errors in all changed files.
+  - Ran `git diff --check` successfully. No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - Existing historical multi-linked fuel rows remain supported; a driver can only delete one when every attached phơi belongs to that driver, and the confirmed lock applies if any linked phơi is confirmed.
+  - Confirmation eligibility continues to depend on the existing at-least-one-fuel-log check; do not bypass it for a deleted final fill.
+- Do-not-repeat notes:
+  - Keep confirmed fuel records locked in both UI and route authorization.
+  - Do not authorize a driver solely from the visible page; always verify fuel creator and linked-phơi ownership on the server.
+
 ## 2026-06-26 - Thêm ngày đăng kiểm, phù hiệu + cảnh báo hết hạn
 
 - Status: done

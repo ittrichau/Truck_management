@@ -251,8 +251,13 @@ class Phoi(db.Model):
     driver_wage = db.Column(db.Numeric(12, 2), default=0, comment='Phí công tài xế (manager nhập)')
     
     # Trạng thái
-    status = db.Column(db.String(20), default='draft')  # draft, submitted, confirmed
+    status = db.Column(db.String(20), default='draft')  # draft, submitted, confirmed, cancelled
     notes = db.Column(db.Text)
+
+    # Hủy phơi (chỉ manager/admin thực hiện khi phơi còn draft)
+    cancelled_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    cancelled_at = db.Column(db.DateTime)
+    cancellation_reason = db.Column(db.Text)
     
     # Người xác nhận
     confirmed_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
@@ -521,9 +526,14 @@ class FuelLog(db.Model):
     notes = db.Column(db.Text)
     created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Phân bổ lại khi phơi nguồn bị hủy.
+    allocation_status = db.Column(db.String(20), nullable=False, default='allocated')  # allocated, unallocated
+    unallocated_from_cancelled_phoi_id = db.Column(db.Integer, db.ForeignKey('phoi.id'), nullable=True)
     
     # Relations
     created_by = db.relationship('User', backref='fuel_logs')
+    unallocated_from_cancelled_phoi = db.relationship('Phoi', foreign_keys=[unallocated_from_cancelled_phoi_id])
     phois = db.relationship('Phoi', secondary=fuel_log_phois, backref='fuel_logs', lazy='dynamic')
     receipts = db.relationship('FuelReceipt', backref='fuel_log', lazy='dynamic', cascade='all, delete-orphan')
     
