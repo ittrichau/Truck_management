@@ -61,7 +61,11 @@ def update_truck_status(truck):
 
 
 def _unallocated_fuel_logs(truck_id=None):
-    query = FuelLog.query.filter_by(allocation_status='unallocated')
+    """Fuel released by a cancelled phơi and awaiting manager allocation."""
+    query = FuelLog.query.filter(
+        FuelLog.allocation_status == 'unallocated',
+        FuelLog.unallocated_from_cancelled_phoi_id.isnot(None),
+    )
     if truck_id:
         query = query.filter_by(truck_id=truck_id)
     return query.order_by(FuelLog.refuel_date.desc(), FuelLog.id.desc()).all()
@@ -77,8 +81,12 @@ def _assign_unallocated_fuel_logs(phoi):
     if len(logs) != len(set(selected_ids)):
         raise ValueError('Có lần đổ xăng chờ phân bổ không tồn tại.')
     for log in logs:
-        if log.allocation_status != 'unallocated' or log.truck_id != phoi.truck_id:
-            raise ValueError('Chỉ được phân bổ lần đổ xăng chờ phân bổ của cùng xe.')
+        if (
+            log.allocation_status != 'unallocated'
+            or not log.unallocated_from_cancelled_phoi_id
+            or log.truck_id != phoi.truck_id
+        ):
+            raise ValueError('Chỉ được phân bổ xăng được tách từ phơi đã hủy của cùng xe.')
         log.phois.append(phoi)
         log.allocation_status = 'allocated'
         log.unallocated_from_cancelled_phoi_id = None

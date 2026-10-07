@@ -49,7 +49,7 @@ async function onCustomerChange(select) {
             {% for fuel in unallocated_fuel_logs %}
             <label class="form-check border rounded p-2 mb-2">
                 <input class="form-check-input ms-0 me-2" type="checkbox" name="unallocated_fuel_log_ids" value="{{ fuel.id }}">
-                <span class="form-check-label">{{ fuel.refuel_date.strftime('%d/%m/%Y') }} · {{ fuel.liters }} lít · {{ '{:,.0f}'.format(fuel.total_cost) }} VNĐ{% if fuel.unallocated_from_cancelled_phoi %}<small class="d-block text-muted">Từ phơi hủy {{ fuel.unallocated_from_cancelled_phoi.phoi_number }}</small>{% endif %}</span>
+                <span class="form-check-label">{{ fuel.refuel_date.strftime('%d/%m/%Y') }} · {{ fuel.liters }} lít · {{ '{:,.0f}'.format(fuel.total_cost) }} VNĐ<small class="d-block text-muted">Từ phơi hủy {{ fuel.unallocated_from_cancelled_phoi.phoi_number }}</small></span>
             </label>
             {% endfor %}
         </div></div>

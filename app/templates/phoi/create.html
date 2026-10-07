@@ -164,17 +164,18 @@ async function onCustomerChange(select) {
         </div>
 
         {% if current_user.is_manager_or_admin() and unallocated_fuel_logs %}
-        <span class="section-title"><i class="bi bi-fuel-pump"></i> Xăng chờ phân bổ</span>
-        <div class="card mb-3" id="unallocated-fuel-section">
-            <div class="card-body py-2">
-                <p class="small text-muted mb-2">Chọn các lần đổ xăng từ phơi đã hủy của đúng xe. Chỉ quản lý mới được phân bổ lại.</p>
+        <div id="unallocated-fuel-container" class="d-none">
+            <span class="section-title"><i class="bi bi-fuel-pump"></i> Xăng chờ phân bổ</span>
+            <div class="card mb-3" id="unallocated-fuel-section">
+                <div class="card-body py-2">
+                    <p class="small text-muted mb-2">Chọn các lần đổ xăng từ phơi đã hủy của đúng xe. Chỉ quản lý mới được phân bổ lại.</p>
                 {% for fuel in unallocated_fuel_logs %}
                 <label class="unallocated-fuel-item form-check border rounded p-2 mb-2" data-truck-id="{{ fuel.truck_id }}">
                     <input class="form-check-input ms-0 me-2" type="checkbox" name="unallocated_fuel_log_ids" value="{{ fuel.id }}">
-                    <span class="form-check-label"><strong>{{ fuel.truck.license_plate }}</strong> · {{ fuel.refuel_date.strftime('%d/%m/%Y') }} · {{ fuel.liters }} lít · {{ '{:,.0f}'.format(fuel.total_cost) }} VNĐ{% if fuel.unallocated_from_cancelled_phoi %}<small class="d-block text-muted">Từ phơi hủy {{ fuel.unallocated_from_cancelled_phoi.phoi_number }}</small>{% endif %}</span>
+                    <span class="form-check-label"><strong>{{ fuel.truck.license_plate }}</strong> · {{ fuel.refuel_date.strftime('%d/%m/%Y') }} · {{ fuel.liters }} lít · {{ '{:,.0f}'.format(fuel.total_cost) }} VNĐ<small class="d-block text-muted">Từ phơi hủy {{ fuel.unallocated_from_cancelled_phoi.phoi_number }}</small></span>
                 </label>
                 {% endfor %}
-                <p id="unallocated-fuel-empty" class="small text-muted mb-0 d-none">Không có lần đổ xăng chờ phân bổ cho xe đã chọn.</p>
+                </div>
             </div>
         </div>
         {% endif %}
@@ -273,11 +274,11 @@ function syncAssignmentControls() {
         item.classList.toggle('d-none', !matchesTruck);
         if (!matchesTruck) item.querySelector('input').checked = false;
     });
-    const unallocatedFuelEmpty = document.getElementById('unallocated-fuel-empty');
-    if (unallocatedFuelEmpty) {
+    const unallocatedFuelContainer = document.getElementById('unallocated-fuel-container');
+    if (unallocatedFuelContainer) {
         const hasMatchingFuel = [...document.querySelectorAll('.unallocated-fuel-item')]
             .some(item => item.dataset.truckId === truckSelect.value);
-        unallocatedFuelEmpty.classList.toggle('d-none', hasMatchingFuel);
+        unallocatedFuelContainer.classList.toggle('d-none', !hasMatchingFuel);
     }
 
     if (isManagerOrAdmin) {
