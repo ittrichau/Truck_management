@@ -1,5 +1,33 @@
 # Current Task Record
 
+## 2026-10-07 - Display porter fees after phơi confirmation
+
+- Status: done
+- Goal: Make recorded bồi dưỡng/bốc vác costs visible when reviewing or printing a submitted/confirmed phơi, and make the printed text modestly larger.
+- Files changed:
+  - `app/templates/phoi/detail.html` — shows each return trip's non-zero bốc vác advance in the trip section and as an individual line in the manager/admin financial breakdown.
+  - `app/templates/phoi/detail_print.html` — shows each non-zero return-trip bốc vác amount in the financial breakdown and return-trip summary; increases the base, information-table, and financial-table font sizes slightly; adds owner and driver signature areas at the printed footer.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: Presentation only for phơi review and print. Existing stored porter-fee values, finance visibility rules, `Phoi.total_expenses()`, `Phoi.driver_out_of_pocket_expenses()`, `Phoi.balance()`, and `Phoi.owner_profit()` remain unchanged. The manager/admin financial section continues to be restricted to its existing roles. The signature areas are hidden on screen and appear only on the printed document.
+- Key decisions:
+  - Render return-trip bốc vác separately rather than changing the total calculation, so the visible breakdown reconciles exactly with the existing total.
+  - Omit zero-value bốc vác rows to keep the review and print layouts compact.
+  - Increase only print-specific layout typography by a small amount to preserve the single-page A4-oriented layout.
+  - Use two equal signature columns labelled Chủ xe and Tài xế, with a fixed signing area and page-break avoidance.
+- Validation:
+  - Re-read the modified Jinja sections to verify the non-zero conditional, return-trip number, formatted amounts, and print-only signature rules.
+  - Loaded the changed templates through the Flask/Jinja environment.
+  - Ran `git diff --check`; no whitespace error was reported.
+  - Editor diagnostics reported no errors after the change.
+  - No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - A phơi with many return trips may use more vertical print space because every non-zero bốc vác line and the signature section are now shown.
+  - Do not change the existing manager/admin-only financial visibility without separate approval.
+- Do-not-repeat notes:
+  - Preserve the model financial methods as the financial source of truth; display code must not independently recalculate totals.
+  - Keep return-trip bốc vác clearly identified as a driver advance.
+  - Keep signature fields print-only unless an on-screen approval/signature workflow is separately approved.
+
 ## 2026-10-07 - Improve phơi action button spacing
 
 - Status: done
@@ -639,3 +667,30 @@
   - Visual browser testing was not launched; the fix relies on standard CSS block-width behavior within the existing form layout.
 - Do-not-repeat notes:
   - Keep a full-width rule on clickable collapsed-section titles so neighboring inline titles cannot appear on the same mobile row.
+
+## 2026-10-07 - Standardize required-form validation feedback
+
+- Status: done
+- Goal: When a user submits any form with missing required information, show a Vietnamese popup, mark invalid fields red, and focus the first missing field.
+- Files changed:
+  - `app/templates/base.html` — adds the shared Bootstrap modal with the message “Bạn cần phải điền đủ thông tin.”
+  - `app/static/js/app.js` — adds common required-field validation, invalid styling, Flatpickr date-input handling, and first-invalid-field focus; avoids currency formatting, unsaved-form submission state, and submit-button loading while invalid submissions are blocked.
+  - `app/templates/phoi/create.html` and `app/templates/phoi/edit.html` — remove duplicated phơi-only invalid-field handlers in favor of the shared mechanism.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: Client-side feedback only for existing forms with `required` controls, including dynamically added phơi fields. Existing HTML required constraints, server validation, form fields, routes, authorization, financial calculations, fuel association rules, URLs, schema, and persisted data remain unchanged. Disabled required fields remain excluded, consistent with native browser validation.
+- Key decisions:
+  - Use a single base-template modal and delegated JavaScript events, so all existing required forms receive the same behavior without individually changing every template.
+  - Set `novalidate` only for forms containing required controls, then use `checkValidity()` to retain the browser’s native constraint rules while replacing the default browser popup with the approved Vietnamese modal.
+  - Focus the Flatpickr alternate input when relevant so date fields remain usable on mobile and desktop.
+- Validation:
+  - Editor diagnostics reported no errors.
+  - Ran `node --check app/static/js/app.js` successfully.
+  - Ran `git diff --check` successfully; Git only reported LF-to-CRLF working-copy warnings.
+  - Reviewed the changed diff and verified the shared submit handler executes before currency formatting, unsaved-form submission state, and loading-button handling.
+  - No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - Visual browser interaction was not launched; the behavior relies on standard Bootstrap 5 modal APIs and native HTML constraint validation.
+  - Forms with no required controls retain their current submission behavior.
+- Do-not-repeat notes:
+  - Keep server-side validation authoritative; this shared client-side validation is a usability layer only.
+  - Check `event.defaultPrevented` in later submit listeners so invalid submissions never create loading or unsaved-state side effects.

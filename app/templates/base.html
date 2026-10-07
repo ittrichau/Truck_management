@@ -262,6 +262,21 @@
         <div class="loading-text">Đang xử lý...</div>
     </div>
 
+    <div class="modal fade" id="required-fields-modal" tabindex="-1" aria-labelledby="required-fields-modal-label" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="required-fields-modal-label"><i class="bi bi-exclamation-circle text-danger"></i> Thiếu thông tin</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+          </div>
+          <div class="modal-body">Bạn cần phải điền đủ thông tin.</div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Đã hiểu</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="container py-3">
       {% with messages = get_flashed_messages(with_categories=true) %} {% if
       messages %} {% for category, message in messages %}

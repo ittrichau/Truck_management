@@ -52,6 +52,66 @@ document.addEventListener('htmx:load', function() {
     });
 });
 
+// Validation dùng chung: thông báo rõ ràng, tô đỏ và đưa người dùng đến trường bắt buộc đầu tiên.
+let requiredFieldFocusTarget = null;
+
+function setRequiredFieldInvalidState(field, isInvalid) {
+    field.classList.toggle('is-invalid', isInvalid);
+    if (field._flatpickr?.altInput) {
+        field._flatpickr.altInput.classList.toggle('is-invalid', isInvalid);
+    }
+}
+
+function focusRequiredField(field) {
+    const target = field._flatpickr?.altInput || field;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.focus({ preventScroll: true });
+}
+
+function showRequiredFieldsModal(firstInvalidField) {
+    requiredFieldFocusTarget = firstInvalidField;
+    const modalElement = document.getElementById('required-fields-modal');
+    if (!modalElement || !window.bootstrap) {
+        focusRequiredField(firstInvalidField);
+        return;
+    }
+    bootstrap.Modal.getOrCreateInstance(modalElement).show();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('form').forEach(function(form) {
+        if (form.querySelector(':required')) form.noValidate = true;
+    });
+
+    const modalElement = document.getElementById('required-fields-modal');
+    modalElement?.addEventListener('hidden.bs.modal', function() {
+        if (!requiredFieldFocusTarget) return;
+        focusRequiredField(requiredFieldFocusTarget);
+        requiredFieldFocusTarget = null;
+    });
+});
+
+document.addEventListener('submit', function(event) {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || !form.querySelector(':required') || form.checkValidity()) return;
+
+    event.preventDefault();
+    const invalidFields = Array.from(form.elements).filter(field =>
+        field instanceof HTMLElement && field.matches(':required') && !field.disabled && !field.validity.valid
+    );
+    invalidFields.forEach(field => setRequiredFieldInvalidState(field, true));
+    if (invalidFields[0]) showRequiredFieldsModal(invalidFields[0]);
+}, true);
+
+document.addEventListener('input', clearRequiredFieldError);
+document.addEventListener('change', clearRequiredFieldError);
+
+function clearRequiredFieldError(event) {
+    const field = event.target;
+    if (!(field instanceof HTMLElement) || !field.matches(':required')) return;
+    setRequiredFieldInvalidState(field, !field.validity.valid);
+}
+
 // Format currency on display
 function formatCurrency(amount) {
     return new Intl.NumberFormat('vi-VN', {
@@ -134,6 +194,7 @@ returnTripObserver.observe(document.body, { childList: true, subtree: true });
 
 // Giá trị gửi về máy chủ phải là số thuần, không có dấu phẩy.
 document.addEventListener('submit', function(event) {
+    if (event.defaultPrevented) return;
     event.target.querySelectorAll('input').forEach(function(input) {
         if (isCurrencyInput(input)) input.value = currencyDigits(input.value);
     });
@@ -181,7 +242,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         form.addEventListener('input', function() { isDirty = true; });
         form.addEventListener('change', function() { isDirty = true; });
-        form.addEventListener('submit', function() { isSubmitting = true; });
+        form.addEventListener('submit', function(event) {
+            if (!event.defaultPrevented) isSubmitting = true;
+        });
 
         window.addEventListener('beforeunload', function(event) {
             if (!isDirty || isSubmitting) return;
@@ -293,6 +356,7 @@ setTimeout(function() {
  * Loading state cho form submit — thay vì overlay, thêm spinner vào nút submit
  */
 document.addEventListener('submit', function(e) {
+    if (e.defaultPrevented) return;
     const form = e.target;
     const submitBtn = form.querySelector('button[type="submit"]');
     if (!submitBtn) return;

@@ -103,6 +103,9 @@
                 <div><i class="bi bi-geo-alt"></i> {{ trip.origin }} → {{ trip.destination }}</div>
                 <div class="small text-muted">Hàng: {{ trip.cargo_description or '--' }}{% if current_user.is_manager_or_admin() %} · Full: {{ '{:,.0f}'.format(trip.revenue_full) }} VNĐ{% if trip.payment_method == 'per_ton' %} · {{ trip.cargo_weight_tons }} tấn × {{ '{:,.0f}'.format(trip.price_per_ton or 0) }} VNĐ/tấn{% else %} · Bao chuyến{% endif %}{% endif %}</div>
                 <div class="small mt-1"><strong>Khối lượng:</strong> {{ trip.cargo_weight_tons or '--' }} tấn</div>
+                {% if trip.porter_fee %}
+                <div class="small mt-1 text-warning"><strong>Bồi dưỡng bốc vác (tài xế đã ứng):</strong> {{ '{:,.0f}'.format(trip.porter_fee) }} VNĐ</div>
+                {% endif %}
                 {% for attachment in trip.attachments.filter_by(attachment_type='weigh_ticket').all() %}
                 <div class="small mt-1"><a target="_blank" href="{{ url_for('phoi.view_attachment', id=phoi.id, attachment_id=attachment.id) }}"><i class="bi bi-image"></i> {{ attachment.original_filename }}</a></div>
                 {% else %}<div class="small text-muted">Chưa có ảnh phiếu cân.</div>{% endfor %}
@@ -183,6 +186,9 @@
                 <tr><td class="ps-3">{{ exp.category_label() }}{% if exp.category == 'repair' %}<br><small class="text-muted">{{ exp.description }} · {% if exp.is_home_repair %}Sửa tại nhà{% else %}{{ exp.repair_location }} · {{ exp.attachments.filter_by(attachment_type='repair_receipt').count() }} hóa đơn{% if exp.driver_paid %} · <span class="badge bg-warning text-dark">Tài xế tự trả</span>{% endif %}{% endif %}</small>{% endif %}</td><td class="text-end">{{ '{:,.0f}'.format(exp.amount) }} VNĐ</td></tr>
                 {% else %}
                 <tr><td class="ps-3 text-muted">Không có chi phí khác</td><td></td></tr>
+                {% endfor %}
+                {% for trip in phoi.return_trips.all() if trip.porter_fee %}
+                <tr><td class="ps-3">Bồi dưỡng bốc vác chuyến về #{{ trip.trip_order }} <small class="text-muted">(tài xế đã ứng)</small></td><td class="text-end">{{ '{:,.0f}'.format(trip.porter_fee) }} VNĐ</td></tr>
                 {% endfor %}
                 <tr><td class="ps-3">Tiền xăng ({{ phoi.fuel_logs|length }} lần)</td><td class="text-end">{{ '{:,.0f}'.format(phoi.fuel_expenses()) }} VNĐ</td></tr>
                 <tr><td><strong>Tổng chi</strong></td><td class="text-end fw-bold">{{ '{:,.0f}'.format(phoi.total_expenses()) }} VNĐ</td></tr>

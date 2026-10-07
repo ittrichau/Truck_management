@@ -360,13 +360,6 @@ function renumberReturnTrips() {
 
 document.querySelector('form').addEventListener('submit', renumberReturnTrips);
 
-document.getElementById('phoi-form').addEventListener('invalid', event => {
-    event.target.classList.add('is-invalid');
-}, true);
-document.getElementById('phoi-form').addEventListener('input', event => {
-    if (event.target.matches('[required]')) event.target.classList.remove('is-invalid');
-});
-
 function toggleCreatePhoiSection(title) {
     const section = document.getElementById(title.dataset.collapseTarget);
     if (!section) return;

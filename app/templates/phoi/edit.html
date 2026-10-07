@@ -266,13 +266,6 @@ function renumberReturnTrips() {
 
 document.getElementById('phoi-form').addEventListener('submit', renumberReturnTrips);
 
-document.getElementById('phoi-form').addEventListener('invalid', event => {
-    event.target.classList.add('is-invalid');
-}, true);
-document.getElementById('phoi-form').addEventListener('input', event => {
-    if (event.target.matches('[required]')) event.target.classList.remove('is-invalid');
-});
-
 new MutationObserver(() => {
     document.querySelectorAll('.return-trip').forEach((trip, index) => {
         if (!trip.querySelector('[name="return_trip_id[]"]')) {
