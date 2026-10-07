@@ -145,6 +145,7 @@
 .collapsible-section-title {
     cursor: pointer;
     display: flex;
+    width: 100%;
     align-items: center;
     gap: 0.35rem;
     user-select: none;

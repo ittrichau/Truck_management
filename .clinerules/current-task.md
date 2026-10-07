@@ -620,3 +620,22 @@
 - Do-not-repeat notes:
   - For decimal edit inputs backed by fixed-scale `Numeric` columns, remove display-only trailing zeros without changing stored precision or switching to currency/thousand-separator handling.
   - Keep a three-decimal display limit for cargo weight and a two-decimal display limit for fuel liters, matching their existing database columns.
+
+## 2026-10-07 - Keep collapsed create-phơi titles on separate lines
+
+- Status: done
+- Goal: Ensure each collapsible create-phơi section title occupies its own row on mobile, including when several sections are collapsed.
+- Files changed:
+  - `app/static/css/style.css` — makes `.collapsible-section-title` span the full available width.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: Presentation-only change to the create-phơi form. Collapse/expand behavior, form fields, saved values, routes, validation, financial calculations, fuel association, roles, and persistence are unchanged.
+- Key decisions:
+  - Retained the existing flex layout and automatic right-aligned chevron; added only `width: 100%` so an inline `span` cannot share a row with the following title.
+- Validation:
+  - Editor diagnostics found no errors in the changed CSS or create template.
+  - Ran `git diff --check` successfully; Git only reported the repository's LF-to-CRLF conversion warning.
+  - No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - Visual browser testing was not launched; the fix relies on standard CSS block-width behavior within the existing form layout.
+- Do-not-repeat notes:
+  - Keep a full-width rule on clickable collapsed-section titles so neighboring inline titles cannot appear on the same mobile row.
