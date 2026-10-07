@@ -1,5 +1,30 @@
 # Current Task Record
 
+## 2026-10-07 - Improve phơi action button spacing
+
+- Status: done
+- Goal: Make action buttons on the phơi detail page visually separated and easier to scan, especially on desktop.
+- Files changed:
+  - `app/templates/phoi/detail.html` — groups the back action and operational actions in semantic action-bar containers; keeps the submit form compatible with the existing POST/CSRF flow.
+  - `app/static/css/style.css` — adds a wrapping flex layout with consistent `0.5rem` gaps for phơi actions and narrow-screen alignment rules.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: Presentation only on the phơi detail page. Back, print, edit, fuel, submit, cancel, reconciliation, and quick-confirm actions retain their existing routes, visibility rules, labels, POST method, confirmation dialog, and CSRF token. No business logic, persisted data, financial result, authorization, fuel association, migration, or URL changed.
+- Key decisions:
+  - Use a page-specific action-bar class rather than a global `.btn` margin, avoiding unintended spacing changes across forms, button groups, and input groups.
+  - Use flex `gap` and wrapping so desktop buttons are consistently separated and overflow is avoided on narrower screens.
+  - Use `display: contents` only for the existing submit form within the action group, preserving its DOM form submission behavior while allowing the button to participate in the flex gap.
+- Validation:
+  - Reviewed the phơi detail template action flow and shared stylesheet.
+  - Editor diagnostics reported no errors after the change.
+  - Re-read the modified template and CSS to verify the action-bar structure, form method, CSRF field, and selectors.
+  - No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - Visual behavior is based on Bootstrap-supported modern browsers; the action buttons intentionally wrap rather than overlap if space is limited.
+  - Do not apply a blanket button-spacing rule because it could disrupt Bootstrap button groups and input groups.
+- Do-not-repeat notes:
+  - Keep action-button spacing scoped to the phơi action bar unless another page is explicitly requested.
+  - Preserve the submit form's POST method, CSRF input, and confirmation prompt when changing its layout.
+
 ## 2026-10-07 - Retain cancelled phơi and reallocate released fuel
 
 - Status: done

@@ -50,6 +50,36 @@
     transform: scale(0.97);
 }
 
+/* Phoi detail action bar — buttons remain separated and wrap cleanly. */
+.phoi-action-bar,
+.phoi-action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+.phoi-action-bar {
+    justify-content: space-between;
+}
+.phoi-action-buttons {
+    justify-content: flex-end;
+}
+.phoi-action-buttons form {
+    display: contents;
+}
+@media (max-width: 575.98px) {
+    .phoi-action-bar,
+    .phoi-action-buttons {
+        align-items: stretch;
+    }
+    .phoi-action-bar {
+        justify-content: flex-start;
+    }
+    .phoi-action-buttons {
+        justify-content: flex-start;
+    }
+}
+
 /* Fix select arrow on iOS */
 .form-select {
     -webkit-appearance: none;

@@ -3,16 +3,16 @@
 {% block content %}
 
 <div class="mx-auto" style="max-width: 700px;">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="phoi-action-bar mb-3">
         <a href="{{ url_for('phoi.index') }}" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-arrow-left"></i> Quay lại
         </a>
-        <div>
+        <div class="phoi-action-buttons">
             <a href="{{ url_for('phoi.print_view', id=phoi.id) }}" class="btn btn-outline-info btn-sm"><i class="bi bi-printer"></i> In</a>
             {% if phoi.status == 'draft' and (current_user.is_manager_or_admin() or (current_user.is_driver() and phoi.driver_id == current_user.id)) %}
             <a href="{{ url_for('phoi.edit', id=phoi.id) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i> Sửa / Thêm chuyến về</a>
             <a href="{{ url_for('fuel.create', phoi_id=phoi.id, truck_id=phoi.truck_id) }}" class="btn btn-outline-warning btn-sm"><i class="bi bi-fuel-pump"></i> Ghi nhận đổ xăng</a>
-            <form action="{{ url_for('phoi.submit', id=phoi.id) }}" method="POST" style="display:inline">
+            <form action="{{ url_for('phoi.submit', id=phoi.id) }}" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Chốt phơi {{ phoi.phoi_number }}? Sau khi chốt tài xế không thể sửa.')"><i class="bi bi-send-check"></i> Chốt phơi</button>
             </form>
