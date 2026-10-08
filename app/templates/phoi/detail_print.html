@@ -146,51 +146,133 @@
 }
 
 /* Print styles */
+@page {
+    size: A4 portrait;
+    margin: 7mm;
+}
+
 @media print {
-    body {
+    html, body {
+        width: 100%;
         margin: 0;
         padding: 0;
+        background: #fff !important;
+    }
+    body {
+        font-size: 9pt;
+        line-height: 1.15;
+    }
+    .container {
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
     .phoi-print-wrapper {
-        max-width: 100%;
-        padding: 0.5cm;
+        max-width: none;
+        margin: 0;
+        padding: 0;
+        font-size: 9pt;
+        line-height: 1.15;
+    }
+    .phoi-print-header {
+        margin-bottom: 5px;
+        padding-bottom: 3px;
+    }
+    .phoi-print-header h3 {
+        font-size: 14pt;
+    }
+    .print-badge {
+        font-size: 7pt;
+        padding: 1px 4px;
+    }
+    .phoi-grid {
+        gap: 5px;
+        margin-bottom: 5px;
+    }
+    .phoi-block,
+    .notes-block {
+        border-radius: 3px;
+        padding: 5px 6px;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+    .phoi-block h5 {
+        margin-bottom: 3px;
+        padding-bottom: 2px;
+        font-size: 8.5pt;
+    }
+    .phoi-info-table td,
+    .phoi-financial-table td {
+        padding: 1px 2px;
+        font-size: 8pt;
+        line-height: 1.1;
+    }
+    .phoi-info-table .label,
+    .phoi-financial-table .sub-row td,
+    .notes-block,
+    .notes-block span {
+        font-size: 7.3pt !important;
+    }
+    .phoi-financial-table .sub-row td {
+        padding-left: 8px;
+    }
+    .phoi-financial-table .total-row td {
+        padding-top: 3px;
+    }
+    .phoi-financial-table hr,
+    .phoi-info-table + hr {
+        margin: 2px 0 !important;
+    }
+    .balance-summary {
+        padding: 5px;
+    }
+    .balance-summary div[style*="font-size:1.2rem"],
+    .phoi-block div[style*="font-size:1.2rem"] {
+        font-size: 11pt !important;
+    }
+    .phoi-block-full {
+        margin-bottom: 5px !important;
+    }
+    .notes-block {
+        margin-top: 4px;
     }
     .print-signatures {
         display: flex;
         justify-content: space-between;
-        gap: 4cm;
-        margin: 20px 1cm 0;
+        gap: 25mm;
+        margin: 8px 10mm 0;
         text-align: center;
-        font-size: 0.92rem;
+        font-size: 8pt;
+        break-inside: avoid;
         page-break-inside: avoid;
     }
     .print-signature {
         flex: 1;
-        min-height: 80px;
+        min-height: 36px;
     }
     .print-signature-title {
-        font-weight: bold;
-        margin-bottom: 4px;
+        margin-bottom: 2px;
     }
     .print-signature-note {
-        color: #6c757d;
-        font-size: 0.78rem;
+        font-size: 6.8pt;
     }
     .phoi-print-header {
         border-bottom-color: #000;
     }
-    .no-print {
+    .no-print,
+    nav,
+    .navbar,
+    .mobile-nav,
+    footer,
+    #loading-overlay,
+    #required-fields-modal,
+    .alert {
         display: none !important;
     }
     /* Force background colors */
     .balance-positive, .balance-negative, .badge-confirmed, .badge-submitted, .badge-draft {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
-    }
-
-    /* Loại bỏ navigation bar mặc định (nếu có từ base.html) */
-    nav, .navbar, footer {
-        display: none !important;
     }
 }
 </style>
