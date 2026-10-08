@@ -148,7 +148,7 @@
 /* Print styles */
 @page {
     size: A4 portrait;
-    margin: 7mm;
+    margin: 6mm;
 }
 
 @media print {
@@ -159,7 +159,7 @@
         background: #fff !important;
     }
     body {
-        font-size: 9pt;
+        font-size: 9.5pt;
         line-height: 1.15;
     }
     .container {
@@ -171,7 +171,7 @@
         max-width: none;
         margin: 0;
         padding: 0;
-        font-size: 9pt;
+        font-size: 9.5pt;
         line-height: 1.15;
     }
     .phoi-print-header {
@@ -182,7 +182,7 @@
         font-size: 14pt;
     }
     .print-badge {
-        font-size: 7pt;
+        font-size: 7.5pt;
         padding: 1px 4px;
     }
     .phoi-grid {
@@ -199,19 +199,19 @@
     .phoi-block h5 {
         margin-bottom: 3px;
         padding-bottom: 2px;
-        font-size: 8.5pt;
+        font-size: 9.5pt;
     }
     .phoi-info-table td,
     .phoi-financial-table td {
         padding: 1px 2px;
-        font-size: 8pt;
+        font-size: 8.5pt;
         line-height: 1.1;
     }
     .phoi-info-table .label,
     .phoi-financial-table .sub-row td,
     .notes-block,
     .notes-block span {
-        font-size: 7.3pt !important;
+        font-size: 7.8pt !important;
     }
     .phoi-financial-table .sub-row td {
         padding-left: 8px;
@@ -228,7 +228,7 @@
     }
     .balance-summary div[style*="font-size:1.2rem"],
     .phoi-block div[style*="font-size:1.2rem"] {
-        font-size: 11pt !important;
+        font-size: 11.5pt !important;
     }
     .phoi-block-full {
         margin-bottom: 5px !important;
@@ -242,13 +242,13 @@
         gap: 25mm;
         margin: 8px 10mm 0;
         text-align: center;
-        font-size: 8pt;
+        font-size: 8.5pt;
         break-inside: avoid;
         page-break-inside: avoid;
     }
     .print-signature {
         flex: 1;
-        min-height: 36px;
+        min-height: 34px;
     }
     .print-signature-title {
         margin-bottom: 2px;
@@ -284,25 +284,25 @@
     <!-- Header -->
     <div class="phoi-print-header">
         <div>
-            <h3>📄 PHIẾU PHƠI</h3>
+            <h3>PHIẾU PHƠI</h3>
             <div style="font-size:0.85rem; color:#6c757d;">{{ phoi.phoi_number }}</div>
         </div>
         <div style="text-align:right;">
             {% if phoi.status == 'confirmed' %}
-                <span class="print-badge badge-confirmed">✅ Đã xác nhận</span>
+                <span class="print-badge badge-confirmed">Đã xác nhận</span>
             {% elif phoi.status == 'submitted' %}
-                <span class="print-badge badge-submitted">� Đã chốt – chờ xác nhận</span>
+                <span class="print-badge badge-submitted">Chờ xác nhận</span>
             {% elif phoi.status == 'cancelled' %}
-                <span class="print-badge badge-cancelled">⛔ ĐÃ HỦY — KHÔNG HỢP LỆ ĐỐI SOÁT</span>
+                <span class="print-badge badge-cancelled">Đã hủy</span>
             {% else %}
-                <span class="print-badge badge-draft">🚚 Đang thực hiện</span>
+                <span class="print-badge badge-draft">Đang thực hiện</span>
             {% endif %}
             {% if phoi.is_substitute %}
-                <span class="print-badge" style="background:#cff4fc; color:#055160; border:1px solid #b6effb;">↔ Chạy giùm</span>
+                <span class="print-badge" style="background:#cff4fc; color:#055160; border:1px solid #b6effb;">Chạy giùm</span>
             {% endif %}
             {% if phoi.confirmed_at %}
                 <div style="font-size:0.75rem; color:#6c757d; margin-top:2px;">
-                    Xác nhận bởi {{ phoi.confirmer.full_name }} lúc {{ phoi.confirmed_at.strftime('%d/%m/%Y %H:%M') }}
+                    Người xác nhận: {{ phoi.confirmer.full_name }} · {{ phoi.confirmed_at.strftime('%d/%m/%Y %H:%M') }}
                 </div>
             {% endif %}
         </div>
@@ -312,15 +312,15 @@
     <div class="phoi-grid">
         <!-- Block 1: Thông tin chuyến -->
         <div class="phoi-block">
-            <h5>📋 Thông tin chuyến</h5>
+            <h5>Chuyến đi</h5>
             <table class="phoi-info-table">
                 <tr><td class="label">Tài xế</td><td class="value">{{ phoi.driver.full_name }}</td></tr>
                 <tr><td class="label">Xe</td><td class="value">{{ phoi.truck.license_plate }}</td></tr>
-                <tr><td class="label">Ngày đi</td><td class="value">{{ phoi.departure_date.strftime('%d/%m/%Y') if phoi.departure_date }}</td></tr>
-                <tr><td class="label">Ngày về</td><td class="value">{{ phoi.return_date.strftime('%d/%m/%Y') if phoi.return_date else '--' }}</td></tr>
-                <tr><td class="label">Điểm đi</td><td class="value">{{ phoi.origin }}</td></tr>
-                <tr><td class="label">Điểm đến</td><td class="value">{{ phoi.destination }}</td></tr>
-                <tr><td class="label">Hàng hóa</td><td class="value">{{ phoi.cargo_description or '--' }}</td></tr>
+                <tr><td class="label">Đi</td><td class="value">{{ phoi.departure_date.strftime('%d/%m/%Y') if phoi.departure_date }}</td></tr>
+                <tr><td class="label">Về</td><td class="value">{{ phoi.return_date.strftime('%d/%m/%Y') if phoi.return_date else '--' }}</td></tr>
+                <tr><td class="label">Từ</td><td class="value">{{ phoi.origin }}</td></tr>
+                <tr><td class="label">Đến</td><td class="value">{{ phoi.destination }}</td></tr>
+                <tr><td class="label">Hàng</td><td class="value">{{ phoi.cargo_description or '--' }}</td></tr>
                 {% if phoi.customer %}
                 <tr><td class="label">Khách hàng</td><td class="value">{{ phoi.customer.name }}</td></tr>
                 {% endif %}
@@ -329,7 +329,7 @@
             <table class="phoi-info-table">
                 <tr>
                     <td class="label">KM cuối</td><td class="value">{{ phoi.km_end or '--' }}</td>
-                    <td class="label">Tổng KM</td><td class="value" style="color:#0d6efd;">{{ phoi.km_total }}</td>
+                    <td class="label">KM</td><td class="value" style="color:#0d6efd;">{{ phoi.km_total }}</td>
                 </tr>
             </table>
         </div>
@@ -337,41 +337,41 @@
         <!-- Block 2: Tài chính (chỉ quản lý/chủ xe) -->
         {% if current_user.is_manager_or_admin() %}
         <div class="phoi-block">
-            <h5>💰 Tài chính</h5>
+            <h5>Tài chính</h5>
             <table class="phoi-financial-table">
-                <tr><td>Doanh thu chuyến đi</td><td class="amount">{{ '{:,.0f}'.format(phoi.revenue_full) }} VNĐ</td></tr>
-                <tr><td>Doanh thu chuyến về ({{ phoi.return_trips.count() }})</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full() - phoi.revenue_full) }} VNĐ</td></tr>
-                <tr class="total-row"><td>Tổng doanh thu full</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full()) }} VNĐ</td></tr>
-                <tr><td>Tiền tạm thu (tài xế giữ)</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ</td></tr>
+                <tr><td>DT đi</td><td class="amount">{{ '{:,.0f}'.format(phoi.revenue_full) }} VNĐ</td></tr>
+                <tr><td>DT về ({{ phoi.return_trips.count() }})</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full() - phoi.revenue_full) }} VNĐ</td></tr>
+                <tr class="total-row"><td>Tổng DT</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full()) }} VNĐ</td></tr>
+                <tr><td>Tài xế đã thu</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ</td></tr>
                 <tr><td colspan="2"><hr style="margin:4px 0;"></td></tr>
-                <tr style="font-weight:600; color:#555;"><td>Chi phí chuyến:</td><td></td></tr>
+                <tr style="font-weight:600; color:#555;"><td>Chi phí</td><td></td></tr>
                 {% for exp in phoi.expenses.all() %}
                 <tr class="sub-row"><td>{{ exp.category_label() }}{% if exp.category == 'repair' %}<br><small>{{ exp.description }} · {% if exp.is_home_repair %}Sửa tại nhà{% else %}{{ exp.repair_location }} · Có hóa đơn{% endif %}</small>{% endif %}</td><td class="amount">{{ '{:,.0f}'.format(exp.amount) }} VNĐ</td></tr>
                 {% else %}
                 <tr class="sub-row"><td style="color:#aaa;">Không có chi phí khác</td><td></td></tr>
                 {% endfor %}
                 {% for trip in phoi.return_trips.all() if trip.porter_fee %}
-                <tr class="sub-row"><td>Bồi dưỡng bốc vác chuyến về #{{ trip.trip_order }} <small>(tài xế đã ứng)</small></td><td class="amount">{{ '{:,.0f}'.format(trip.porter_fee) }} VNĐ</td></tr>
+                <tr class="sub-row"><td>Bốc vác về #{{ trip.trip_order }}</td><td class="amount">{{ '{:,.0f}'.format(trip.porter_fee) }} VNĐ</td></tr>
                 {% endfor %}
-                <tr class="sub-row"><td>Tiền xăng ({{ phoi.fuel_logs|length }} lần)</td><td class="amount">{{ '{:,.0f}'.format(phoi.fuel_expenses()) }} VNĐ</td></tr>
+                <tr class="sub-row"><td>Xăng ({{ phoi.fuel_logs|length }})</td><td class="amount">{{ '{:,.0f}'.format(phoi.fuel_expenses()) }} VNĐ</td></tr>
                 <tr class="total-row"><td><strong>Tổng chi</strong></td><td class="amount">{{ '{:,.0f}'.format(phoi.total_expenses()) }} VNĐ</td></tr>
                 <tr><td colspan="2"><hr style="margin:4px 0;"></td></tr>
-                <tr class="total-row"><td><strong>Phí công tài xế</strong></td><td class="amount" style="color:#0d6efd;">{{ '{:,.0f}'.format(phoi.driver_wage) }} VNĐ</td></tr>
+                <tr class="total-row"><td><strong>Công tài xế</strong></td><td class="amount" style="color:#0d6efd;">{{ '{:,.0f}'.format(phoi.driver_wage) }} VNĐ</td></tr>
             </table>
         </div>
         {% endif %}
     </div>
 
     <div class="phoi-block phoi-block-full" style="margin-bottom:12px;">
-        <h5>🔁 Chuyến về và phiếu cân</h5>
+        <h5>Chuyến về</h5>
         <table class="phoi-info-table">
             {% for trip in phoi.return_trips.all() %}
             <tr>
-                <td class="label">Chuyến về #{{ trip.trip_order }} · {{ trip.origin }} → {{ trip.destination }}</td>
-                <td class="value">{{ trip.cargo_description or '--' }} · {{ trip.cargo_weight_tons or '--' }} tấn{% if trip.porter_fee %} · Bốc vác: {{ '{:,.0f}'.format(trip.porter_fee) }} VNĐ{% endif %}{% if trip.attachment_count('weigh_ticket') %} · {{ trip.attachment_count('weigh_ticket') }} ảnh{% endif %}</td>
+                <td class="label">#{{ trip.trip_order }} · {{ trip.origin }} → {{ trip.destination }}</td>
+                <td class="value">{{ trip.cargo_description or '--' }} · {{ trip.cargo_weight_tons or '--' }} tấn{% if trip.porter_fee %} · Bốc vác: {{ '{:,.0f}'.format(trip.porter_fee) }} VNĐ{% endif %}{% if trip.attachment_count('weigh_ticket') %} · {{ trip.attachment_count('weigh_ticket') }} phiếu cân{% endif %}</td>
             </tr>
             {% else %}
-            <tr><td class="label">Chuyến về</td><td class="value">Chưa có dữ liệu</td></tr>
+            <tr><td class="label">Chuyến về</td><td class="value">--</td></tr>
             {% endfor %}
         </table>
     </div>
@@ -382,23 +382,23 @@
         <div class="phoi-block balance-summary {% if phoi.balance() >= 0 %}balance-positive{% else %}balance-negative{% endif %}">
             {% set bal = phoi.balance() %}
             {% if bal >= 0 %}
-                <div style="font-size:0.8rem; margin-bottom:4px;">👉 Chủ xe cần trả thêm cho tài xế</div>
+                <div style="font-size:0.8rem; margin-bottom:4px;">Chủ xe trả tài xế</div>
                 <div style="font-size:1.2rem; font-weight:bold;">{{ '{:,.0f}'.format(bal) }} VNĐ</div>
             {% else %}
-                <div style="font-size:0.8rem; margin-bottom:4px;">👉 Tài xế cần nộp lại cho chủ xe</div>
+                <div style="font-size:0.8rem; margin-bottom:4px;">Tài xế nộp chủ xe</div>
                 <div style="font-size:1.2rem; font-weight:bold;">{{ '{:,.0f}'.format(-bal) }} VNĐ</div>
             {% endif %}
             <div style="font-size:0.75rem; margin-top:6px; opacity:0.8;">
-                Tài xế đã ứng + Công: {{ '{:,.0f}'.format(phoi.driver_out_of_pocket_expenses() + phoi.driver_wage) }} VNĐ
-                &nbsp;|&nbsp;
-                Tài xế đã thu: {{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ
+                Ứng + công: {{ '{:,.0f}'.format(phoi.driver_out_of_pocket_expenses() + phoi.driver_wage) }} VNĐ
+                &nbsp;·&nbsp;
+                Đã thu: {{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ
             </div>
         </div>
 
         <!-- Block 4: Lợi nhuận chủ xe -->
         {% if current_user.is_manager_or_admin() %}
         <div class="phoi-block" style="text-align:center; background:#f8f9fa;">
-            <div style="font-size:0.8rem; color:#6c757d; margin-bottom:4px;">Lợi nhuận chủ xe (Full - Chi - Công)</div>
+            <div style="font-size:0.8rem; color:#6c757d; margin-bottom:4px;">Lợi nhuận chủ xe</div>
             <div style="font-size:1.2rem; font-weight:bold; {% if phoi.owner_profit() >= 0 %}color:#198754{% else %}color:#dc3545{% endif %};">
                 {{ '{:,.0f}'.format(phoi.owner_profit()) }} VNĐ
             </div>
@@ -409,7 +409,7 @@
     {% if phoi.notes %}
     <!-- Ghi chú -->
     <div class="notes-block">
-        <strong style="font-size:0.8rem;">📝 Ghi chú:</strong>
+        <strong style="font-size:0.8rem;">Ghi chú:</strong>
         <span style="font-size:0.85rem;">{{ phoi.notes }}</span>
     </div>
     {% endif %}
@@ -418,11 +418,9 @@
     <div class="print-signatures">
         <div class="print-signature">
             <div class="print-signature-title">CHỦ XE</div>
-            <div class="print-signature-note">(Ký và ghi rõ họ tên)</div>
         </div>
         <div class="print-signature">
             <div class="print-signature-title">TÀI XẾ</div>
-            <div class="print-signature-note">(Ký và ghi rõ họ tên)</div>
         </div>
     </div>
 
