@@ -694,3 +694,28 @@
 - Do-not-repeat notes:
   - Keep server-side validation authoritative; this shared client-side validation is a usability layer only.
   - Check `event.defaultPrevented` in later submit listeners so invalid submissions never create loading or unsaved-state side effects.
+
+## 2026-10-08 - List missing fields and expand collapsed phơi sections
+
+- Status: done
+- Goal: Make the shared missing-required-fields popup list every missing field in top-to-bottom form order, and automatically open any collapsed create/edit phơi section containing a missing field.
+- Files changed:
+  - `app/templates/base.html` — changes the shared popup body to hold an ordered list of missing field labels.
+  - `app/static/js/app.js` — derives accessible labels, renders missing fields in DOM order, expands matching collapsed sections, and then retains the existing first-field focus behavior.
+  - `.clinerules/current-task.md` — this record.
+- Affected flow/impact: Client-side validation feedback only. Existing form constraints, routes, authorization, server-side validation, financial calculations, fuel links, persisted data, and schema are unchanged. The expansion behavior applies only where an invalid field is inside an existing `d-none` section whose matching title has `data-collapse-target`.
+- Key decisions:
+  - Use each form control’s associated label first, with a safe fallback to its accessible name or input name, so existing and dynamically added return-trip fields are included without template-specific mappings.
+  - Preserve DOM/form-control order to give users the requested top-to-bottom list.
+  - Reuse the established section title attributes and icon conventions instead of duplicating phơi-specific collapse code in the shared validator.
+- Validation:
+  - Ran `node --check app/static/js/app.js` successfully.
+  - Ran `git diff --check` successfully.
+  - Editor diagnostics reported no errors in the changed JavaScript and base template.
+  - No development server was launched and no persisted application data was changed.
+- Risks/constraints:
+  - Visual browser interaction was not launched; this uses the existing Bootstrap modal and section-collapse markup.
+  - A required field without an associated label falls back to its accessible label or HTML field name.
+- Do-not-repeat notes:
+  - Keep the missing-field list generated from native form validity, not a duplicated manual list of required controls.
+  - Only auto-expand sections that use the established `data-collapse-target`/matching-card-ID convention.

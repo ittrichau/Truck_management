@@ -68,9 +68,43 @@ function focusRequiredField(field) {
     target.focus({ preventScroll: true });
 }
 
-function showRequiredFieldsModal(firstInvalidField) {
+function requiredFieldLabel(field) {
+    const labels = Array.from(field.labels || []).map(label => label.textContent.trim());
+    const label = labels.find(Boolean) || field.closest('.form-check')?.querySelector('label')?.textContent.trim();
+    return label?.replace(/\s*\*\s*$/, '').trim() || field.getAttribute('aria-label') || field.name || 'Trường bắt buộc';
+}
+
+function expandRequiredFieldSection(field) {
+    const section = field.closest('[id]');
+    if (!section || !section.classList.contains('d-none')) return;
+
+    const title = document.querySelector(`[data-collapse-target="${CSS.escape(section.id)}"]`);
+    if (!title) return;
+
+    section.classList.remove('d-none');
+    title.setAttribute('aria-expanded', 'true');
+    const icon = title.querySelector('.section-toggle-icon');
+    icon?.classList.replace('bi-chevron-down', 'bi-chevron-up');
+}
+
+function expandRequiredFieldSections(invalidFields) {
+    invalidFields.forEach(expandRequiredFieldSection);
+}
+
+function showRequiredFieldsModal(invalidFields) {
+    const firstInvalidField = invalidFields[0];
     requiredFieldFocusTarget = firstInvalidField;
+    expandRequiredFieldSections(invalidFields);
+
     const modalElement = document.getElementById('required-fields-modal');
+    const list = document.getElementById('required-fields-list');
+    if (list) {
+        list.replaceChildren(...invalidFields.map(field => {
+            const item = document.createElement('li');
+            item.textContent = requiredFieldLabel(field);
+            return item;
+        }));
+    }
     if (!modalElement || !window.bootstrap) {
         focusRequiredField(firstInvalidField);
         return;
@@ -100,7 +134,7 @@ document.addEventListener('submit', function(event) {
         field instanceof HTMLElement && field.matches(':required') && !field.disabled && !field.validity.valid
     );
     invalidFields.forEach(field => setRequiredFieldInvalidState(field, true));
-    if (invalidFields[0]) showRequiredFieldsModal(invalidFields[0]);
+    if (invalidFields[0]) showRequiredFieldsModal(invalidFields);
 }, true);
 
 document.addEventListener('input', clearRequiredFieldError);
