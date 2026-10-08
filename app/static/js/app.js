@@ -69,9 +69,11 @@ function focusRequiredField(field) {
 }
 
 function requiredFieldLabel(field) {
-    const labels = Array.from(field.labels || []).map(label => label.textContent.trim());
-    const label = labels.find(Boolean) || field.closest('.form-check')?.querySelector('label')?.textContent.trim();
-    return label?.replace(/\s*\*\s*$/, '').trim() || field.getAttribute('aria-label') || field.name || 'Trường bắt buộc';
+    const associatedLabel = Array.from(field.labels || []).map(label => label.textContent.trim()).find(Boolean);
+    const fieldContainer = field.closest('.form-check, .mb-2, .mb-3, .col, [class*="col-"]');
+    const visibleLabel = fieldContainer?.querySelector('.form-label, .form-check-label, label')?.textContent.trim();
+    const label = associatedLabel || visibleLabel || field.getAttribute('aria-label') || field.name || 'Trường bắt buộc';
+    return label.replace(/\s*\*\s*$/, '').trim();
 }
 
 function expandRequiredFieldSection(field) {
