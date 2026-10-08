@@ -49,6 +49,31 @@ def financial_confirmation_error(phoi):
             return f'Tổng tiền tài xế và quản lý đã thu của {trip_label} không thể lớn hơn doanh thu full.'
     return None
 
+def _sync_confirmation_toll_fee(phoi):
+    """Record the manager's explicit toll decision for the entire phơi."""
+    toll_status = request.form.get('toll_fee_status')
+    existing_expense = PhoiExpense.query.filter_by(phoi_id=phoi.id, category='toll_fee').first()
+
+    if toll_status == 'incurred':
+        amount = _money(request.form.get('toll_fee_amount', ''))
+        if amount <= 0:
+            raise ValueError('Vui lòng nhập tổng phí đường toàn phơi lớn hơn 0.')
+        if existing_expense:
+            existing_expense.amount = amount
+            existing_expense.description = 'Phí đường toàn phơi'
+        else:
+            db.session.add(PhoiExpense(
+                phoi_id=phoi.id,
+                category='toll_fee',
+                description='Phí đường toàn phơi',
+                amount=amount,
+            ))
+    elif toll_status == 'none':
+        if existing_expense:
+            db.session.delete(existing_expense)
+    else:
+        raise ValueError('Vui lòng xác nhận phơi có phát sinh phí đường hay không.')
+
 def update_truck_status(truck):
     if not truck:
         return
@@ -881,6 +906,7 @@ def confirm(id):
             else:
                 raise ValueError('Trạng thái thu tiền không hợp lệ.')
 
+        _sync_confirmation_toll_fee(phoi)
         error = submission_error(phoi) or financial_confirmation_error(phoi)
         if error:
             raise ValueError(error)

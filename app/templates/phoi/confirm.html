@@ -50,6 +50,25 @@
         </div>
         {% endfor %}
 
+        {% set toll_expense = phoi.expenses.filter_by(category='toll_fee').first() %}
+        <div class="card border-warning mb-3" id="toll-fee-card">
+            <div class="card-body">
+                <h6 class="card-title mb-2"><i class="bi bi-cash-coin"></i> Phí đường toàn phơi</h6>
+                <p class="small text-muted mb-3">Quản lý xác nhận tổng phí cho cả chuyến đi và các chuyến về. Khoản này do chủ xe thanh toán trực tiếp.</p>
+                <div class="btn-group w-100" role="group">
+                    <input type="radio" class="btn-check toll-fee-status" name="toll_fee_status" id="toll-fee-incurred" value="incurred" {% if toll_expense %}checked{% endif %} required>
+                    <label class="btn btn-outline-warning" for="toll-fee-incurred">Có phát sinh phí đường</label>
+                    <input type="radio" class="btn-check toll-fee-status" name="toll_fee_status" id="toll-fee-none" value="none" {% if not toll_expense %}checked{% endif %} required>
+                    <label class="btn btn-outline-secondary" for="toll-fee-none">Không phát sinh</label>
+                </div>
+                <div class="toll-fee-amount mt-3 {% if not toll_expense %}d-none{% endif %}">
+                    <label class="form-label small mb-1" for="toll-fee-amount">Tổng phí đường toàn phơi (VNĐ)</label>
+                    <input type="text" class="form-control currency-input" id="toll-fee-amount" name="toll_fee_amount" value="{{ '{:,.0f}'.format(toll_expense.amount) if toll_expense else '' }}" inputmode="numeric" placeholder="Nhập tổng phí đường">
+                    <div class="invalid-feedback">Nhập tổng phí đường lớn hơn 0.</div>
+                </div>
+            </div>
+        </div>
+
         <div class="d-grid gap-2 mb-5">
             <button type="submit" class="btn btn-success btn-lg"><i class="bi bi-check-circle"></i> XÁC NHẬN PHƠI</button>
             <a href="{{ url_for('phoi.detail', id=phoi.id) }}" class="btn btn-outline-secondary">Hủy</a>
@@ -80,6 +99,15 @@ function collectionAmount(card) {
     return Number((card.querySelector('.currency-input').value || '').replace(/,/g, ''));
 }
 
+function updateTollFeeField() {
+    const incurred = document.querySelector('.toll-fee-status:checked').value === 'incurred';
+    document.querySelector('.toll-fee-amount').classList.toggle('d-none', !incurred);
+}
+
+document.querySelectorAll('.toll-fee-status').forEach(input => {
+    input.addEventListener('change', updateTollFeeField);
+});
+
 document.querySelector('form').addEventListener('submit', event => {
     let firstInvalid = null;
     document.querySelectorAll('.collection-card').forEach(card => {
@@ -90,6 +118,12 @@ document.querySelector('form').addEventListener('submit', event => {
         amount.classList.toggle('is-invalid', invalid);
         if (invalid && !firstInvalid) firstInvalid = amount;
     });
+    const tollAmount = document.querySelector('#toll-fee-amount');
+    const tollIncurred = document.querySelector('.toll-fee-status:checked').value === 'incurred';
+    const tollValue = Number((tollAmount.value || '').replace(/,/g, ''));
+    const tollInvalid = tollIncurred && (!Number.isFinite(tollValue) || tollValue <= 0);
+    tollAmount.classList.toggle('is-invalid', tollInvalid);
+    if (tollInvalid && !firstInvalid) firstInvalid = tollAmount;
     if (firstInvalid) {
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -98,7 +132,7 @@ document.querySelector('form').addEventListener('submit', event => {
 }, true);
 
 document.addEventListener('input', event => {
-    if (event.target.matches('.collection-card .currency-input')) event.target.classList.remove('is-invalid');
+    if (event.target.matches('.collection-card .currency-input, #toll-fee-amount')) event.target.classList.remove('is-invalid');
 });
 </script>
 {% endblock %}

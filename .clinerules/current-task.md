@@ -4,6 +4,7 @@
 - None.
 
 ## Recent completed
+- **2026-10-08 — Whole-phơi toll confirmation:** In `app/routes/phoi.py` and `app/templates/phoi/confirm.html`, manager/admin must explicitly choose whether the full phơi incurred tolls when confirming; a positive single total is required when incurred, otherwise the manager records no toll. The `toll_fee` remains an owner-paid expense, so existing profit and driver-settlement formulas are unchanged. Validated with `compileall`, application import, no editor errors, and mock-based checks for both toll decisions; no migration or persisted-data change. Do not move this decision back to driver creation/submission or add tolls to driver balance.
 - **2026-10-08 — Required-field popup:** Lists visible Vietnamese labels in form order and expands established collapsed phơi sections containing missing fields. Client-side usability only; server validation remains authoritative.
 - **2026-10-07 — Post-confirm porter fee display:** Shows non-zero return porter fees as driver advances in review/print; print includes owner/driver signatures; financial display remains manager/admin-only.
 - **2026-10-07 — Phơi cancellation and fuel release:** Manager/admin cancel draft records only; retain evidence/history; released fuel requires explicit same-truck reallocation.
