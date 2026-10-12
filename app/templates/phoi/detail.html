@@ -210,6 +210,10 @@
                     {% if porter_fee_advanced %}
                     <br><small class="text-warning">Gồm {{ '{:,.0f}'.format(porter_fee_advanced) }} VNĐ bốc vác tài xế đã ứng</small>
                     {% endif %}
+                    {% set other_expense_advanced = phoi.expenses.filter_by(category='other').all()|sum(attribute='amount') %}
+                    {% if other_expense_advanced %}
+                    <br><small class="text-warning">Gồm {{ '{:,.0f}'.format(other_expense_advanced) }} VNĐ chi phí khác tài xế đã ứng</small>
+                    {% endif %}
                     {% if phoi.expenses.filter_by(category='repair', driver_paid=True).count() %}
                     <br><small class="text-warning">Gồm {{ '{:,.0f}'.format(phoi.expenses.filter_by(category='repair', driver_paid=True).all()|sum(attribute='amount')) }} VNĐ sửa xe tài xế tự trả</small>
                     {% endif %}

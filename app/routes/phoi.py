@@ -50,29 +50,26 @@ def financial_confirmation_error(phoi):
     return None
 
 def _sync_confirmation_toll_fee(phoi):
-    """Record the manager's explicit toll decision for the entire phơi."""
+    """Require and record the manager's positive toll fee for the entire phơi."""
     toll_status = request.form.get('toll_fee_status')
-    existing_expense = PhoiExpense.query.filter_by(phoi_id=phoi.id, category='toll_fee').first()
+    if toll_status != 'incurred':
+        raise ValueError('Vui lòng nhập tổng phí đường toàn phơi lớn hơn 0 trước khi xác nhận.')
 
-    if toll_status == 'incurred':
-        amount = _money(request.form.get('toll_fee_amount', ''))
-        if amount <= 0:
-            raise ValueError('Vui lòng nhập tổng phí đường toàn phơi lớn hơn 0.')
-        if existing_expense:
-            existing_expense.amount = amount
-            existing_expense.description = 'Phí đường toàn phơi'
-        else:
-            db.session.add(PhoiExpense(
-                phoi_id=phoi.id,
-                category='toll_fee',
-                description='Phí đường toàn phơi',
-                amount=amount,
-            ))
-    elif toll_status == 'none':
-        if existing_expense:
-            db.session.delete(existing_expense)
+    amount = _money(request.form.get('toll_fee_amount', ''))
+    if amount <= 0:
+        raise ValueError('Vui lòng nhập tổng phí đường toàn phơi lớn hơn 0.')
+
+    existing_expense = PhoiExpense.query.filter_by(phoi_id=phoi.id, category='toll_fee').first()
+    if existing_expense:
+        existing_expense.amount = amount
+        existing_expense.description = 'Phí đường toàn phơi'
     else:
-        raise ValueError('Vui lòng xác nhận phơi có phát sinh phí đường hay không.')
+        db.session.add(PhoiExpense(
+            phoi_id=phoi.id,
+            category='toll_fee',
+            description='Phí đường toàn phơi',
+            amount=amount,
+        ))
 
 def update_truck_status(truck):
     if not truck:
@@ -906,6 +903,10 @@ def confirm(id):
             else:
                 raise ValueError('Trạng thái thu tiền không hợp lệ.')
 
+        driver_wage = _money(request.form.get('driver_wage', ''))
+        if driver_wage <= 0:
+            raise ValueError('Vui lòng nhập tiền công tài xế lớn hơn 0 trước khi xác nhận.')
+        phoi.driver_wage = driver_wage
         _sync_confirmation_toll_fee(phoi)
         error = submission_error(phoi) or financial_confirmation_error(phoi)
         if error:
