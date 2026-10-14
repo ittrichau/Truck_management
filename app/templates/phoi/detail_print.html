@@ -179,7 +179,11 @@
         padding-bottom: 3px;
     }
     .phoi-print-header h3 {
-        font-size: 14pt;
+        font-size: 19pt;
+    }
+    .phoi-print-header > div:first-child > div {
+        font-size: 11pt !important;
+        color: #343a40 !important;
     }
     .print-badge {
         font-size: 7.5pt;
@@ -199,19 +203,26 @@
     .phoi-block h5 {
         margin-bottom: 3px;
         padding-bottom: 2px;
-        font-size: 9.5pt;
+        font-size: 12pt;
     }
-    .phoi-info-table td,
+    .phoi-info-table td {
+        padding: 3px 4px;
+        font-size: 11pt;
+        line-height: 1.25;
+    }
     .phoi-financial-table td {
         padding: 1px 2px;
-        font-size: 8.5pt;
+        font-size: 9.5pt;
         line-height: 1.1;
     }
-    .phoi-info-table .label,
+    .phoi-info-table .label {
+        color: #495057 !important;
+        font-size: 9.5pt !important;
+    }
     .phoi-financial-table .sub-row td,
     .notes-block,
     .notes-block span {
-        font-size: 7.8pt !important;
+        font-size: 9pt !important;
     }
     .phoi-financial-table .sub-row td {
         padding-left: 8px;
@@ -224,11 +235,49 @@
         margin: 2px 0 !important;
     }
     .balance-summary {
-        padding: 5px;
+        padding: 9px;
     }
     .balance-summary div[style*="font-size:1.2rem"],
     .phoi-block div[style*="font-size:1.2rem"] {
-        font-size: 11.5pt !important;
+        font-size: 16pt !important;
+    }
+    .balance-summary div[style*="font-size:0.8rem"],
+    .phoi-block div[style*="font-size:0.8rem"] {
+        font-size: 10pt !important;
+    }
+    .vehicle-summary {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 5px 0 8px;
+        padding: 5px 8px;
+        border: 1px solid #ced4da;
+        background: #f8f9fa !important;
+        color: #495057;
+        font-size: 8.5pt;
+        line-height: 1.2;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    .trip-primary .trip-path {
+        display: block;
+        color: #111 !important;
+        font-size: 15pt;
+        font-weight: 700;
+        line-height: 1.25;
+    }
+    .trip-primary .trip-detail {
+        font-size: 11pt;
+        font-weight: 600;
+    }
+    .trip-km td {
+        font-weight: 700;
+        font-size: 12pt !important;
+        border-top: 1px solid #adb5bd;
+        padding-top: 5px !important;
+    }
+    .phoi-block .trip-km .label {
+        font-size: 9.5pt !important;
     }
     .phoi-block-full {
         margin-bottom: 5px !important;
@@ -308,28 +357,29 @@
         </div>
     </div>
 
+    <div class="vehicle-summary">
+        <span>Tài xế: <strong>{{ phoi.driver.full_name }}</strong></span>
+        <span>Xe: <strong>{{ phoi.truck.license_plate }}</strong></span>
+    </div>
+
     <!-- GRID: Thông tin chuyến + Doanh thu -->
     <div class="phoi-grid">
         <!-- Block 1: Thông tin chuyến -->
         <div class="phoi-block">
             <h5>Chuyến đi</h5>
-            <table class="phoi-info-table">
-                <tr><td class="label">Tài xế</td><td class="value">{{ phoi.driver.full_name }}</td></tr>
-                <tr><td class="label">Xe</td><td class="value">{{ phoi.truck.license_plate }}</td></tr>
-                <tr><td class="label">Đi</td><td class="value">{{ phoi.departure_date.strftime('%d/%m/%Y') if phoi.departure_date }}</td></tr>
-                <tr><td class="label">Về</td><td class="value">{{ phoi.return_date.strftime('%d/%m/%Y') if phoi.return_date else '--' }}</td></tr>
-                <tr><td class="label">Từ</td><td class="value">{{ phoi.origin }}</td></tr>
-                <tr><td class="label">Đến</td><td class="value">{{ phoi.destination }}</td></tr>
-                <tr><td class="label">Hàng</td><td class="value">{{ phoi.cargo_description or '--' }}</td></tr>
+            <table class="phoi-info-table trip-primary">
+                <tr><td class="label">Tuyến đường</td><td class="value trip-path">{{ phoi.origin }} → {{ phoi.destination }}</td></tr>
+                <tr><td class="label">Ngày đi</td><td class="value trip-detail">{{ phoi.departure_date.strftime('%d/%m/%Y') if phoi.departure_date }}</td></tr>
+                <tr><td class="label">Ngày về</td><td class="value trip-detail">{{ phoi.return_date.strftime('%d/%m/%Y') if phoi.return_date else '--' }}</td></tr>
+                <tr><td class="label">Hàng</td><td class="value trip-detail">{{ phoi.cargo_description or '--' }}</td></tr>
                 {% if phoi.customer %}
-                <tr><td class="label">Khách hàng</td><td class="value">{{ phoi.customer.name }}</td></tr>
+                <tr><td class="label">Khách hàng</td><td class="value trip-detail">{{ phoi.customer.name }}</td></tr>
                 {% endif %}
             </table>
-            <hr style="margin: 6px 0;">
-            <table class="phoi-info-table">
+            <table class="phoi-info-table trip-km">
                 <tr>
-                    <td class="label">KM cuối</td><td class="value">{{ phoi.km_end or '--' }}</td>
-                    <td class="label">KM</td><td class="value" style="color:#0d6efd;">{{ phoi.km_total }}</td>
+                    <td class="label">KM cuối</td><td class="value">{{ phoi.km_end or '--' }} km</td>
+                    <td class="label">Tổng KM</td><td class="value">{{ phoi.km_total }} km</td>
                 </tr>
             </table>
         </div>
