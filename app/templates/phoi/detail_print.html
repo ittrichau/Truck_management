@@ -317,33 +317,6 @@
         </div>
     </section>
 
-    {% if current_user.is_manager_or_admin() %}
-    <section class="print-section finance-section">
-        <h4 class="print-section-title">03 / TỔNG HỢP TÀI CHÍNH <span style="float:right;font-size:9pt;font-weight:400;">Đơn vị: VNĐ</span></h4>
-        <table class="phoi-financial-table">
-            <tr><td>Doanh thu chuyến đi</td><td class="amount">{{ '{:,.0f}'.format(phoi.revenue_full) }} VNĐ</td></tr>
-            <tr><td>Doanh thu chuyến về ({{ phoi.return_trips.count() }})</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full() - phoi.revenue_full) }} VNĐ</td></tr>
-            <tr class="total-row"><td>TỔNG DOANH THU</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full()) }} VNĐ</td></tr>
-            <tr><td>Tài xế đã thu</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ</td></tr>
-            <tr><td colspan="2"><hr style="margin:4px 0;"></td></tr>
-            <tr style="font-weight:600; color:#555;"><td>Chi phí</td><td></td></tr>
-                {% for exp in phoi.expenses.all() %}
-                <tr class="sub-row"><td>{{ exp.category_label() }}{% if exp.category == 'repair' %}<br><small>{{ exp.description }} · {% if exp.is_home_repair %}Sửa tại nhà{% else %}{{ exp.repair_location }} · Có hóa đơn{% endif %}</small>{% endif %}</td><td class="amount">{{ '{:,.0f}'.format(exp.amount) }} VNĐ</td></tr>
-                {% else %}
-                <tr class="sub-row"><td style="color:#aaa;">Không có chi phí khác</td><td></td></tr>
-                {% endfor %}
-                {% for trip in phoi.return_trips.all() if trip.porter_fee %}
-                <tr class="sub-row"><td>Bốc vác về #{{ trip.trip_order }}</td><td class="amount">{{ '{:,.0f}'.format(trip.porter_fee) }} VNĐ</td></tr>
-                {% endfor %}
-                <tr class="sub-row"><td>Xăng ({{ phoi.fuel_logs|length }}){% if phoi.driver_fuel_expenses() %} <small style="color:#856404;">(Tài xế tự trả: {{ '{:,.0f}'.format(phoi.driver_fuel_expenses()) }} VNĐ)</small>{% endif %}</td><td class="amount">{{ '{:,.0f}'.format(phoi.fuel_expenses()) }} VNĐ</td></tr>
-                <tr class="total-row"><td><strong>Tổng chi</strong></td><td class="amount">{{ '{:,.0f}'.format(phoi.total_expenses()) }} VNĐ</td></tr>
-                <tr><td colspan="2"><hr style="margin:4px 0;"></td></tr>
-                <tr class="total-row"><td><strong>Công tài xế</strong></td><td class="amount" style="color:#0d6efd;">{{ '{:,.0f}'.format(phoi.driver_wage) }} VNĐ</td></tr>
-            </table>
-        </div>
-        {% endif %}
-    </div>
-
     <section class="print-section return-trips-block">
         <h4 class="print-section-title">02 / CHI TIẾT CHUYẾN VỀ</h4>
         {% for trip in phoi.return_trips.all() %}
@@ -397,6 +370,32 @@
         <div class="return-trip-empty">Chưa có chuyến về.</div>
         {% endfor %}
     </section>
+
+    {% if current_user.is_manager_or_admin() %}
+    <section class="print-section finance-section">
+        <h4 class="print-section-title">03 / TỔNG HỢP TÀI CHÍNH <span style="float:right;font-size:9pt;font-weight:400;">Đơn vị: VNĐ</span></h4>
+        <table class="phoi-financial-table">
+            <tr><td>Doanh thu chuyến đi</td><td class="amount">{{ '{:,.0f}'.format(phoi.revenue_full) }} VNĐ</td></tr>
+            <tr><td>Doanh thu chuyến về ({{ phoi.return_trips.count() }})</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full() - phoi.revenue_full) }} VNĐ</td></tr>
+            <tr class="total-row"><td>TỔNG DOANH THU</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full()) }} VNĐ</td></tr>
+            <tr><td>Tài xế đã thu</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ</td></tr>
+            <tr><td colspan="2"><hr style="margin:4px 0;"></td></tr>
+            <tr style="font-weight:600; color:#555;"><td>Chi phí</td><td></td></tr>
+            {% for exp in phoi.expenses.all() %}
+            <tr class="sub-row"><td>{{ exp.category_label() }}{% if exp.category == 'repair' %}<br><small>{{ exp.description }} · {% if exp.is_home_repair %}Sửa tại nhà{% else %}{{ exp.repair_location }} · Có hóa đơn{% endif %}</small>{% endif %}</td><td class="amount">{{ '{:,.0f}'.format(exp.amount) }} VNĐ</td></tr>
+            {% else %}
+            <tr class="sub-row"><td style="color:#aaa;">Không có chi phí khác</td><td></td></tr>
+            {% endfor %}
+            {% for trip in phoi.return_trips.all() if trip.porter_fee %}
+            <tr class="sub-row"><td>Bốc vác về #{{ trip.trip_order }}</td><td class="amount">{{ '{:,.0f}'.format(trip.porter_fee) }} VNĐ</td></tr>
+            {% endfor %}
+            <tr class="sub-row"><td>Xăng ({{ phoi.fuel_logs|length }}){% if phoi.driver_fuel_expenses() %} <small style="color:#856404;">(Tài xế tự trả: {{ '{:,.0f}'.format(phoi.driver_fuel_expenses()) }} VNĐ)</small>{% endif %}</td><td class="amount">{{ '{:,.0f}'.format(phoi.fuel_expenses()) }} VNĐ</td></tr>
+            <tr class="total-row"><td><strong>Tổng chi</strong></td><td class="amount">{{ '{:,.0f}'.format(phoi.total_expenses()) }} VNĐ</td></tr>
+            <tr><td colspan="2"><hr style="margin:4px 0;"></td></tr>
+            <tr class="total-row"><td><strong>Công tài xế</strong></td><td class="amount" style="color:#0d6efd;">{{ '{:,.0f}'.format(phoi.driver_wage) }} VNĐ</td></tr>
+        </table>
+    </section>
+    {% endif %}
 
     <section class="print-section settlement-section">
         <h4 class="print-section-title">04 / ĐỐI CHIẾU THANH TOÁN</h4>
