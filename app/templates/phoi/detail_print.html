@@ -298,22 +298,29 @@
 
     <section class="print-section trip-section">
         <h4 class="print-section-title">01 / THÔNG TIN CHUYẾN ĐI</h4>
-        <div class="trip-primary">
-            <div class="trip-route-row">
-                <span class="trip-route-label">Tuyến đường</span>
-                <span class="trip-route-text">{{ phoi.origin }} → {{ phoi.destination }}</span>
+        <div class="return-trip-item outbound-trip-item">
+            <div class="return-trip-route">Chuyến đi: {{ phoi.origin }} → {{ phoi.destination }}</div>
+            <div class="return-trip-meta">
+                <div class="return-trip-field"><span class="print-label">Ngày đi:</span> <span class="print-value">{{ phoi.departure_date.strftime('%d/%m/%Y') if phoi.departure_date else '--' }}</span></div>
+                <div class="return-trip-field"><span class="print-label">Ngày về:</span> <span class="print-value">{{ phoi.return_date.strftime('%d/%m/%Y') if phoi.return_date else '--' }}</span></div>
+                <div class="return-trip-field"><span class="print-label">Khách hàng:</span> <span class="print-value">{{ phoi.customer.name if phoi.customer else '--' }}</span></div>
+                <div class="return-trip-field"><span class="print-label">Hàng hóa:</span> <span class="print-value">{{ phoi.cargo_description or '--' }}</span></div>
+                <div class="return-trip-field"><span class="print-label">Khối lượng:</span> <span class="print-value">{{ phoi.cargo_weight_tons or '--' }} tấn</span></div>
+                <div class="return-trip-field"><span class="print-label">Phiếu cân:</span> <span class="print-value">{{ phoi.weigh_ticket_number or '--' }}{% if phoi.attachment_count('weigh_ticket') %} · {{ phoi.attachment_count('weigh_ticket') }} ảnh{% endif %}</span></div>
+                <div class="return-trip-field"><span class="print-label">KM đầu:</span> <span class="print-value">{{ phoi.km_start if phoi.km_start is not none else '--' }} km</span></div>
+                <div class="return-trip-field"><span class="print-label">KM cuối:</span> <span class="print-value">{{ phoi.km_end if phoi.km_end is not none else '--' }} km</span></div>
+                <div class="return-trip-field"><span class="print-label">Tổng KM:</span> <span class="print-value">{{ phoi.km_total if phoi.km_total is not none else '--' }} km</span></div>
+                {% if current_user.is_manager_or_admin() %}
+                <div class="return-trip-field"><span class="print-label">Doanh thu:</span> <span class="print-value">{{ '{:,.0f}'.format(phoi.revenue_full or 0) }} VNĐ{% if phoi.payment_method == 'per_ton' and phoi.price_per_ton %} ({{ '{:,.0f}'.format(phoi.price_per_ton) }} VNĐ/tấn){% else %} (bao chuyến){% endif %}</span></div>
+                <div class="return-trip-field"><span class="print-label">Tài xế đã thu:</span> <span class="print-value">{{ '{:,.0f}'.format(phoi.revenue_collected or 0) }} VNĐ</span></div>
+                {% if phoi.manager_revenue_collected %}
+                <div class="return-trip-field"><span class="print-label">Quản lý đã thu:</span> <span class="print-value">{{ '{:,.0f}'.format(phoi.manager_revenue_collected) }} VNĐ</span></div>
+                {% endif %}
+                {% endif %}
+                {% if phoi.notes %}
+                <div class="return-trip-field return-trip-notes"><span class="print-label">Ghi chú:</span> <span class="print-value">{{ phoi.notes }}</span></div>
+                {% endif %}
             </div>
-            <div class="trip-meta">
-                <div class="trip-meta-item"><span class="print-label">Ngày đi/về:</span> <span class="print-value">{{ phoi.departure_date.strftime('%d/%m/%Y') if phoi.departure_date }} – {{ phoi.return_date.strftime('%d/%m/%Y') if phoi.return_date else '--' }}</span></div>
-                <div class="trip-meta-item"><span class="print-label">Hàng:</span> <span class="print-value">{{ phoi.cargo_description or '--' }}</span></div>
-                <div class="trip-meta-item"><span class="print-label">Tổng KM:</span> <span class="print-value">{{ phoi.km_total }} km</span></div>
-            </div>
-            <div class="trip-meta trip-km">
-                <div class="trip-meta-item"><span class="print-label">KM cuối:</span> <span class="print-value">{{ phoi.km_end or '--' }} km</span></div>
-            </div>
-            {% if phoi.customer %}
-            <div class="trip-customer"><span class="print-label">Khách hàng:</span> <span class="print-value">{{ phoi.customer.name }}</span></div>
-            {% endif %}
         </div>
     </section>
 
