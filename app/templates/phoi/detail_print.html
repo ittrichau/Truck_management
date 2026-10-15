@@ -3,381 +3,272 @@
 
 {% block extra_head %}
 <style>
-/* Layout in ấn – gói gọn trong 1 trang A4 */
+/* Corporate minimal preview, scoped to the print page. */
 .phoi-print-wrapper {
-    max-width: 1000px;
+    --print-ink: #26384c;
+    max-width: 820px;
     margin: 0 auto;
-    font-size: 0.98rem;
-    line-height: 1.35;
+    padding: 24px 30px;
+    background: #fff;
+    color: #17212b;
+    font: 11pt/1.32 Arial, Helvetica, sans-serif;
+    box-shadow: 0 2px 18px rgba(0, 0, 0, .12);
 }
-.phoi-print-wrapper .no-print { display: none !important; }
+.phoi-print-wrapper * { box-sizing: border-box; }
 
 .phoi-print-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    border-bottom: 2px solid #000;
-    padding-bottom: 4px;
-    margin-bottom: 12px;
+    align-items: flex-start;
+    gap: 16px;
+    border-bottom: 1px solid #26384c;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
 }
-
 .phoi-print-header h3 {
     margin: 0;
-    font-weight: bold;
+    color: #26384c;
+    font-size: 20pt;
+    font-weight: 700;
+    letter-spacing: .04em;
 }
-
 .print-badge {
-    font-size: 0.75rem;
-    font-weight: bold;
-    padding: 2px 8px;
-    border-radius: 4px;
+    font-size: 9pt;
+    font-weight: 700;
+    padding: 2px 6px;
+    border: 1px solid #26384c;
     display: inline-block;
 }
+.badge-confirmed, .badge-submitted, .badge-draft, .badge-cancelled {
+    background: #fff;
+    color: #26384c;
+}
+.vehicle-summary {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 4px 0 7px;
+    border-bottom: 1px solid #c6cdd4;
+    font-size: 10pt;
+}
+.vehicle-summary > span { flex: 1; }
+.vehicle-summary > span:last-child { text-align: right; }
 
-.badge-confirmed { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-.badge-submitted { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
-.badge-draft    { background: #e2e3e5; color: #383d41; border: 1px solid #d6d8db; }
-.badge-cancelled { background: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
-
-/* Grid layout 2 cột chính */
-.phoi-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-bottom: 12px;
+.print-section { margin-top: 10px; }
+.print-section-title {
+    margin: 0 0 5px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid #aeb8c2;
+    color: #26384c;
+    font-size: 11pt;
+    font-weight: 700;
+    letter-spacing: .035em;
 }
-
-/* Các block con */
-.phoi-block {
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    padding: 10px 12px;
-}
-
-.phoi-block h5 {
-    font-size: 0.9rem;
-    font-weight: bold;
-    margin: 0 0 8px 0;
-    padding-bottom: 4px;
-    border-bottom: 1px solid #eee;
-}
-
-/* Block full-width */
-.phoi-block-full {
-    grid-column: 1 / -1;
-}
-
-/* Bảng dữ liệu 2 cột bên trong block */
-.phoi-info-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-.phoi-info-table td {
-    padding: 2px 4px;
-    font-size: 0.92rem;
-}
-.phoi-info-table td:first-child {
-    width: 50%;
-}
-.phoi-info-table .label {
-    color: #6c757d;
-    font-size: 0.82rem;
-}
-.phoi-info-table .value {
+.trip-primary { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.trip-route-row td { padding: 1px 0 4px; }
+.trip-route-label {
+    display: block;
+    margin-bottom: 1px;
+    color: #495563;
+    font-size: 9pt;
     font-weight: 600;
+    text-transform: uppercase;
 }
+.trip-route-text {
+    display: block;
+    color: #111;
+    font-size: 15pt;
+    font-weight: 700;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+.trip-meta {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr 1fr;
+    gap: 6px 14px;
+    padding: 3px 0;
+}
+.trip-meta-item { min-width: 0; }
+.print-label { color: #495563; font-size: 9pt; }
+.print-value { font-size: 10.5pt; font-weight: 600; overflow-wrap: anywhere; }
+.trip-customer { padding-top: 2px; }
+.trip-km { padding-top: 3px; border-top: 1px solid #d5dbe0; }
+.trip-km .trip-meta-item { display: flex; gap: 5px; align-items: baseline; }
 
-/* Bảng tài chính */
+.return-trip-item {
+    padding: 5px 0 6px;
+    border-bottom: 1px solid #c6cdd4;
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+.return-trip-route {
+    margin-bottom: 3px;
+    color: #17212b;
+    font-size: 10.5pt;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+.return-trip-meta {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 3px 10px;
+}
+.return-trip-field { min-width: 0; overflow-wrap: anywhere; }
+.return-trip-field .print-label,
+.return-trip-field .print-value { display: inline; }
+.return-trip-field .print-label { margin-right: 3px; }
+.return-trip-notes { grid-column: 1 / -1; }
+.return-trip-empty { font-size: 10.5pt; }
+
 .phoi-financial-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.92rem;
+    font-size: 10.5pt;
+    font-variant-numeric: tabular-nums;
 }
-.phoi-financial-table td {
-    padding: 2px 4px;
-}
-.phoi-financial-table .amount {
-    text-align: right;
-    font-weight: 600;
-}
+.phoi-financial-table td { padding: 2px 5px; border-bottom: .5px solid #d5dbe0; }
+.phoi-financial-table .amount { text-align: right; font-weight: 600; white-space: nowrap; }
 .phoi-financial-table .total-row td {
-    border-top: 1px solid #adb5bd;
-    padding-top: 6px;
-    margin-top: 4px;
-    font-weight: bold;
+    border-top: 1px solid #26384c;
+    border-bottom: 1px solid #26384c;
+    padding-top: 4px;
+    font-weight: 700;
 }
-.phoi-financial-table .sub-row td {
-    padding-left: 16px;
-    color: #555;
-    font-size: 0.82rem;
-}
+.phoi-financial-table .sub-row td { color: #394653; }
 
-/* Kết quả đối chiếu */
-.balance-summary {
+.settlement-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 9px;
+}
+.settlement-summary, .owner-profit {
+    min-width: 0;
+    padding: 6px 8px;
+    border-top: 1px solid #26384c;
+    border-bottom: 1px solid #aeb8c2;
     text-align: center;
-    padding: 8px;
-    border-radius: 6px;
+    break-inside: avoid;
+    page-break-inside: avoid;
 }
-.balance-positive { background: #d4edda; color: #155724; }
-.balance-negative { background: #f8d7da; color: #721c24; }
-
-/* Profit block */
-.profit-block {
-    text-align: center;
-    padding: 10px;
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    margin-bottom: 12px;
-}
-
-/* Notes */
-.notes-block {
-    border: 1px dashed #ccc;
-    border-radius: 6px;
+.settlement-label { font-size: 10pt; font-weight: 700; }
+.settlement-amount { margin: 1px 0; font-size: 16pt; font-weight: 700; font-variant-numeric: tabular-nums; }
+.settlement-details { font-size: 9pt; }
+.fit-warning:not([hidden]) {
+    display: block;
+    flex-basis: 100%;
     padding: 8px 12px;
-    margin-top: 8px;
-    font-size: 0.85rem;
+    border: 1px solid #8a5b00;
+    color: #543900;
+    background: #fff8e7;
+    text-align: center;
 }
+.notes-block { margin-top: 7px; padding-top: 5px; border-top: 1px solid #aeb8c2; font-size: 10pt; }
 
-/* Khu vực ký cuối phiếu */
 .print-signatures {
     display: none;
+    justify-content: space-between;
+    gap: 20mm;
+    margin: 12px 8mm 0;
+    text-align: center;
+    font-size: 10pt;
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+.print-signature { flex: 1; min-height: 42px; }
+.print-signature-title { font-weight: 700; }
+.print-controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin: 14px auto;
 }
 
-/* Print styles */
-@page {
-    size: A4 portrait;
-    margin: 6mm;
+@page { size: A4 portrait; margin: 8mm 9mm; }
+@media (max-width: 640px) {
+    .phoi-print-wrapper { padding: 14px; box-shadow: none; }
+    .trip-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .return-trip-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media print {
-    html, body {
-        width: 100%;
-        margin: 0;
-        padding: 0;
-        background: #fff !important;
-    }
-    body {
-        font-size: 9.5pt;
-        line-height: 1.15;
-    }
-    .container {
-        max-width: none !important;
-        margin: 0 !important;
-        padding: 0 !important;
-    }
+    html, body { width: auto; margin: 0 !important; padding: 0 !important; background: #fff !important; }
+    body { color: #111; font: 11pt/1.22 Arial, Helvetica, sans-serif; }
+    .container { width: auto !important; max-width: none !important; margin: 0 !important; padding: 0 !important; }
     .phoi-print-wrapper {
+        --print-font: 11pt;
+        width: auto;
         max-width: none;
+        min-height: 0;
         margin: 0;
         padding: 0;
-        font-size: 9.5pt;
-        line-height: 1.15;
+        box-shadow: none;
+        font-size: var(--print-font);
+        line-height: 1.22;
     }
-    .phoi-print-header {
-        margin-bottom: 5px;
-        padding-bottom: 3px;
-    }
-    .phoi-print-header h3 {
-        font-size: 19pt;
-    }
-    .phoi-print-header > div:first-child > div {
-        font-size: 11pt !important;
-        color: #343a40 !important;
-    }
-    .print-badge {
-        font-size: 7.5pt;
-        padding: 1px 4px;
-    }
-    .phoi-grid {
-        gap: 5px;
-        margin-bottom: 5px;
-    }
-    .phoi-block,
-    .notes-block {
-        border-radius: 3px;
-        padding: 5px 6px;
-        break-inside: avoid;
-        page-break-inside: avoid;
-    }
-    .phoi-block h5 {
-        margin-bottom: 3px;
-        padding-bottom: 2px;
-        font-size: 12pt;
-    }
-    .phoi-info-table td {
-        padding: 3px 4px;
-        font-size: 11pt;
-        line-height: 1.25;
-    }
-    .phoi-financial-table td {
-        padding: 1px 2px;
-        font-size: 9.5pt;
-        line-height: 1.1;
-    }
-    .phoi-info-table .label {
-        color: #495057 !important;
-        font-size: 9.5pt !important;
-    }
-    .phoi-financial-table .sub-row td,
-    .notes-block,
-    .notes-block span {
-        font-size: 9pt !important;
-    }
-    .phoi-financial-table .sub-row td {
-        padding-left: 8px;
-    }
-    .phoi-financial-table .total-row td {
-        padding-top: 3px;
-    }
-    .phoi-financial-table hr,
-    .phoi-info-table + hr {
-        margin: 2px 0 !important;
-    }
-    .balance-summary {
-        padding: 9px;
-    }
-    .balance-summary div[style*="font-size:1.2rem"],
-    .phoi-block div[style*="font-size:1.2rem"] {
-        font-size: 16pt !important;
-    }
-    .balance-summary div[style*="font-size:0.8rem"],
-    .phoi-block div[style*="font-size:0.8rem"] {
-        font-size: 10pt !important;
-    }
-    .vehicle-summary {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        margin: 5px 0 8px;
-        padding: 5px 8px;
-        border: 1px solid #ced4da;
-        background: #f8f9fa !important;
-        color: #495057;
-        font-size: 8.5pt;
-        line-height: 1.2;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-    }
-    .trip-primary .trip-path {
-        display: block;
-        width: 100%;
-        color: #111 !important;
-        font-size: 15pt;
-        font-weight: 700;
-        line-height: 1.25;
-        text-align: left;
-        white-space: nowrap;
-    }
-    .trip-primary .trip-route-value {
-        container-type: inline-size;
-        text-align: left;
-    }
-    .trip-primary .trip-route-text {
-        display: block;
-        width: max-content;
-        max-width: 100%;
-        font-size: clamp(8pt, 7cqw, 15pt);
-        text-align: left;
-        white-space: nowrap;
-    }
-    .trip-primary .trip-detail {
-        font-size: 11pt;
-        font-weight: 600;
-    }
-    .trip-km td {
-        font-weight: 700;
-        font-size: 12pt !important;
-        border-top: 1px solid #adb5bd;
-        padding-top: 5px !important;
-    }
-    .phoi-block .trip-km .label {
-        font-size: 9.5pt !important;
-    }
-    .return-trip-item + .return-trip-item {
-        border-top: 1px solid #adb5bd;
-        margin-top: 5px;
-        padding-top: 5px;
-    }
-    .return-trip-route {
-        margin-bottom: 2px;
-        font-size: 11pt;
-        font-weight: 700;
-        text-align: left;
-    }
-    .return-trip-table {
-        table-layout: fixed;
-    }
-    .return-trip-table td {
-        width: 25%;
-        padding: 2px 4px;
-        font-size: 9.5pt;
-        vertical-align: top;
-        overflow-wrap: anywhere;
-    }
-    .return-trip-table .label {
-        font-size: 8.5pt !important;
-    }
-    .return-trip-empty {
-        font-size: 10pt;
-        color: #495057;
-    }
-    .phoi-block-full {
-        margin-bottom: 5px !important;
-    }
-    .notes-block {
-        margin-top: 4px;
-    }
-    .print-signatures {
-        display: flex;
-        justify-content: space-between;
-        gap: 25mm;
-        margin: 8px 10mm 0;
-        text-align: center;
-        font-size: 8.5pt;
-        break-inside: avoid;
-        page-break-inside: avoid;
-    }
-    .print-signature {
-        flex: 1;
-        min-height: 34px;
-    }
-    .print-signature-title {
-        margin-bottom: 2px;
-    }
-    .print-signature-note {
-        font-size: 6.8pt;
-    }
-    .phoi-print-header {
-        border-bottom-color: #000;
-    }
-    .no-print,
-    nav,
-    .navbar,
-    .mobile-nav,
-    footer,
-    #loading-overlay,
-    #required-fields-modal,
-    .alert {
+    .phoi-print-header { margin-bottom: 5px; padding-bottom: 5px; }
+    .phoi-print-header h3 { font-size: 19pt; }
+    .phoi-print-header > div:first-child > div { font-size: 9.5pt !important; color: #343a40 !important; }
+    .print-badge { font-size: 9pt; padding: 1px 5px; }
+    .vehicle-summary { margin: 0; padding: 3px 0 5px; font-size: 9.5pt; }
+    .print-section { margin-top: 7px; }
+    .print-section-title { margin-bottom: 3px; font-size: 11.5pt; }
+    .trip-route-text { font-size: 15pt; }
+    .trip-meta { gap: 2px 10px; padding: 2px 0; }
+    .print-label { font-size: 9pt; }
+    .print-value { font-size: 10.5pt; }
+    .return-trip-item { padding: 4px 0; }
+    .return-trip-route { margin-bottom: 2px; font-size: 10.5pt; }
+    .return-trip-meta { gap: 2px 8px; }
+    .return-trip-field .print-label { font-size: 9pt; }
+    .return-trip-field .print-value { font-size: 10pt; }
+    .phoi-financial-table { font-size: 10.5pt; }
+    .phoi-financial-table td { padding: 1.5px 4px; }
+    .settlement-row { margin-top: 7px; gap: 8px; }
+    .settlement-summary, .owner-profit { padding: 4px 6px; }
+    .settlement-label { font-size: 10pt; }
+    .settlement-amount { font-size: 16pt; }
+    .settlement-details { font-size: 9pt; }
+    .notes-block { margin-top: 5px; padding-top: 4px; font-size: 10pt; }
+    .print-signatures { display: flex; margin-top: 9px; }
+    .print-signature { min-height: 40px; }
+    .print-controls, .fit-warning, nav, .navbar, .mobile-nav, footer,
+    #loading-overlay, #required-fields-modal, .alert, .offcanvas {
         display: none !important;
     }
-    /* Force background colors */
-    .balance-positive, .balance-negative, .badge-confirmed, .badge-submitted, .badge-draft {
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-    }
+
+    /* Measured density tiers: reduce spacing first; keep readable type sizes. */
+    .phoi-print-wrapper.density-compact { line-height: 1.16; }
+    .density-compact .print-section { margin-top: 5px; }
+    .density-compact .return-trip-item { padding: 2px 0; }
+    .density-compact .trip-meta, .density-compact .return-trip-meta { gap: 1px 6px; }
+    .density-compact .settlement-row { margin-top: 4px; }
+    .density-compact .print-signatures { margin-top: 6px; }
+
+    .phoi-print-wrapper.density-dense { --print-font: 9.5pt; line-height: 1.12; }
+    .density-dense .print-section { margin-top: 3px; }
+    .density-dense .print-section-title { margin-bottom: 1px; font-size: 10.5pt; }
+    .density-dense .trip-route-text { font-size: 13pt; }
+    .density-dense .print-value,
+    .density-dense .return-trip-field .print-value,
+    .density-dense .phoi-financial-table { font-size: 9.5pt; }
+    .density-dense .return-trip-item { padding: 1px 0; }
+    .density-dense .return-trip-route { font-size: 9.5pt; }
+    .density-dense .settlement-amount { font-size: 14pt; }
+    .density-dense .print-signatures { margin-top: 4px; }
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="phoi-print-wrapper">
+<div class="phoi-print-wrapper" id="phoi-print-sheet" data-print-sheet>
 
     <!-- Header -->
     <div class="phoi-print-header">
         <div>
             <h3>PHIẾU PHƠI</h3>
-            <div style="font-size:0.85rem; color:#6c757d;">{{ phoi.phoi_number }}</div>
+            <div style="font-size:0.85rem; color:#6c757d;">Mã: {{ phoi.phoi_number }}</div>
         </div>
         <div style="text-align:right;">
             {% if phoi.status == 'confirmed' %}
@@ -405,39 +296,37 @@
         <span>Xe: <strong>{{ phoi.truck.license_plate }}</strong></span>
     </div>
 
-    <!-- GRID: Thông tin chuyến + Doanh thu -->
-    <div class="phoi-grid">
-        <!-- Block 1: Thông tin chuyến -->
-        <div class="phoi-block">
-            <h5>Chuyến đi</h5>
-            <table class="phoi-info-table trip-primary">
-                <tr><td class="label">Tuyến đường</td><td class="value trip-path trip-route-value"><span class="trip-route-text">{{ phoi.origin }} → {{ phoi.destination }}</span></td></tr>
-                <tr><td class="label">Ngày đi</td><td class="value trip-detail">{{ phoi.departure_date.strftime('%d/%m/%Y') if phoi.departure_date }}</td></tr>
-                <tr><td class="label">Ngày về</td><td class="value trip-detail">{{ phoi.return_date.strftime('%d/%m/%Y') if phoi.return_date else '--' }}</td></tr>
-                <tr><td class="label">Hàng</td><td class="value trip-detail">{{ phoi.cargo_description or '--' }}</td></tr>
-                {% if phoi.customer %}
-                <tr><td class="label">Khách hàng</td><td class="value trip-detail">{{ phoi.customer.name }}</td></tr>
-                {% endif %}
-            </table>
-            <table class="phoi-info-table trip-km">
-                <tr>
-                    <td class="label">KM cuối</td><td class="value">{{ phoi.km_end or '--' }} km</td>
-                    <td class="label">Tổng KM</td><td class="value">{{ phoi.km_total }} km</td>
-                </tr>
-            </table>
+    <section class="print-section trip-section">
+        <h4 class="print-section-title">01 / THÔNG TIN CHUYẾN ĐI</h4>
+        <div class="trip-primary">
+            <div class="trip-route-row">
+                <span class="trip-route-label">Tuyến đường</span>
+                <span class="trip-route-text">{{ phoi.origin }} → {{ phoi.destination }}</span>
+            </div>
+            <div class="trip-meta">
+                <div class="trip-meta-item"><span class="print-label">Ngày đi/về:</span> <span class="print-value">{{ phoi.departure_date.strftime('%d/%m/%Y') if phoi.departure_date }} – {{ phoi.return_date.strftime('%d/%m/%Y') if phoi.return_date else '--' }}</span></div>
+                <div class="trip-meta-item"><span class="print-label">Hàng:</span> <span class="print-value">{{ phoi.cargo_description or '--' }}</span></div>
+                <div class="trip-meta-item"><span class="print-label">Tổng KM:</span> <span class="print-value">{{ phoi.km_total }} km</span></div>
+            </div>
+            <div class="trip-meta trip-km">
+                <div class="trip-meta-item"><span class="print-label">KM cuối:</span> <span class="print-value">{{ phoi.km_end or '--' }} km</span></div>
+            </div>
+            {% if phoi.customer %}
+            <div class="trip-customer"><span class="print-label">Khách hàng:</span> <span class="print-value">{{ phoi.customer.name }}</span></div>
+            {% endif %}
         </div>
+    </section>
 
-        <!-- Block 2: Tài chính (chỉ quản lý/chủ xe) -->
-        {% if current_user.is_manager_or_admin() %}
-        <div class="phoi-block">
-            <h5>Tài chính</h5>
-            <table class="phoi-financial-table">
-                <tr><td>DT đi</td><td class="amount">{{ '{:,.0f}'.format(phoi.revenue_full) }} VNĐ</td></tr>
-                <tr><td>DT về ({{ phoi.return_trips.count() }})</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full() - phoi.revenue_full) }} VNĐ</td></tr>
-                <tr class="total-row"><td>Tổng DT</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full()) }} VNĐ</td></tr>
-                <tr><td>Tài xế đã thu</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ</td></tr>
-                <tr><td colspan="2"><hr style="margin:4px 0;"></td></tr>
-                <tr style="font-weight:600; color:#555;"><td>Chi phí</td><td></td></tr>
+    {% if current_user.is_manager_or_admin() %}
+    <section class="print-section finance-section">
+        <h4 class="print-section-title">03 / TỔNG HỢP TÀI CHÍNH <span style="float:right;font-size:9pt;font-weight:400;">Đơn vị: VNĐ</span></h4>
+        <table class="phoi-financial-table">
+            <tr><td>Doanh thu chuyến đi</td><td class="amount">{{ '{:,.0f}'.format(phoi.revenue_full) }} VNĐ</td></tr>
+            <tr><td>Doanh thu chuyến về ({{ phoi.return_trips.count() }})</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full() - phoi.revenue_full) }} VNĐ</td></tr>
+            <tr class="total-row"><td>TỔNG DOANH THU</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full()) }} VNĐ</td></tr>
+            <tr><td>Tài xế đã thu</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ</td></tr>
+            <tr><td colspan="2"><hr style="margin:4px 0;"></td></tr>
+            <tr style="font-weight:600; color:#555;"><td>Chi phí</td><td></td></tr>
                 {% for exp in phoi.expenses.all() %}
                 <tr class="sub-row"><td>{{ exp.category_label() }}{% if exp.category == 'repair' %}<br><small>{{ exp.description }} · {% if exp.is_home_repair %}Sửa tại nhà{% else %}{{ exp.repair_location }} · Có hóa đơn{% endif %}</small>{% endif %}</td><td class="amount">{{ '{:,.0f}'.format(exp.amount) }} VNĐ</td></tr>
                 {% else %}
@@ -455,8 +344,8 @@
         {% endif %}
     </div>
 
-    <div class="phoi-block phoi-block-full return-trips-block" style="margin-bottom:12px;">
-        <h5>Chi tiết chuyến về</h5>
+    <section class="print-section return-trips-block">
+        <h4 class="print-section-title">02 / CHI TIẾT CHUYẾN VỀ</h4>
         {% for trip in phoi.return_trips.all() %}
         <div class="return-trip-item">
             <div class="return-trip-route">Chuyến về #{{ trip.trip_order }}: {{ trip.origin }} → {{ trip.destination }}</div>
@@ -507,44 +396,36 @@
         {% else %}
         <div class="return-trip-empty">Chưa có chuyến về.</div>
         {% endfor %}
-    </div>
+    </section>
 
-    <!-- GRID: Kết quả đối chiếu + Kết luận -->
-    <div class="phoi-grid">
-        <!-- Block 3: Đối chiếu -->
-        <div class="phoi-block balance-summary {% if phoi.balance() >= 0 %}balance-positive{% else %}balance-negative{% endif %}">
-            {% set bal = phoi.balance() %}
-            {% if bal >= 0 %}
-                <div style="font-size:0.8rem; margin-bottom:4px;">Chủ xe trả tài xế</div>
-                <div style="font-size:1.2rem; font-weight:bold;">{{ '{:,.0f}'.format(bal) }} VNĐ</div>
-            {% else %}
-                <div style="font-size:0.8rem; margin-bottom:4px;">Tài xế nộp chủ xe</div>
-                <div style="font-size:1.2rem; font-weight:bold;">{{ '{:,.0f}'.format(-bal) }} VNĐ</div>
+    <section class="print-section settlement-section">
+        <h4 class="print-section-title">04 / ĐỐI CHIẾU THANH TOÁN</h4>
+        <div class="settlement-row">
+            <div class="settlement-summary {% if phoi.balance() >= 0 %}balance-positive{% else %}balance-negative{% endif %}">
+                {% set bal = phoi.balance() %}
+                {% if bal >= 0 %}
+                    <div class="settlement-label">Chủ xe trả tài xế</div>
+                    <div class="settlement-amount">{{ '{:,.0f}'.format(bal) }} VNĐ</div>
+                {% else %}
+                    <div class="settlement-label">Tài xế nộp chủ xe</div>
+                    <div class="settlement-amount">{{ '{:,.0f}'.format(-bal) }} VNĐ</div>
+                {% endif %}
+                <div class="settlement-details">Ứng + công: {{ '{:,.0f}'.format(phoi.driver_out_of_pocket_expenses() + phoi.driver_wage) }} VNĐ · Đã thu: {{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ</div>
+            </div>
+            {% if current_user.is_manager_or_admin() %}
+            <div class="owner-profit">
+                <div class="settlement-label">Lợi nhuận chủ xe</div>
+                <div class="settlement-amount {% if phoi.owner_profit() >= 0 %}profit-positive{% else %}profit-negative{% endif %}">{{ '{:,.0f}'.format(phoi.owner_profit()) }} VNĐ</div>
+            </div>
             {% endif %}
-            <div style="font-size:0.75rem; margin-top:6px; opacity:0.8;">
-                Ứng + công: {{ '{:,.0f}'.format(phoi.driver_out_of_pocket_expenses() + phoi.driver_wage) }} VNĐ
-                &nbsp;·&nbsp;
-                Đã thu: {{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ
-            </div>
         </div>
-
-        <!-- Block 4: Lợi nhuận chủ xe -->
-        {% if current_user.is_manager_or_admin() %}
-        <div class="phoi-block" style="text-align:center; background:#f8f9fa;">
-            <div style="font-size:0.8rem; color:#6c757d; margin-bottom:4px;">Lợi nhuận chủ xe</div>
-            <div style="font-size:1.2rem; font-weight:bold; {% if phoi.owner_profit() >= 0 %}color:#198754{% else %}color:#dc3545{% endif %};">
-                {{ '{:,.0f}'.format(phoi.owner_profit()) }} VNĐ
-            </div>
-        </div>
-        {% endif %}
-    </div>
+    </section>
 
     {% if phoi.notes %}
-    <!-- Ghi chú -->
-    <div class="notes-block">
-        <strong style="font-size:0.8rem;">Ghi chú:</strong>
-        <span style="font-size:0.85rem;">{{ phoi.notes }}</span>
-    </div>
+    <section class="print-section notes-block">
+        <h4 class="print-section-title">GHI CHÚ</h4>
+        <div class="print-value">{{ phoi.notes }}</div>
+    </section>
     {% endif %}
 
     <!-- Chỉ hiển thị khi in -->
@@ -557,8 +438,9 @@
         </div>
     </div>
 
-    <!-- Nút in (ẩn khi in) -->
-    <div class="no-print" style="margin-top: 16px; display:flex; gap:8px; justify-content:center;">
+    <!-- Nút in và trạng thái kiểm tra khổ giấy (ẩn khi in) -->
+    <div class="no-print print-controls" style="margin-top: 16px; display:flex; gap:8px; justify-content:center;">
+        <span class="fit-warning" role="status" aria-live="polite" hidden></span>
         <button onclick="window.print()" class="btn btn-primary" style="padding: 6px 20px;">
             <i class="bi bi-printer"></i> In phiếu phơi
         </button>
@@ -567,5 +449,31 @@
         </a>
     </div>
 
+    <script>
+    (() => {
+        const sheet = document.getElementById('phoi-print-sheet');
+        const warning = document.querySelector('.fit-warning');
+        if (!sheet || !warning) return;
+
+        const pageHeightPx = (297 - 16) * 96 / 25.4;
+        const tiers = ['', 'density-compact', 'density-dense'];
+
+        function assessPrintFit() {
+            sheet.classList.remove('density-compact', 'density-dense');
+            warning.hidden = true;
+            for (const tier of tiers) {
+                if (tier) sheet.classList.add(tier);
+                if (sheet.scrollHeight <= pageHeightPx) return;
+            }
+            warning.textContent = 'Nội dung dài hơn một trang A4 kể cả ở chế độ gọn; bản in sẽ tiếp tục sang trang tiếp theo, không bị cắt.';
+            warning.hidden = false;
+        }
+
+        window.addEventListener('load', assessPrintFit, { once: true });
+        window.addEventListener('beforeprint', assessPrintFit);
+        window.addEventListener('resize', assessPrintFit);
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(assessPrintFit);
+    })();
+    </script>
 </div>
 {% endblock %}
