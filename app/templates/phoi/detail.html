@@ -129,7 +129,21 @@
             {% for fuel in phoi.fuel_logs %}
             <div class="p-3 {% if not loop.last %}border-bottom{% endif %}">
                 <div class="d-flex justify-content-between"><strong>{{ fuel.refuel_date.strftime('%d/%m/%Y') }}</strong><strong>{{ '{:,.0f}'.format(fuel.total_cost) }} VNĐ</strong></div>
-                <div class="small text-muted">{{ fuel.liters }} lít · {{ '{:,.0f}'.format(fuel.price_per_liter) }} VNĐ/lít · {{ fuel.truck.license_plate }}</div>
+                <div class="small text-muted">
+                    {{ fuel.liters }} lít · {{ '{:,.0f}'.format(fuel.price_per_liter) }} VNĐ/lít · {{ fuel.truck.license_plate }}
+                    {% if fuel.paid_by == 'driver' %}
+                    · <span class="badge bg-warning text-dark">Tài xế tự trả</span>
+                    {% else %}
+                    · <span class="badge bg-secondary">Chủ xe trả</span>
+                    {% endif %}
+                </div>
+                {% if fuel.paid_by == 'driver' and fuel.receipts.count() %}
+                <div class="small text-muted mt-1">
+                    {% for receipt in fuel.receipts.all() %}
+                    <a href="{{ url_for('fuel.view_receipt', id=fuel.id, receipt_id=receipt.id) }}" target="_blank"><i class="bi bi-receipt"></i> Hóa đơn {{ loop.index }}</a>{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
                 {% if phoi.status != 'confirmed' and (current_user.is_manager_or_admin() or (current_user.is_driver() and fuel.created_by_id == current_user.id)) %}
                 <div class="mt-2">
                     <a href="{{ url_for('fuel.edit', id=fuel.id) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i> Sửa số lít / ngày đổ</a>
@@ -190,7 +204,7 @@
                 {% for trip in phoi.return_trips.all() if trip.porter_fee %}
                 <tr><td class="ps-3">Bồi dưỡng bốc vác chuyến về #{{ trip.trip_order }} <small class="text-muted">(tài xế đã ứng)</small></td><td class="text-end">{{ '{:,.0f}'.format(trip.porter_fee) }} VNĐ</td></tr>
                 {% endfor %}
-                <tr><td class="ps-3">Tiền xăng ({{ phoi.fuel_logs|length }} lần)</td><td class="text-end">{{ '{:,.0f}'.format(phoi.fuel_expenses()) }} VNĐ</td></tr>
+                <tr><td class="ps-3">Tiền xăng ({{ phoi.fuel_logs|length }} lần){% if phoi.driver_fuel_expenses() %}<br><small class="text-warning">Gồm {{ '{:,.0f}'.format(phoi.driver_fuel_expenses()) }} VNĐ tài xế tự trả (hoàn lại khi đối chiếu)</small>{% endif %}</td><td class="text-end">{{ '{:,.0f}'.format(phoi.fuel_expenses()) }} VNĐ</td></tr>
                 <tr><td><strong>Tổng chi</strong></td><td class="text-end fw-bold">{{ '{:,.0f}'.format(phoi.total_expenses()) }} VNĐ</td></tr>
                 <tr><td colspan="2"><hr class="my-1"></td></tr>
                 <tr><td><strong>Phí công tài xế</strong></td><td class="text-end fw-bold text-primary">{{ '{:,.0f}'.format(phoi.driver_wage) }} VNĐ</td></tr>
@@ -216,6 +230,9 @@
                     {% endif %}
                     {% if phoi.expenses.filter_by(category='repair', driver_paid=True).count() %}
                     <br><small class="text-warning">Gồm {{ '{:,.0f}'.format(phoi.expenses.filter_by(category='repair', driver_paid=True).all()|sum(attribute='amount')) }} VNĐ sửa xe tài xế tự trả</small>
+                    {% endif %}
+                    {% if phoi.driver_fuel_expenses() %}
+                    <br><small class="text-warning">Gồm {{ '{:,.0f}'.format(phoi.driver_fuel_expenses()) }} VNĐ tiền xăng tài xế tự trả</small>
                     {% endif %}
                 </div>
                 <div class="col-6">

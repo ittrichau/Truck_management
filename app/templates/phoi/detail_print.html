@@ -261,10 +261,25 @@
     }
     .trip-primary .trip-path {
         display: block;
+        width: 100%;
         color: #111 !important;
         font-size: 15pt;
         font-weight: 700;
         line-height: 1.25;
+        text-align: left;
+        white-space: nowrap;
+    }
+    .trip-primary .trip-route-value {
+        container-type: inline-size;
+        text-align: left;
+    }
+    .trip-primary .trip-route-text {
+        display: block;
+        width: max-content;
+        max-width: 100%;
+        font-size: clamp(8pt, 7cqw, 15pt);
+        text-align: left;
+        white-space: nowrap;
     }
     .trip-primary .trip-detail {
         font-size: 11pt;
@@ -278,6 +293,34 @@
     }
     .phoi-block .trip-km .label {
         font-size: 9.5pt !important;
+    }
+    .return-trip-item + .return-trip-item {
+        border-top: 1px solid #adb5bd;
+        margin-top: 5px;
+        padding-top: 5px;
+    }
+    .return-trip-route {
+        margin-bottom: 2px;
+        font-size: 11pt;
+        font-weight: 700;
+        text-align: left;
+    }
+    .return-trip-table {
+        table-layout: fixed;
+    }
+    .return-trip-table td {
+        width: 25%;
+        padding: 2px 4px;
+        font-size: 9.5pt;
+        vertical-align: top;
+        overflow-wrap: anywhere;
+    }
+    .return-trip-table .label {
+        font-size: 8.5pt !important;
+    }
+    .return-trip-empty {
+        font-size: 10pt;
+        color: #495057;
     }
     .phoi-block-full {
         margin-bottom: 5px !important;
@@ -368,7 +411,7 @@
         <div class="phoi-block">
             <h5>Chuyến đi</h5>
             <table class="phoi-info-table trip-primary">
-                <tr><td class="label">Tuyến đường</td><td class="value trip-path">{{ phoi.origin }} → {{ phoi.destination }}</td></tr>
+                <tr><td class="label">Tuyến đường</td><td class="value trip-path trip-route-value"><span class="trip-route-text">{{ phoi.origin }} → {{ phoi.destination }}</span></td></tr>
                 <tr><td class="label">Ngày đi</td><td class="value trip-detail">{{ phoi.departure_date.strftime('%d/%m/%Y') if phoi.departure_date }}</td></tr>
                 <tr><td class="label">Ngày về</td><td class="value trip-detail">{{ phoi.return_date.strftime('%d/%m/%Y') if phoi.return_date else '--' }}</td></tr>
                 <tr><td class="label">Hàng</td><td class="value trip-detail">{{ phoi.cargo_description or '--' }}</td></tr>
@@ -403,7 +446,7 @@
                 {% for trip in phoi.return_trips.all() if trip.porter_fee %}
                 <tr class="sub-row"><td>Bốc vác về #{{ trip.trip_order }}</td><td class="amount">{{ '{:,.0f}'.format(trip.porter_fee) }} VNĐ</td></tr>
                 {% endfor %}
-                <tr class="sub-row"><td>Xăng ({{ phoi.fuel_logs|length }})</td><td class="amount">{{ '{:,.0f}'.format(phoi.fuel_expenses()) }} VNĐ</td></tr>
+                <tr class="sub-row"><td>Xăng ({{ phoi.fuel_logs|length }}){% if phoi.driver_fuel_expenses() %} <small style="color:#856404;">(Tài xế tự trả: {{ '{:,.0f}'.format(phoi.driver_fuel_expenses()) }} VNĐ)</small>{% endif %}</td><td class="amount">{{ '{:,.0f}'.format(phoi.fuel_expenses()) }} VNĐ</td></tr>
                 <tr class="total-row"><td><strong>Tổng chi</strong></td><td class="amount">{{ '{:,.0f}'.format(phoi.total_expenses()) }} VNĐ</td></tr>
                 <tr><td colspan="2"><hr style="margin:4px 0;"></td></tr>
                 <tr class="total-row"><td><strong>Công tài xế</strong></td><td class="amount" style="color:#0d6efd;">{{ '{:,.0f}'.format(phoi.driver_wage) }} VNĐ</td></tr>
@@ -412,18 +455,58 @@
         {% endif %}
     </div>
 
-    <div class="phoi-block phoi-block-full" style="margin-bottom:12px;">
-        <h5>Chuyến về</h5>
-        <table class="phoi-info-table">
-            {% for trip in phoi.return_trips.all() %}
-            <tr>
-                <td class="label">#{{ trip.trip_order }} · {{ trip.origin }} → {{ trip.destination }}</td>
-                <td class="value">{{ trip.cargo_description or '--' }} · {{ trip.cargo_weight_tons or '--' }} tấn{% if trip.porter_fee %} · Bốc vác: {{ '{:,.0f}'.format(trip.porter_fee) }} VNĐ{% endif %}{% if trip.attachment_count('weigh_ticket') %} · {{ trip.attachment_count('weigh_ticket') }} phiếu cân{% endif %}</td>
-            </tr>
-            {% else %}
-            <tr><td class="label">Chuyến về</td><td class="value">--</td></tr>
-            {% endfor %}
-        </table>
+    <div class="phoi-block phoi-block-full return-trips-block" style="margin-bottom:12px;">
+        <h5>Chi tiết chuyến về</h5>
+        {% for trip in phoi.return_trips.all() %}
+        <div class="return-trip-item">
+            <div class="return-trip-route">Chuyến về #{{ trip.trip_order }}: {{ trip.origin }} → {{ trip.destination }}</div>
+            <table class="phoi-info-table return-trip-table">
+                <tr>
+                    <td class="label">Ngày về</td>
+                    <td class="value">{{ trip.return_date.strftime('%d/%m/%Y') if trip.return_date else '--' }}</td>
+                    <td class="label">Khách hàng</td>
+                    <td class="value">{{ trip.customer.name if trip.customer else '--' }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Hàng hóa</td>
+                    <td class="value">{{ trip.cargo_description or '--' }}</td>
+                    <td class="label">Khối lượng</td>
+                    <td class="value">{{ trip.cargo_weight_tons or '--' }} tấn</td>
+                </tr>
+                {% if current_user.is_manager_or_admin() %}
+                <tr>
+                    <td class="label">Doanh thu</td>
+                    <td class="value">{{ '{:,.0f}'.format(trip.revenue_full or 0) }} VNĐ{% if trip.payment_method == 'per_ton' and trip.price_per_ton %} ({{ '{:,.0f}'.format(trip.price_per_ton) }} VNĐ/tấn){% else %} (bao chuyến){% endif %}</td>
+                    <td class="label">Tài xế đã thu</td>
+                    <td class="value">{{ '{:,.0f}'.format(trip.revenue_collected or 0) }} VNĐ</td>
+                </tr>
+                {% if trip.manager_revenue_collected %}
+                <tr>
+                    <td class="label">Quản lý đã thu</td>
+                    <td class="value">{{ '{:,.0f}'.format(trip.manager_revenue_collected) }} VNĐ</td>
+                    <td class="label">Bốc vác</td>
+                    <td class="value">{{ '{:,.0f}'.format(trip.porter_fee or 0) }} VNĐ</td>
+                </tr>
+                {% elif trip.porter_fee %}
+                <tr>
+                    <td class="label">Bốc vác</td>
+                    <td class="value">{{ '{:,.0f}'.format(trip.porter_fee) }} VNĐ</td>
+                    <td class="label">Phiếu cân</td>
+                    <td class="value">{{ trip.attachment_count('weigh_ticket') }} ảnh</td>
+                </tr>
+                {% endif %}
+                {% endif %}
+                {% if trip.notes %}
+                <tr><td class="label">Ghi chú</td><td class="value" colspan="3">{{ trip.notes }}</td></tr>
+                {% endif %}
+                {% if trip.attachment_count('weigh_ticket') and (trip.manager_revenue_collected or trip.porter_fee) %}
+                <tr><td class="label">Phiếu cân</td><td class="value" colspan="3">{{ trip.attachment_count('weigh_ticket') }} ảnh</td></tr>
+                {% endif %}
+            </table>
+        </div>
+        {% else %}
+        <div class="return-trip-empty">Chưa có chuyến về.</div>
+        {% endfor %}
     </div>
 
     <!-- GRID: Kết quả đối chiếu + Kết luận -->

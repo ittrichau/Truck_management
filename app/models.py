@@ -302,6 +302,16 @@ class Phoi(db.Model):
                 total += fuel_log.total_cost / attached_count
         return total
 
+    def driver_fuel_expenses(self):
+        """Tiền xăng do tài xế tự chi/ứng gắn với phơi này; dữ liệu cũ gắn nhiều phơi được chia đều."""
+        total = 0
+        for fuel_log in self.fuel_logs:
+            if fuel_log.paid_by == 'driver':
+                attached_count = fuel_log.attached_phoi_count()
+                if attached_count:
+                    total += fuel_log.total_cost / attached_count
+        return total
+
     def total_expenses(self):
         """Tổng chi phí chủ xe của toàn bộ phơi, gồm cả xăng đã gắn vào phơi."""
         return (
@@ -311,14 +321,14 @@ class Phoi(db.Model):
         )
 
     def driver_out_of_pocket_expenses(self):
-        """Các khoản tài xế tự chi/ứng, gồm toàn bộ tiền bốc vác của phơi."""
+        """Các khoản tài xế tự chi/ứng, gồm toàn bộ tiền bốc vác và xăng do tài xế tự trả của phơi."""
         other = sum(exp.amount for exp in self.expenses.filter_by(category='other').all())
         repair_paid = sum(
             exp.amount for exp in self.expenses.filter_by(category='repair', driver_paid=True).all()
         )
         porter_fee = sum(exp.amount for exp in self.expenses.filter_by(category='porter_fee').all())
         return_trip_porter_fee = sum(trip.porter_fee for trip in self.return_trips.all())
-        return other + repair_paid + porter_fee + return_trip_porter_fee
+        return other + repair_paid + porter_fee + return_trip_porter_fee + self.driver_fuel_expenses()
 
     def total_km_all_trips(self):
         """Tổng KM của cả chuyến đi-về, đo bằng một lần ghi đồng hồ."""
