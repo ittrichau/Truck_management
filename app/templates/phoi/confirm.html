@@ -65,7 +65,7 @@
         <div class="card border-primary mb-3" id="driver-wage-card">
             <div class="card-body">
                 <h6 class="card-title mb-2"><i class="bi bi-person-badge"></i> Tiền công tài xế *</h6>
-                <p class="small text-muted mb-3">Nhập tiền công tài xế cho toàn phơi. Số tiền phải lớn hơn 0.</p>
+                <p class="small text-muted mb-3">{% if phoi.driver_wage %}Số tiền tài xế đã tự nhập. Quản lý có thể xác nhận hoặc chỉnh sửa lại trước khi hoàn tất chốt phơi.{% else %}Nhập tiền công tài xế cho toàn phơi. Số tiền phải lớn hơn 0.{% endif %}</p>
                 <label class="form-label small mb-1" for="driver-wage">Tiền công tài xế (VNĐ)</label>
                 <input type="text" class="form-control currency-input" id="driver-wage" name="driver_wage" value="{{ '{:,.0f}'.format(phoi.driver_wage) if phoi.driver_wage else '' }}" inputmode="numeric" placeholder="Nhập tiền công tài xế" required>
                 <div class="invalid-feedback">Nhập tiền công tài xế lớn hơn 0.</div>

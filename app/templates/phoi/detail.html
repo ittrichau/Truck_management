@@ -220,6 +220,9 @@
                 <div class="col-6">
                     <small class="text-muted">Tài xế đã ứng + Công</small><br>
                     <span class="fs-5 fw-bold">{{ '{:,.0f}'.format(phoi.driver_out_of_pocket_expenses() + phoi.driver_wage) }} VNĐ</span>
+                    {% if phoi.driver_wage %}
+                    <br><small class="text-primary">Gồm {{ '{:,.0f}'.format(phoi.driver_wage) }} VNĐ tiền công tài xế</small>
+                    {% endif %}
                     {% set porter_fee_advanced = phoi.expenses.filter_by(category='porter_fee').all()|sum(attribute='amount') + phoi.return_trips.all()|sum(attribute='porter_fee') %}
                     {% if porter_fee_advanced %}
                     <br><small class="text-warning">Gồm {{ '{:,.0f}'.format(porter_fee_advanced) }} VNĐ bốc vác tài xế đã ứng</small>

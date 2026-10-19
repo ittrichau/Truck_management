@@ -129,11 +129,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
 document.addEventListener('submit', function(event) {
     const form = event.target;
-    if (!(form instanceof HTMLFormElement) || !form.querySelector(':required') || form.checkValidity()) return;
+    if (!(form instanceof HTMLFormElement)) return;
+    form.querySelectorAll('input').forEach(function(input) {
+        if (isWeightInput(input)) finalizeWeightInput(input);
+    });
+    if (!form.querySelector(':required') || form.checkValidity()) return;
 
     event.preventDefault();
     const invalidFields = Array.from(form.elements).filter(field =>
-        field instanceof HTMLElement && field.matches(':required') && !field.disabled && !field.validity.valid
+        field instanceof HTMLElement && !field.disabled && !field.validity.valid
     );
     invalidFields.forEach(field => setRequiredFieldInvalidState(field, true));
     if (invalidFields[0]) showRequiredFieldsModal(invalidFields);
@@ -188,12 +192,132 @@ function prepareCurrencyInput(input) {
     formatCurrencyInput(input);
 }
 
+// Định dạng trường số tấn (1.000 -> 99.999 tấn, tương ứng 1.000 - 99.999 kg).
+// Khi nhập 12000 -> 12.000, 7000 -> 7.000. Giới hạn 1000 -> 99999.
+const weightInputNames = new Set([
+    'cargo_weight_tons', 'return_trip_cargo_weight_tons[]'
+]);
+
+function isWeightInput(input) {
+    return input instanceof HTMLInputElement && (
+        input.classList.contains('cargo-weight') || weightInputNames.has(input.name)
+    );
+}
+
+function weightDigits(value) {
+    return String(value || '').replace(/\D/g, '').slice(0, 5);
+}
+
+function formatWeightDigits(digits) {
+    if (!digits) return '';
+    const clean = digits.slice(0, 5);
+    if (clean.length <= 3) {
+        return clean;
+    }
+    const splitIndex = clean.length - 3;
+    return clean.slice(0, splitIndex) + '.' + clean.slice(splitIndex);
+}
+
+function formatWeightInput(input) {
+    const digits = weightDigits(input.value);
+    input.value = formatWeightDigits(digits);
+}
+
+function finalizeWeightInput(input) {
+    if (!isWeightInput(input)) return;
+    const raw = String(input.value || '').trim();
+    if (!raw) {
+        input.setCustomValidity('');
+        input.classList.remove('is-invalid');
+        return;
+    }
+
+    if (raw.includes('.') || raw.includes(',')) {
+        const parts = raw.replace(/,/g, '.').split('.');
+        const intPart = parts[0].replace(/\D/g, '');
+        const decPart = (parts[1] || '').replace(/\D/g, '');
+        const intNum = parseInt(intPart, 10) || 0;
+        if (intNum >= 1 && intNum <= 99) {
+            const paddedDec = (decPart + '000').slice(0, 3);
+            input.value = `${intNum}.${paddedDec}`;
+            validateWeightRange(input);
+            syncAllPaymentCalculators();
+            return;
+        }
+    }
+
+    const digits = raw.replace(/\D/g, '');
+    const num = parseInt(digits, 10) || 0;
+    if (digits.length >= 1 && digits.length <= 2 && num >= 1 && num <= 99) {
+        input.value = `${num}.000`;
+    } else if (num >= 1000 && num <= 99999) {
+        const cleanDigits = String(num);
+        input.value = formatWeightDigits(cleanDigits);
+    } else if (digits.length >= 4) {
+        input.value = formatWeightDigits(digits.slice(0, 5));
+    }
+
+    validateWeightRange(input);
+    syncAllPaymentCalculators();
+}
+
+function validateWeightRange(input) {
+    if (!isWeightInput(input)) return true;
+    const raw = String(input.value || '').trim();
+    if (!raw) {
+        input.setCustomValidity('');
+        input.classList.remove('is-invalid');
+        return true;
+    }
+    const normalized = raw.replace(/,/g, '.');
+    let val = Number(normalized);
+    if (val >= 1000 && val <= 99999) {
+        val = val / 1000;
+    }
+    if (isNaN(val) || val < 1.0 || val > 99.999) {
+        input.setCustomValidity('Số tấn phải từ 1.000 đến 99.999 tấn (1.000 - 99.999 kg).');
+        input.classList.add('is-invalid');
+        return false;
+    } else {
+        input.setCustomValidity('');
+        input.classList.remove('is-invalid');
+        return true;
+    }
+}
+
+function prepareWeightInput(input) {
+    if (!isWeightInput(input)) return;
+    input.type = 'text';
+    input.inputMode = 'numeric';
+    input.autocomplete = 'off';
+    if (!input.placeholder) {
+        input.placeholder = 'Ví dụ: 18.500';
+    }
+    const raw = String(input.value || '').trim();
+    if (raw) {
+        finalizeWeightInput(input);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('input').forEach(prepareCurrencyInput);
+    document.querySelectorAll('input').forEach(function(input) {
+        prepareCurrencyInput(input);
+        prepareWeightInput(input);
+    });
 });
 
 document.addEventListener('input', function(event) {
     const input = event.target;
+    if (isWeightInput(input)) {
+        input.setCustomValidity('');
+        input.classList.remove('is-invalid');
+        const cursorFromEnd = input.value.length - input.selectionStart;
+        formatWeightInput(input);
+        const cursor = Math.max(0, input.value.length - cursorFromEnd);
+        input.setSelectionRange(cursor, cursor);
+        syncAllPaymentCalculators();
+        return;
+    }
     if (!isCurrencyInput(input)) return;
 
     const cursorFromEnd = input.value.length - input.selectionStart;
@@ -202,9 +326,35 @@ document.addEventListener('input', function(event) {
     input.setSelectionRange(cursor, cursor);
 });
 
-// Các ô được thêm động (chuyến về, hạng mục sửa xe) cũng tự chuyển thành ô tiền.
+document.addEventListener('focusout', function(event) {
+    if (isWeightInput(event.target)) finalizeWeightInput(event.target);
+});
+document.addEventListener('change', function(event) {
+    if (isWeightInput(event.target)) finalizeWeightInput(event.target);
+});
+
+document.addEventListener('keydown', function(event) {
+    if (event.key !== 'Backspace') return;
+    const input = event.target;
+    if (!isWeightInput(input)) return;
+    if (input.selectionStart !== input.selectionEnd) return;
+    const pos = input.selectionStart;
+    if (pos > 0 && input.value[pos - 1] === '.') {
+        event.preventDefault();
+        const val = input.value;
+        const newVal = val.slice(0, pos - 2) + val.slice(pos - 1);
+        const digits = weightDigits(newVal);
+        input.value = formatWeightDigits(digits);
+        const newCursor = Math.max(0, pos - 2);
+        input.setSelectionRange(newCursor, newCursor);
+        syncAllPaymentCalculators();
+    }
+});
+
+// Các ô được thêm động (chuyến về, hạng mục sửa xe) cũng tự chuyển thành ô tiền / ô số tấn.
 document.addEventListener('focusin', function(event) {
     prepareCurrencyInput(event.target);
+    prepareWeightInput(event.target);
 });
 
 // Tương thích với biểu mẫu chuyến về được tạo bởi các phiên bản giao diện trước.
@@ -233,12 +383,19 @@ document.addEventListener('submit', function(event) {
     if (event.defaultPrevented) return;
     event.target.querySelectorAll('input').forEach(function(input) {
         if (isCurrencyInput(input)) input.value = currencyDigits(input.value);
+        if (isWeightInput(input)) finalizeWeightInput(input);
     });
 });
 
 // Tính doanh thu theo hai cách: bao chuyến hoặc số tấn × giá mỗi tấn.
 function numericInputValue(input) {
-    return Number(String(input?.value || '').replace(/,/g, '')) || 0;
+    if (!input) return 0;
+    const str = String(input.value || '').trim();
+    if (isWeightInput(input)) {
+        const val = Number(str.replace(/,/g, '')) || 0;
+        return (val >= 1000 && val <= 99999) ? val / 1000 : val;
+    }
+    return Number(str.replace(/,/g, '')) || 0;
 }
 
 function syncPaymentCalculator(container) {

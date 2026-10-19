@@ -143,7 +143,8 @@ async function onCustomerChange(select) {
                     </div>
                     <div class="col-6 per-ton-field d-none">
                         <label class="form-label">Số tấn</label>
-                        <input type="number" name="cargo_weight_tons" class="form-control cargo-weight" min="0" step="0.001" placeholder="Ví dụ: 18.500">
+                        <input type="text" name="cargo_weight_tons" class="form-control cargo-weight" inputmode="numeric" autocomplete="off" placeholder="Ví dụ: 18.500">
+                        <div class="invalid-feedback">Số tấn phải từ 1.000 đến 99.999 tấn (1.000 - 99.999 kg).</div>
                     </div>
                     <div class="col-6 per-ton-field d-none">
                         <label class="form-label">Giá 1 tấn (VNĐ)</label>
@@ -201,6 +202,16 @@ async function onCustomerChange(select) {
                     <input type="text" name="expense_other" class="form-control currency-input" value="0" inputmode="numeric">
                 </div>
                 {% include 'phoi/_repair_expenses.html' %}
+            </div>
+        </div>
+
+        <!-- TIỀN CÔNG TÀI XẾ -->
+        <span class="section-title collapsible-section-title" data-collapse-target="driver-wage-section" role="button" tabindex="0" aria-controls="driver-wage-section" aria-expanded="true"><i class="bi bi-person-badge"></i> Tiền công tài xế <i class="bi bi-chevron-up section-toggle-icon" aria-hidden="true"></i></span>
+        <div class="card mb-3" id="driver-wage-section">
+            <div class="card-body">
+                <label class="form-label">Tiền công chuyến (VNĐ)</label>
+                <input type="text" name="driver_wage" class="form-control currency-input" value="" inputmode="numeric" placeholder="Nhập tiền công tài xế (nếu có)">
+                <small class="text-muted">Tài xế có thể nhập ngay hoặc bổ sung trước khi chốt phơi; quản lý có thể xác nhận hoặc chỉnh sửa lại khi chốt.</small>
             </div>
         </div>
 
@@ -341,7 +352,7 @@ function addReturnTrip(values = {}) {
                 <div class="col-6"><label class="form-label">Điểm đến *</label><input type="text" name="return_trip_destination[]" class="form-control form-control-sm" required value="${values.destination || ''}"></div>
                 <div class="col-12"><label class="form-label">Mô tả hàng hóa</label><input type="text" name="return_trip_cargo[]" class="form-control form-control-sm" value="${values.cargo || ''}"></div>
                 <div class="col-12"><label class="form-label">Ảnh phiếu cân</label><input type="file" data-return-ticket-upload class="form-control form-control-sm" name="return_trip_weigh_ticket_images_${number - 1}" accept="image/jpeg,image/png,image/webp" multiple><small class="text-muted">Tối đa 5 ảnh.</small></div>
-                <div class="col-12" data-payment-calculator><label class="form-label">Cách tính tiền *</label><select name="return_trip_payment_method[]" class="form-select form-select-sm payment-method"><option value="fixed" ${values.paymentMethod === 'per_ton' ? '' : 'selected'}>Bao chuyến — tiền cố định</option><option value="per_ton" ${values.paymentMethod === 'per_ton' ? 'selected' : ''}>Theo tấn — số tấn × giá/tấn</option></select><div class="row g-2 mt-1"><div class="col-6 fixed-revenue-field"><label class="form-label">Tiền bao chuyến (VNĐ)</label><input type="text" name="return_trip_revenue_full[]" class="form-control form-control-sm currency-input calculated-revenue" inputmode="numeric" value="${values.revenueFull || ''}"></div><div class="col-6 per-ton-field d-none"><label class="form-label">Số tấn</label><input type="number" name="return_trip_cargo_weight_tons[]" class="form-control form-control-sm cargo-weight" min="0" step="0.001" value="${values.cargoWeightTons || ''}"></div><div class="col-6 per-ton-field d-none"><label class="form-label">Giá 1 tấn (VNĐ)</label><input type="text" name="return_trip_price_per_ton[]" class="form-control form-control-sm currency-input price-per-ton" inputmode="numeric" value="${values.pricePerTon || ''}"></div></div></div>
+                <div class="col-12" data-payment-calculator><label class="form-label">Cách tính tiền *</label><select name="return_trip_payment_method[]" class="form-select form-select-sm payment-method"><option value="fixed" ${values.paymentMethod === 'per_ton' ? '' : 'selected'}>Bao chuyến — tiền cố định</option><option value="per_ton" ${values.paymentMethod === 'per_ton' ? 'selected' : ''}>Theo tấn — số tấn × giá/tấn</option></select><div class="row g-2 mt-1"><div class="col-6 fixed-revenue-field"><label class="form-label">Tiền bao chuyến (VNĐ)</label><input type="text" name="return_trip_revenue_full[]" class="form-control form-control-sm currency-input calculated-revenue" inputmode="numeric" value="${values.revenueFull || ''}"></div><div class="col-6 per-ton-field d-none"><label class="form-label">Số tấn</label><input type="text" name="return_trip_cargo_weight_tons[]" class="form-control form-control-sm cargo-weight" inputmode="numeric" autocomplete="off" placeholder="Ví dụ: 18.500" value="${values.cargoWeightTons || ''}"><div class="invalid-feedback">Số tấn phải từ 1.000 đến 99.999 tấn (1.000 - 99.999 kg).</div></div><div class="col-6 per-ton-field d-none"><label class="form-label">Giá 1 tấn (VNĐ)</label><input type="text" name="return_trip_price_per_ton[]" class="form-control form-control-sm currency-input price-per-ton" inputmode="numeric" value="${values.pricePerTon || ''}"></div></div></div>
                 <div class="col-6"><label class="form-label">Đã thu tạm (VNĐ)</label><input type="text" name="return_trip_revenue_collected[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="${values.revenueCollected || ''}"></div>
                 <div class="col-12"><label class="form-label">Tiền bốc vác <small class="text-muted">(tài xế ứng trước)</small></label><input type="text" name="return_trip_porter_fee[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="${values.porterFee || '0'}"></div>
                 <div class="col-12"><label class="form-label">Ghi chú</label><input type="text" name="return_trip_notes[]" class="form-control form-control-sm" value="${values.notes || ''}"></div>

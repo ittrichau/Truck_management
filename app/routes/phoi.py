@@ -37,6 +37,8 @@ def financial_confirmation_error(phoi):
         elif trip.payment_method == 'per_ton':
             if trip.cargo_weight_tons is None or trip.cargo_weight_tons <= 0:
                 return f'Vui lòng nhập số tấn lớn hơn 0 cho {trip_label} trước khi xác nhận.'
+            if trip.cargo_weight_tons < Decimal('1.000') or trip.cargo_weight_tons > Decimal('99.999'):
+                return f'Số tấn của {trip_label} phải từ 1.000 đến 99.999 tấn trước khi xác nhận.'
             if trip.price_per_ton is None or trip.price_per_ton <= 0:
                 return f'Vui lòng nhập đơn giá mỗi tấn lớn hơn 0 cho {trip_label} trước khi xác nhận.'
         else:
@@ -217,12 +219,17 @@ def _revenue_from_form(method, fixed_revenue, weight, price_per_ton):
         return _money(fixed_revenue), None, None
 
     try:
-        tons = Decimal(str(weight).strip()) if str(weight or '').strip() else None
+        raw_weight = str(weight or '').strip().replace(',', '.')
+        tons = Decimal(raw_weight) if raw_weight else None
     except InvalidOperation:
         raise ValueError('Số tấn không hợp lệ.')
     price = _money(price_per_ton) if str(price_per_ton or '').strip() else None
-    if tons is not None and tons < 0:
-        raise ValueError('Số tấn không thể âm.')
+    if tons is not None:
+        if Decimal('1000') <= tons <= Decimal('99999'):
+            tons = tons / Decimal('1000')
+        if tons < Decimal('1.000') or tons > Decimal('99.999'):
+            raise ValueError('Số tấn chỉ được dao động từ 1.000 đến 99.999 tấn (1.000 - 99.999 kg).')
+        tons = tons.quantize(Decimal('0.001'))
     if price is not None and price < 0:
         raise ValueError('Đơn giá mỗi tấn không thể âm.')
     revenue = tons * price if tons is not None and price is not None else Decimal('0')
@@ -465,6 +472,10 @@ def create():
             )
             phoi.cargo_weight_tons = cargo_weight_tons
             phoi.revenue_collected = _money(request.form.get('revenue_collected', 0))
+            driver_wage = _money(request.form.get('driver_wage', 0))
+            if driver_wage < 0:
+                raise ValueError('Tiền công tài xế không thể âm.')
+            phoi.driver_wage = driver_wage
 
             # Phơi mới đang thực hiện; chuyến về và đổ xăng sẽ được thêm sau.
             phoi.status = 'draft'
@@ -707,7 +718,11 @@ def edit(id):
                     phoi.manager_revenue_collected = _money(
                         request.form.get('manager_revenue_collected', 0)
                     )
-                phoi.driver_wage = _money(request.form.get('driver_wage', 0))
+
+            driver_wage = _money(request.form.get('driver_wage', 0))
+            if driver_wage < 0:
+                raise ValueError('Tiền công tài xế không thể âm.')
+            phoi.driver_wage = driver_wage
 
             synced_return_trips = _sync_return_trips(phoi)
             db.session.flush()
@@ -847,6 +862,17 @@ def submit(id):
     if error:
         flash(error, 'danger')
         return redirect(url_for('phoi.detail', id=id))
+
+    if 'driver_wage' in request.form and request.form.get('driver_wage', '').strip():
+        try:
+            submitted_wage = _money(request.form.get('driver_wage'))
+            if submitted_wage < 0:
+                flash('Tiền công tài xế không thể âm.', 'danger')
+                return redirect(url_for('phoi.detail', id=id))
+            phoi.driver_wage = submitted_wage
+        except ValueError as err:
+            flash(str(err), 'danger')
+            return redirect(url_for('phoi.detail', id=id))
 
     phoi.status = 'submitted'
     update_truck_status(phoi.truck)
