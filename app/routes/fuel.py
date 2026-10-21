@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from app import db
 from app.models import FuelLog, FuelPrice, FuelReceipt, Truck, Phoi
 from app.phoi_attachments import save_phoi_attachment, delete_attachment_file, attachment_path
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 bp = Blueprint('fuel', __name__)
 
@@ -246,6 +246,19 @@ def price_list():
     return render_template('fuel/prices.html', prices=prices)
 
 
+def _has_price_on_effective_days(effective_from, effective_to, exclude_id=None):
+    query = FuelPrice.query
+    if exclude_id is not None:
+        query = query.filter(FuelPrice.id != exclude_id)
+
+    day_start = datetime.combine(effective_from.date(), datetime.min.time())
+    next_day_start = day_start + timedelta(days=1)
+    return query.filter(
+        FuelPrice.effective_from >= day_start,
+        FuelPrice.effective_from < next_day_start,
+    ).first() is not None
+
+
 @bp.route('/fuel/prices/create', methods=['GET', 'POST'])
 @login_required
 def create_price():
@@ -254,8 +267,6 @@ def create_price():
         return redirect(url_for('fuel.price_list'))
     if request.method == 'POST':
         try:
-            from datetime import timedelta
-
             # Parse datetime từ form (định dạng: YYYY-MM-DDTHH:MM)
             effective_from_str = request.form.get('effective_from', '')
             # Mặc định 3:00 PM (15:00) nếu không nhập giờ
@@ -265,6 +276,10 @@ def create_price():
 
             effective_to_str = request.form.get('effective_to', '').strip()
             effective_to = datetime.strptime(effective_to_str, '%Y-%m-%dT%H:%M') if effective_to_str else None
+            if effective_to and effective_to <= effective_from:
+                raise ValueError('Thời điểm kết thúc phải sau thời điểm bắt đầu.')
+            if _has_price_on_effective_days(effective_from, effective_to):
+                raise ValueError('Ngày bắt đầu hiệu lực đã có bảng giá khác. Mỗi ngày chỉ được có một giá xăng.')
 
             # Tìm giá đang hiệu lực (có effective_to = NULL) và tự động đóng lại
             active_price = FuelPrice.get_active_price(effective_from)
@@ -295,6 +310,64 @@ def create_price():
     now = datetime.now()
     today_15h = now.replace(hour=15, minute=0, second=0, microsecond=0).strftime('%Y-%m-%dT%H:%M')
     return render_template('fuel/price_form.html', price=None, today_15h=today_15h)
+
+
+@bp.route('/fuel/prices/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_price(id):
+    if not current_user.is_admin():
+        flash('Chỉ admin mới được sửa giá xăng.', 'danger')
+        return redirect(url_for('fuel.price_list'))
+
+    fp = FuelPrice.query.get_or_404(id)
+    if request.method == 'POST':
+        try:
+            price_per_liter = float(request.form.get('price_per_liter', '').replace(',', '').strip())
+            if price_per_liter <= 0:
+                raise ValueError('Giá xăng phải lớn hơn 0.')
+
+            effective_from_str = request.form.get('effective_from', '').strip()
+            if not effective_from_str:
+                raise ValueError('Vui lòng chọn thời điểm bắt đầu hiệu lực.')
+            effective_from = datetime.strptime(effective_from_str, '%Y-%m-%dT%H:%M')
+
+            effective_to_str = request.form.get('effective_to', '').strip()
+            effective_to = datetime.strptime(effective_to_str, '%Y-%m-%dT%H:%M') if effective_to_str else None
+            if effective_to and effective_to <= effective_from:
+                raise ValueError('Thời điểm kết thúc phải sau thời điểm bắt đầu.')
+            if _has_price_on_effective_days(effective_from, effective_to, exclude_id=fp.id):
+                raise ValueError('Ngày bắt đầu hiệu lực đã có bảng giá khác. Mỗi ngày chỉ được có một giá xăng.')
+
+            fp.price_per_liter = price_per_liter
+            fp.effective_from = effective_from
+            fp.effective_to = effective_to
+            fp.notes = request.form.get('notes', '').strip()
+            db.session.commit()
+            flash('Đã cập nhật bảng giá xăng. Các lần đổ xăng đã ghi nhận không thay đổi.', 'success')
+            return redirect(url_for('fuel.price_list'))
+        except (TypeError, ValueError) as exc:
+            db.session.rollback()
+            flash(f'Lỗi: {str(exc)}', 'danger')
+
+    return render_template(
+        'fuel/price_form.html',
+        price=fp,
+        today_15h=fp.effective_from.strftime('%Y-%m-%dT%H:%M'),
+    )
+
+
+@bp.route('/fuel/prices/<int:id>/delete', methods=['POST'])
+@login_required
+def delete_price(id):
+    if not current_user.is_admin():
+        flash('Chỉ admin mới được xóa giá xăng.', 'danger')
+        return redirect(url_for('fuel.price_list'))
+
+    fp = FuelPrice.query.get_or_404(id)
+    db.session.delete(fp)
+    db.session.commit()
+    flash('Đã xóa bảng giá xăng. Các lần đổ xăng đã ghi nhận không thay đổi.', 'success')
+    return redirect(url_for('fuel.price_list'))
 
 
 @bp.route('/fuel/prices/<int:id>/toggle', methods=['POST'])

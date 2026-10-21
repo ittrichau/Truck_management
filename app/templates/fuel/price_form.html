@@ -1,14 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Thêm giá xăng mới{% endblock %}
+{% block title %}{{ 'Sửa giá xăng' if price else 'Thêm giá xăng mới' }}{% endblock %}
 {% block content %}
 <div class="mx-auto" style="max-width: 500px;">
-    <h5 class="mb-3"><i class="bi bi-plus-circle"></i> Thêm giá xăng mới</h5>
+    <h5 class="mb-3"><i class="bi bi-{{ 'pencil-square' if price else 'plus-circle' }}"></i> {{ 'Sửa giá xăng' if price else 'Thêm giá xăng mới' }}</h5>
     <div class="card"><div class="card-body">
     <form method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
             <label class="form-label">Giá (VNĐ/lít) *</label>
-            <input type="text" name="price_per_liter" class="form-control currency-input" required placeholder="25,000" inputmode="numeric">
+            <input type="text" name="price_per_liter" class="form-control currency-input" required placeholder="25,000" inputmode="numeric" value="{{ '{:,.0f}'.format(price.price_per_liter) if price else '' }}">
         </div>
         <div class="row g-2 mb-3">
             <div class="col-6">
@@ -18,16 +18,16 @@
             </div>
             <div class="col-6">
                 <label class="form-label">Đến ngày <span class="text-muted">(tùy chọn)</span></label>
-                <input type="datetime-local" name="effective_to" class="form-control">
+                <input type="datetime-local" name="effective_to" class="form-control" value="{{ price.effective_to.strftime('%Y-%m-%dT%H:%M') if price and price.effective_to else '' }}">
                 <small class="text-muted">Để trống nếu giá này đang hiện hành. Hệ thống sẽ tự động đóng giá cũ.</small>
             </div>
         </div>
         <div class="mb-3">
             <label class="form-label">Ghi chú</label>
-            <textarea name="notes" class="form-control" rows="2"></textarea>
+            <textarea name="notes" class="form-control" rows="2">{{ price.notes if price and price.notes else '' }}</textarea>
         </div>
         <button type="submit" class="btn btn-primary w-100">
-            <i class="bi bi-check-circle"></i> Lưu giá xăng
+            <i class="bi bi-check-circle"></i> {{ 'Cập nhật giá xăng' if price else 'Lưu giá xăng' }}
         </button>
         <a href="{{ url_for('fuel.price_list') }}" class="btn btn-outline-secondary w-100 mt-2">Quay lại</a>
     </form>

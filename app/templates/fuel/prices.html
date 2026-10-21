@@ -22,7 +22,7 @@
                         <th>Trạng thái</th>
                         <th>Ghi chú</th>
                         {% if current_user.is_admin() %}
-                        <th></th>
+                        <th>Thao tác</th>
                         {% endif %}
                     </tr>
                 </thead>
@@ -42,11 +42,16 @@
                         <td class="small">{{ p.notes or '—' }}</td>
                         {% if current_user.is_admin() %}
                         <td>
+                            <a href="{{ url_for('fuel.edit_price', id=p.id) }}" class="btn btn-sm btn-outline-primary">Sửa</a>
                             <form action="{{ url_for('fuel.toggle_price', id=p.id) }}" method="POST" style="display:inline;">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm {% if p.is_active %}btn-outline-secondary{% else %}btn-outline-success{% endif %}">
                                     {{ 'Tắt' if p.is_active else 'Bật' }}
                                 </button>
+                            </form>
+                            <form action="{{ url_for('fuel.delete_price', id=p.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Xóa bảng giá này? Các lần đổ xăng đã ghi nhận sẽ giữ nguyên đơn giá.');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Xóa</button>
                             </form>
                         </td>
                         {% endif %}
