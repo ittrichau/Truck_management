@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file
+from flask import Blueprint, current_app, render_template, redirect, url_for, flash, request, jsonify, send_file
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 from app import db
@@ -114,6 +114,28 @@ def _assign_unallocated_fuel_logs(phoi):
         log.phois.append(phoi)
         log.allocation_status = 'allocated'
         log.unallocated_from_cancelled_phoi_id = None
+
+
+def _delete_exclusive_phoi_fuel_logs(phoi):
+    """Delete a phơi's fuel records only when no other phơi uses them."""
+    storage_keys = []
+    fuel_logs = list(phoi.fuel_logs)
+    if any(log.attached_phoi_count() != 1 for log in fuel_logs):
+        raise ValueError('Không thể hủy phơi vì có lần đổ xăng đang được gắn với phơi khác.')
+
+    for log in fuel_logs:
+        for receipt in log.receipts.all():
+            storage_keys.append(receipt.storage_key)
+        db.session.delete(log)
+    return len(fuel_logs), storage_keys
+
+
+def _delete_phoi_attachment_files(storage_keys):
+    for storage_key in storage_keys:
+        try:
+            delete_attachment_file(storage_key)
+        except OSError:
+            current_app.logger.exception('Unable to delete phơi attachment %s', storage_key)
 
 def _ensure_truck_has_no_other_active_phoi(truck_id, excluded_phoi_id=None):
     """A truck may have only one in-progress draft phơi at a time."""
@@ -554,6 +576,7 @@ def upload_attachment(id):
     can_update_attachments = (
         (phoi.status == 'draft' and can_manage_phoi(current_user, phoi))
         or (phoi.status == 'submitted' and current_user.is_manager_or_admin())
+        or (phoi.status == 'confirmed' and current_user.is_admin())
     )
     if not can_update_attachments:
         flash('Chỉ chủ xe mới có thể bổ sung chứng từ sau khi phơi đã chốt.', 'danger')
@@ -633,6 +656,7 @@ def delete_attachment(id, attachment_id):
     can_delete_attachment = (
         (phoi.status == 'draft' and can_manage_phoi(current_user, phoi))
         or (phoi.status == 'submitted' and current_user.is_manager_or_admin())
+        or (phoi.status == 'confirmed' and current_user.is_admin())
     )
     if not can_delete_attachment:
         flash('Chỉ chủ xe mới có thể xóa chứng từ sau khi phơi đã chốt.', 'danger')
@@ -668,6 +692,7 @@ def edit(id):
     can_edit = (
         (phoi.status == 'draft' and can_manage_phoi(current_user, phoi))
         or (phoi.status == 'submitted' and current_user.is_manager_or_admin())
+        or (phoi.status == 'confirmed' and current_user.is_admin())
     )
     if not can_edit:
         flash('Tài xế chỉ có thể sửa phơi đang thực hiện; phơi đã xác nhận không thể chỉnh sửa.', 'warning')
@@ -763,6 +788,20 @@ def edit(id):
                     endpoint=request.endpoint,
                     status_code=200,
                 ))
+            elif phoi.status == 'confirmed' and current_user.is_admin():
+                db.session.add(ActivityLog(
+                    user_id=current_user.id,
+                    username=current_user.username,
+                    action='UPDATE',
+                    resource_type='phoi_reconciliation',
+                    resource_id=str(phoi.id),
+                    details=f'Admin đã chỉnh sửa phơi đã xác nhận {phoi.phoi_number}.',
+                    ip_address=request.remote_addr,
+                    user_agent=request.headers.get('User-Agent', '')[:200],
+                    method=request.method,
+                    endpoint=request.endpoint,
+                    status_code=200,
+                ))
 
             update_truck_status(old_truck)
             update_truck_status(truck)
@@ -796,11 +835,16 @@ def edit(id):
 @login_required
 def cancel(id):
     phoi = Phoi.query.get_or_404(id)
-    if not current_user.is_manager_or_admin():
+    is_allowed_role = current_user.is_manager_or_admin() or current_user.is_admin()
+    if not is_allowed_role:
         flash('Chỉ quản lý mới có quyền hủy phơi.', 'danger')
         return redirect(url_for('phoi.detail', id=id))
-    if phoi.status != 'draft':
-        flash('Chỉ có thể hủy phơi đang thực hiện.', 'warning')
+    can_cancel = (
+        phoi.status == 'draft'
+        or (phoi.status == 'confirmed' and current_user.is_admin())
+    )
+    if not can_cancel:
+        flash('Chỉ có thể hủy phơi đang thực hiện; admin có thể hủy phơi đã xác nhận.', 'warning')
         return redirect(url_for('phoi.detail', id=id))
 
     reason = request.form.get('cancellation_reason', '').strip()
@@ -808,14 +852,19 @@ def cancel(id):
         flash('Vui lòng nhập lý do hủy phơi.', 'danger')
         return redirect(url_for('phoi.detail', id=id))
 
+    was_confirmed = phoi.status == 'confirmed'
     try:
         released_count = 0
-        for fuel_log in list(phoi.fuel_logs):
-            fuel_log.phois.remove(phoi)
-            if fuel_log.attached_phoi_count() == 0:
-                fuel_log.allocation_status = 'unallocated'
-                fuel_log.unallocated_from_cancelled_phoi_id = phoi.id
-                released_count += 1
+        deleted_receipt_keys = []
+        if phoi.status == 'confirmed':
+            released_count, deleted_receipt_keys = _delete_exclusive_phoi_fuel_logs(phoi)
+        else:
+            for fuel_log in list(phoi.fuel_logs):
+                fuel_log.phois.remove(phoi)
+                if fuel_log.attached_phoi_count() == 0:
+                    fuel_log.allocation_status = 'unallocated'
+                    fuel_log.unallocated_from_cancelled_phoi_id = phoi.id
+                    released_count += 1
 
         phoi.status = 'cancelled'
         phoi.cancelled_by_id = current_user.id
@@ -830,7 +879,7 @@ def cancel(id):
             resource_id=str(phoi.id),
             details=(
                 f'Đã hủy phơi {phoi.phoi_number}. Lý do: {reason}. '
-                f'{released_count} lần đổ xăng chuyển sang chờ phân bổ.'
+                + (f'Đã xóa {released_count} lần đổ xăng riêng.' if was_confirmed else f'{released_count} lần đổ xăng chuyển sang chờ phân bổ.')
             ),
             ip_address=request.remote_addr,
             user_agent=request.headers.get('User-Agent', '')[:200],
@@ -844,7 +893,12 @@ def cancel(id):
         flash('Không thể hủy phơi. Vui lòng thử lại.', 'danger')
         return redirect(url_for('phoi.detail', id=id))
 
-    flash(f'Đã hủy phơi {phoi.phoi_number}. {released_count} lần đổ xăng đang chờ phân bổ lại.', 'success')
+    if was_confirmed:
+        _delete_phoi_attachment_files(deleted_receipt_keys)
+    if was_confirmed:
+        flash(f'Đã hủy phơi {phoi.phoi_number} và xóa {released_count} lần đổ xăng cùng hóa đơn.', 'success')
+    else:
+        flash(f'Đã hủy phơi {phoi.phoi_number}. {released_count} lần đổ xăng đang chờ phân bổ lại.', 'success')
     return redirect(url_for('phoi.detail', id=id))
 
 @bp.route('/phoi/<int:id>/submit', methods=['POST'])

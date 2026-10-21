@@ -24,6 +24,10 @@
             <a href="{{ url_for('phoi.edit', id=phoi.id) }}" class="btn btn-primary btn-sm"><i class="bi bi-clipboard-check"></i> Đối soát / Sửa phơi</a>
             <a href="{{ url_for('phoi.confirm', id=phoi.id) }}" class="btn btn-success btn-sm"><i class="bi bi-check-circle"></i> Xác nhận nhanh</a>
             {% endif %}
+            {% if current_user.is_admin() and phoi.status == 'confirmed' %}
+            <a href="{{ url_for('phoi.edit', id=phoi.id) }}" class="btn btn-primary btn-sm"><i class="bi bi-pencil"></i> Sửa phơi đã xác nhận</a>
+            <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#cancelPhoiModal"><i class="bi bi-x-circle"></i> Hủy phơi</button>
+            {% endif %}
         </div>
     </div>
 
@@ -109,7 +113,7 @@
                 {% for attachment in trip.attachments.filter_by(attachment_type='weigh_ticket').all() %}
                 <div class="small mt-1"><a target="_blank" href="{{ url_for('phoi.view_attachment', id=phoi.id, attachment_id=attachment.id) }}"><i class="bi bi-image"></i> {{ attachment.original_filename }}</a></div>
                 {% else %}<div class="small text-muted">Chưa có ảnh phiếu cân.</div>{% endfor %}
-                {% if (phoi.status == 'draft' and (current_user.is_manager_or_admin() or (current_user.is_driver() and phoi.driver_id == current_user.id))) or (phoi.status == 'submitted' and current_user.is_manager_or_admin()) %}
+                {% if (phoi.status == 'draft' and (current_user.is_manager_or_admin() or (current_user.is_driver() and phoi.driver_id == current_user.id))) or (phoi.status == 'submitted' and current_user.is_manager_or_admin()) or (phoi.status == 'confirmed' and current_user.is_admin()) %}
                 <form action="{{ url_for('phoi.upload_attachment', id=phoi.id) }}" method="POST" enctype="multipart/form-data" class="mt-2">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="attachment_type" value="weigh_ticket"><input type="hidden" name="return_trip_id" value="{{ trip.id }}">
                     <div class="input-group input-group-sm"><input type="file" name="images" class="form-control" accept="image/jpeg,image/png,image/webp" multiple required><button class="btn btn-outline-primary" type="submit">Tải phiếu cân</button></div>
@@ -144,12 +148,12 @@
                     {% endfor %}
                 </div>
                 {% endif %}
-                {% if phoi.status != 'confirmed' and (current_user.is_manager_or_admin() or (current_user.is_driver() and fuel.created_by_id == current_user.id)) %}
+                {% if (phoi.status != 'confirmed' and (current_user.is_manager_or_admin() or (current_user.is_driver() and fuel.created_by_id == current_user.id))) or (phoi.status == 'confirmed' and current_user.is_admin() and fuel.attached_phoi_count() == 1) %}
                 <div class="mt-2">
                     <a href="{{ url_for('fuel.edit', id=fuel.id) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i> Sửa số lít / ngày đổ</a>
                     <form action="{{ url_for('fuel.delete', id=fuel.id) }}" method="POST" class="d-inline">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Xóa lần đổ xăng này? Nếu đây là lần cuối, phơi sẽ phải thêm xăng lại trước khi xác nhận.')"><i class="bi bi-trash"></i> Xóa</button>
+                        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Xóa lần đổ xăng này và ảnh hóa đơn?')"><i class="bi bi-trash"></i> Xóa</button>
                     </form>
                 </div>
                 {% endif %}
@@ -164,7 +168,7 @@
             {% if phoi.cargo_weight_tons %}
             <div class="mb-3 small"><strong>Khối lượng:</strong> {{ phoi.cargo_weight_tons }} tấn</div>
             {% endif %}
-            {% if (phoi.status == 'draft' and (current_user.is_manager_or_admin() or (current_user.is_driver() and phoi.driver_id == current_user.id))) or (phoi.status == 'submitted' and current_user.is_manager_or_admin()) %}
+            {% if (phoi.status == 'draft' and (current_user.is_manager_or_admin() or (current_user.is_driver() and phoi.driver_id == current_user.id))) or (phoi.status == 'submitted' and current_user.is_manager_or_admin()) or (phoi.status == 'confirmed' and current_user.is_admin()) %}
             <form action="{{ url_for('phoi.upload_attachment', id=phoi.id) }}" method="POST" enctype="multipart/form-data" class="border rounded p-3 mb-3 bg-light">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="row g-2 align-items-end">
@@ -177,7 +181,7 @@
             {% for attachment in phoi.attachments.filter_by(return_trip_id=None).all() %}
             <div class="d-flex align-items-center justify-content-between border-bottom py-2 gap-2">
                 <a class="text-decoration-none" target="_blank" href="{{ url_for('phoi.view_attachment', id=phoi.id, attachment_id=attachment.id) }}"><i class="bi bi-image"></i> <strong>{{ attachment.type_label() }}</strong>{% if attachment.expense %}<br><small class="text-warning">Sửa xe: {{ attachment.expense.description }}</small>{% endif %}<br><small class="text-muted">{{ attachment.original_filename }} · {{ '%.1f'|format(attachment.file_size / 1024) }} KB · {{ attachment.created_at.strftime('%d/%m/%Y %H:%M') }}</small></a>
-                {% if (phoi.status == 'draft' and (current_user.is_manager_or_admin() or (current_user.is_driver() and phoi.driver_id == current_user.id))) or (phoi.status == 'submitted' and current_user.is_manager_or_admin()) %}<form action="{{ url_for('phoi.delete_attachment', id=phoi.id, attachment_id=attachment.id) }}" method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-danger btn-sm" onclick="return confirm('Xóa ảnh này?')">Xóa</button></form>{% endif %}
+                {% if (phoi.status == 'draft' and (current_user.is_manager_or_admin() or (current_user.is_driver() and phoi.driver_id == current_user.id))) or (phoi.status == 'submitted' and current_user.is_manager_or_admin()) or (phoi.status == 'confirmed' and current_user.is_admin()) %}<form action="{{ url_for('phoi.delete_attachment', id=phoi.id, attachment_id=attachment.id) }}" method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-danger btn-sm" onclick="return confirm('Xóa ảnh này?')">Xóa</button></form>{% endif %}
             </div>
             {% else %}<p class="text-muted mb-0">Chưa có ảnh chứng từ nào.</p>{% endfor %}
         </div>
@@ -277,7 +281,7 @@
     {% endif %}
 </div>
 
-{% if current_user.is_manager_or_admin() and phoi.status == 'draft' %}
+{% if (current_user.is_manager_or_admin() and phoi.status == 'draft') or (current_user.is_admin() and phoi.status == 'confirmed') %}
 <div class="modal fade" id="cancelPhoiModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <form method="POST" action="{{ url_for('phoi.cancel', id=phoi.id) }}" class="modal-content">
@@ -288,13 +292,21 @@
             </div>
             <div class="modal-body">
                 <p>Phơi được giữ lại để tra cứu nhưng sẽ không được dùng để đối soát hoặc báo cáo tài chính.</p>
+                {% if phoi.status == 'confirmed' %}
+                <p class="small text-danger">Các lần đổ xăng và hóa đơn thuộc phơi này sẽ bị xóa. Nếu có lần đổ xăng đang gắn với phơi khác, thao tác hủy sẽ bị từ chối.</p>
+                {% else %}
+                {% if phoi.status == 'confirmed' %}
+                <p class="small text-danger">Các lần đổ xăng và hóa đơn thuộc phơi này sẽ bị xóa. Nếu có lần đổ xăng đang gắn với phơi khác, thao tác hủy sẽ bị từ chối.</p>
+                {% else %}
                 <p class="small text-muted">Lần đổ xăng chỉ gắn với phơi này sẽ chuyển sang chờ phân bổ; xăng dùng chung vẫn giữ ở các phơi còn lại.</p>
+                {% endif %}
+                {% endif %}
                 <label for="cancellation_reason" class="form-label">Lý do hủy *</label>
                 <textarea id="cancellation_reason" name="cancellation_reason" class="form-control" rows="3" required></textarea>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
-                <button type="submit" class="btn btn-danger">Xác nhận hủy phơi</button>
+                <button type="submit" class="btn btn-danger" onclick="return confirm('Xác nhận hủy phơi? Thao tác này không thể hoàn tác.')">Xác nhận hủy phơi</button>
             </div>
         </form>
     </div>

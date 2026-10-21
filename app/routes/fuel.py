@@ -159,8 +159,12 @@ def edit(id):
     ):
         flash('Bạn không có quyền sửa lần đổ xăng này.', 'danger')
         return redirect(url_for('fuel.index'))
-    if any(phoi.status == 'confirmed' for phoi in linked_phois):
+    has_confirmed_link = any(phoi.status == 'confirmed' for phoi in linked_phois)
+    if has_confirmed_link and not current_user.is_admin():
         flash('Không thể sửa lần đổ xăng đã gắn với phơi được xác nhận.', 'warning')
+        return redirect(url_for('fuel.index'))
+    if has_confirmed_link and len(linked_phois) != 1:
+        flash('Không thể sửa lần đổ xăng đang được nhiều phơi sử dụng.', 'warning')
         return redirect(url_for('fuel.index'))
 
     if request.method == 'POST':
@@ -213,11 +217,18 @@ def delete(id):
     ):
         flash('Bạn không có quyền xóa lần đổ xăng này.', 'danger')
         return redirect(url_for('fuel.index'))
-    if any(phoi.status == 'confirmed' for phoi in linked_phois):
+    has_confirmed_link = any(phoi.status == 'confirmed' for phoi in linked_phois)
+    if has_confirmed_link and not current_user.is_admin():
         flash('Không thể xóa lần đổ xăng đã gắn với phơi được xác nhận.', 'danger')
         return redirect(url_for('fuel.index'))
+    if has_confirmed_link and len(linked_phois) != 1:
+        flash('Không thể xóa lần đổ xăng đang được nhiều phơi sử dụng.', 'danger')
+        return redirect(url_for('fuel.index'))
+    receipt_keys = [receipt.storage_key for receipt in log.receipts.all()]
     db.session.delete(log)
     db.session.commit()
+    for storage_key in receipt_keys:
+        delete_attachment_file(storage_key)
     flash('Đã xóa bản ghi đổ xăng. Nếu đây là lần xăng cuối, hãy thêm lại trước khi xác nhận phơi.', 'success')
     if len(linked_phois) == 1:
         return redirect(url_for('phoi.detail', id=linked_phois[0].id))
