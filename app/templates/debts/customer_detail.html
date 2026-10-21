@@ -95,13 +95,49 @@
 <div class="d-flex justify-content-between align-items-center mb-2">
     <h6 class="mb-0">
         <i class="bi bi-list-ul"></i>
-        Phơi còn nợ
+        Các chuyến công nợ
         <span class="badge bg-danger ms-1">{{ total_count }}</span>
     </h6>
     {% if not show_all %}
     <small class="text-muted">Hiển thị {{ rows|length }} / {{ total_count }}</small>
     {% endif %}
 </div>
+
+<form method="GET" class="card card-body mb-3">
+    <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-3">
+            <label for="truck_id" class="form-label">Xe</label>
+            <select id="truck_id" name="truck_id" class="form-select">
+                <option value="">Tất cả xe</option>
+                {% for truck in trucks %}
+                <option value="{{ truck.id }}" {% if filter_truck_id == truck.id %}selected{% endif %}>{{ truck.license_plate }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label for="start_date" class="form-label">Từ ngày</label>
+            <input type="date" id="start_date" name="start_date" class="form-control" value="{{ start_date }}">
+        </div>
+        <div class="col-6 col-md-2">
+            <label for="end_date" class="form-label">Đến ngày</label>
+            <input type="date" id="end_date" name="end_date" class="form-control" value="{{ end_date }}">
+        </div>
+        <div class="col-8 col-md-3">
+            <label for="payment_status" class="form-label">Thanh toán</label>
+            <select id="payment_status" name="payment_status" class="form-select">
+                <option value="all" {% if payment_status == 'all' %}selected{% endif %}>Tất cả</option>
+                <option value="unpaid" {% if payment_status == 'unpaid' %}selected{% endif %}>Còn nợ</option>
+                <option value="paid" {% if payment_status == 'paid' %}selected{% endif %}>Đã thanh toán</option>
+            </select>
+        </div>
+        <div class="col-4 col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-primary flex-grow-1"><i class="bi bi-funnel"></i></button>
+            <a href="{{ url_for('debts.customer_detail', customer_id=customer.id) }}" class="btn btn-outline-secondary" title="Xóa bộ lọc">
+                <i class="bi bi-x-lg"></i>
+            </a>
+        </div>
+    </div>
+</form>
 
 {% if rows %}
 <div class="card">
@@ -152,9 +188,9 @@
 
 {% if has_more %}
 <div class="text-center mt-3">
-    <a href="{{ url_for('debts.customer_detail', customer_id=customer.id, all=1) }}"
+    <a href="{{ url_for('debts.customer_detail', customer_id=customer.id, all=1, truck_id=filter_truck_id or '', start_date=start_date, end_date=end_date, payment_status=payment_status) }}"
        class="btn btn-outline-primary">
-        <i class="bi bi-chevron-down"></i> Hiển thị tất cả {{ total_count }} phơi còn nợ
+        <i class="bi bi-chevron-down"></i> Hiển thị tất cả {{ total_count }} chuyến
     </a>
 </div>
 {% endif %}
@@ -162,7 +198,7 @@
 {% else %}
 <div class="text-center py-5 text-muted">
     <i class="bi bi-check-circle display-4 text-success"></i>
-    <p class="mt-2 mb-0">{{ customer.name }} không còn công nợ.</p>
+    <p class="mt-2 mb-0">Không có chuyến nào khớp với bộ lọc.</p>
 </div>
 {% endif %}
 

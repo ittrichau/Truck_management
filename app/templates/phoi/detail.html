@@ -295,11 +295,7 @@
                 {% if phoi.status == 'confirmed' %}
                 <p class="small text-danger">Các lần đổ xăng và hóa đơn thuộc phơi này sẽ bị xóa. Nếu có lần đổ xăng đang gắn với phơi khác, thao tác hủy sẽ bị từ chối.</p>
                 {% else %}
-                {% if phoi.status == 'confirmed' %}
-                <p class="small text-danger">Các lần đổ xăng và hóa đơn thuộc phơi này sẽ bị xóa. Nếu có lần đổ xăng đang gắn với phơi khác, thao tác hủy sẽ bị từ chối.</p>
-                {% else %}
                 <p class="small text-muted">Lần đổ xăng chỉ gắn với phơi này sẽ chuyển sang chờ phân bổ; xăng dùng chung vẫn giữ ở các phơi còn lại.</p>
-                {% endif %}
                 {% endif %}
                 <label for="cancellation_reason" class="form-label">Lý do hủy *</label>
                 <textarea id="cancellation_reason" name="cancellation_reason" class="form-control" rows="3" required></textarea>

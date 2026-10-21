@@ -1,11 +1,12 @@
 from collections import defaultdict
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
-from app.models import Customer, Phoi, PhoiReturnTrip
+from app.models import Customer, Phoi, PhoiReturnTrip, Truck
 
 bp = Blueprint('debts', __name__)
 
@@ -18,11 +19,25 @@ def index():
         flash('Bạn không có quyền truy cập trang công nợ.', 'danger')
         return redirect(url_for('phoi.index'))
 
-    phois = (
-        Phoi.query.filter_by(status='confirmed')
-        .order_by(Phoi.departure_date.desc(), Phoi.id.desc())
-        .all()
-    )
+    customer_search = request.args.get('customer', '').strip()
+    payment_status = request.args.get('payment_status', 'all')
+    start_date = request.args.get('start_date', '').strip()
+    end_date = request.args.get('end_date', '').strip()
+
+    start_day = end_day = None
+    if start_date:
+        try:
+            start_day = datetime.strptime(start_date, '%Y-%m-%d').date()
+        except ValueError:
+            start_date = ''
+    if end_date:
+        try:
+            end_day = datetime.strptime(end_date, '%Y-%m-%d').date()
+        except ValueError:
+            end_date = ''
+    phois = Phoi.query.filter_by(status='confirmed').order_by(
+        Phoi.departure_date.desc(), Phoi.id.desc()
+    ).all()
 
     customer_debts = defaultdict(
         lambda: {
@@ -44,24 +59,36 @@ def index():
         )
         debt['trip_count'] += 1
 
+    def within_date_range(day):
+        return not ((start_day and (not day or day < start_day)) or
+                    (end_day and (not day or day > end_day)))
+
     for phoi in phois:
-        add_debt(
-            phoi.customer,
-            phoi.revenue_full,
-            phoi.revenue_collected,
-            phoi.manager_revenue_collected,
-        )
-        for return_trip in phoi.return_trips:
+        if within_date_range(phoi.departure_date):
             add_debt(
-                return_trip.customer,
-                return_trip.revenue_full,
-                return_trip.revenue_collected,
-                return_trip.manager_revenue_collected,
+                phoi.customer,
+                phoi.revenue_full,
+                phoi.revenue_collected,
+                phoi.manager_revenue_collected,
             )
+        for return_trip in phoi.return_trips:
+            if within_date_range(return_trip.return_date or phoi.departure_date):
+                add_debt(
+                    return_trip.customer,
+                    return_trip.revenue_full,
+                    return_trip.revenue_collected,
+                    return_trip.manager_revenue_collected,
+                )
 
     debts = []
     for debt in customer_debts.values():
         debt['outstanding'] = debt['revenue_full'] - debt['revenue_collected']
+        if customer_search and customer_search.casefold() not in debt['customer'].name.casefold():
+            continue
+        if payment_status == 'unpaid' and debt['outstanding'] <= 0:
+            continue
+        if payment_status == 'paid' and debt['outstanding'] > 0:
+            continue
         debts.append(debt)
     debts.sort(key=lambda debt: (-debt['outstanding'], debt['customer'].name.lower()))
 
@@ -70,7 +97,15 @@ def index():
         'revenue_collected': sum((debt['revenue_collected'] for debt in debts), Decimal('0')),
         'outstanding': sum((debt['outstanding'] for debt in debts), Decimal('0')),
     }
-    return render_template('debts/index.html', debts=debts, totals=totals)
+    return render_template(
+        'debts/index.html',
+        debts=debts,
+        totals=totals,
+        customer_search=customer_search,
+        payment_status=payment_status,
+        start_date=start_date,
+        end_date=end_date,
+    )
 
 
 @bp.route('/debts/customer/<int:customer_id>')
@@ -83,6 +118,21 @@ def customer_detail(customer_id):
 
     customer = Customer.query.get_or_404(customer_id)
     show_all = request.args.get('all') == '1'
+    filter_truck_id = request.args.get('truck_id', type=int)
+    payment_status = request.args.get('payment_status', 'unpaid')
+    start_date = request.args.get('start_date', '').strip()
+    end_date = request.args.get('end_date', '').strip()
+    start_day = end_day = None
+    if start_date:
+        try:
+            start_day = datetime.strptime(start_date, '%Y-%m-%d').date()
+        except ValueError:
+            start_date = ''
+    if end_date:
+        try:
+            end_day = datetime.strptime(end_date, '%Y-%m-%d').date()
+        except ValueError:
+            end_date = ''
 
     # --- Thu thập tất cả các "dòng nợ" (phơi chính + chuyến về) của khách ---
     debt_rows = []
@@ -135,15 +185,28 @@ def customer_detail(customer_id):
     # Sắp xếp: mới nhất trước
     debt_rows.sort(key=lambda r: (r['date'] or r['phoi'].departure_date), reverse=True)
 
-    # Chỉ lấy các dòng còn nợ (outstanding > 0)
-    debt_rows_with_debt = [r for r in debt_rows if r['outstanding'] > 0]
-    all_rows = debt_rows_with_debt
+    # Áp dụng bộ lọc trên từng lượt, bao gồm ngày riêng của chuyến về.
+    all_rows = []
+    for row in debt_rows:
+        row_day = row['date']
+        if filter_truck_id and row['phoi'].truck_id != filter_truck_id:
+            continue
+        if start_day and (not row_day or row_day < start_day):
+            continue
+        if end_day and (not row_day or row_day > end_day):
+            continue
+        if payment_status == 'unpaid' and row['outstanding'] <= 0:
+            continue
+        if payment_status == 'paid' and row['outstanding'] > 0:
+            continue
+        all_rows.append(row)
     total_outstanding = sum((r['outstanding'] for r in all_rows), Decimal('0'))
     total_revenue_full = sum((r['revenue_full'] for r in all_rows), Decimal('0'))
     total_revenue_collected = sum((r['revenue_collected'] for r in all_rows), Decimal('0'))
 
     displayed_rows = all_rows if show_all else all_rows[:20]
     has_more = len(all_rows) > 20 and not show_all
+    trucks = Truck.query.order_by(Truck.license_plate).all()
 
     return render_template(
         'debts/customer_detail.html',
@@ -155,6 +218,11 @@ def customer_detail(customer_id):
         total_count=len(all_rows),
         show_all=show_all,
         has_more=has_more,
+        trucks=trucks,
+        filter_truck_id=filter_truck_id,
+        payment_status=payment_status,
+        start_date=start_date,
+        end_date=end_date,
     )
 
 

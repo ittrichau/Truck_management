@@ -12,6 +12,38 @@
     Công nợ = tiền phải thu − tiền đã thu.
 </div>
 
+<form method="GET" class="card card-body mb-3">
+    <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-4">
+            <label for="customer" class="form-label">Chủ hàng</label>
+            <input type="search" id="customer" name="customer" class="form-control"
+                   value="{{ customer_search }}" placeholder="Nhập tên chủ hàng">
+        </div>
+        <div class="col-6 col-md-2">
+            <label for="start_date" class="form-label">Từ ngày</label>
+            <input type="date" id="start_date" name="start_date" class="form-control" value="{{ start_date }}">
+        </div>
+        <div class="col-6 col-md-2">
+            <label for="end_date" class="form-label">Đến ngày</label>
+            <input type="date" id="end_date" name="end_date" class="form-control" value="{{ end_date }}">
+        </div>
+        <div class="col-8 col-md-2">
+            <label for="payment_status" class="form-label">Thanh toán</label>
+            <select id="payment_status" name="payment_status" class="form-select">
+                <option value="all" {% if payment_status == 'all' %}selected{% endif %}>Tất cả</option>
+                <option value="unpaid" {% if payment_status == 'unpaid' %}selected{% endif %}>Còn nợ</option>
+                <option value="paid" {% if payment_status == 'paid' %}selected{% endif %}>Đã thanh toán</option>
+            </select>
+        </div>
+        <div class="col-4 col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-primary flex-grow-1"><i class="bi bi-funnel"></i></button>
+            <a href="{{ url_for('debts.index') }}" class="btn btn-outline-secondary" title="Xóa bộ lọc">
+                <i class="bi bi-x-lg"></i>
+            </a>
+        </div>
+    </div>
+</form>
+
 <div class="row g-2 mb-3">
     <div class="col-12 col-md-4">
         <div class="card p-3">
@@ -51,7 +83,7 @@
                 {% for debt in debts %}
                 <tr>
                     <td>
-                        <a href="{{ url_for('debts.customer_detail', customer_id=debt.customer.id) }}" class="text-decoration-none">
+                        <a href="{{ url_for('debts.customer_detail', customer_id=debt.customer.id, truck_id=request.args.get('truck_id', ''), start_date=start_date, end_date=end_date, payment_status=payment_status) }}" class="text-decoration-none">
                             <strong>{{ debt.customer.name }}</strong>
                         </a>
                         {% if debt.customer.contact_phone %}
@@ -65,7 +97,7 @@
                     </td>
                     <td class="text-center">{{ debt.trip_count }}</td>
                     <td class="text-center">
-                        <a href="{{ url_for('debts.customer_detail', customer_id=debt.customer.id) }}" class="btn btn-outline-primary btn-sm">
+                        <a href="{{ url_for('debts.customer_detail', customer_id=debt.customer.id, truck_id=request.args.get('truck_id', ''), start_date=start_date, end_date=end_date, payment_status=payment_status) }}" class="btn btn-outline-primary btn-sm">
                             <i class="bi bi-eye"></i>
                         </a>
                     </td>
