@@ -14,10 +14,19 @@
 
 <form method="GET" class="card card-body mb-3">
     <div class="row g-2 align-items-end">
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-3">
             <label for="customer" class="form-label">Chủ hàng</label>
             <input type="search" id="customer" name="customer" class="form-control"
                    value="{{ customer_search }}" placeholder="Nhập tên chủ hàng">
+        </div>
+        <div class="col-12 col-md-2">
+            <label for="truck_id" class="form-label">Xe</label>
+            <select id="truck_id" name="truck_id" class="form-select">
+                <option value="">Tất cả xe</option>
+                {% for truck in trucks %}
+                <option value="{{ truck.id }}" {% if filter_truck_id == truck.id %}selected{% endif %}>{{ truck.license_plate }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div class="col-6 col-md-2">
             <label for="start_date" class="form-label">Từ ngày</label>
@@ -83,7 +92,7 @@
                 {% for debt in debts %}
                 <tr>
                     <td>
-                        <a href="{{ url_for('debts.customer_detail', customer_id=debt.customer.id, truck_id=request.args.get('truck_id', ''), start_date=start_date, end_date=end_date, payment_status=payment_status) }}" class="text-decoration-none">
+                        <a href="{{ url_for('debts.customer_detail', customer_id=debt.customer.id, truck_id=filter_truck_id or '', start_date=start_date, end_date=end_date, payment_status=payment_status) }}" class="text-decoration-none">
                             <strong>{{ debt.customer.name }}</strong>
                         </a>
                         {% if debt.customer.contact_phone %}
@@ -97,7 +106,7 @@
                     </td>
                     <td class="text-center">{{ debt.trip_count }}</td>
                     <td class="text-center">
-                        <a href="{{ url_for('debts.customer_detail', customer_id=debt.customer.id, truck_id=request.args.get('truck_id', ''), start_date=start_date, end_date=end_date, payment_status=payment_status) }}" class="btn btn-outline-primary btn-sm">
+                        <a href="{{ url_for('debts.customer_detail', customer_id=debt.customer.id, truck_id=filter_truck_id or '', start_date=start_date, end_date=end_date, payment_status=payment_status) }}" class="btn btn-outline-primary btn-sm">
                             <i class="bi bi-eye"></i>
                         </a>
                     </td>

@@ -20,6 +20,7 @@ def index():
         return redirect(url_for('phoi.index'))
 
     customer_search = request.args.get('customer', '').strip()
+    filter_truck_id = request.args.get('truck_id', type=int)
     payment_status = request.args.get('payment_status', 'all')
     start_date = request.args.get('start_date', '').strip()
     end_date = request.args.get('end_date', '').strip()
@@ -65,20 +66,22 @@ def index():
 
     for phoi in phois:
         if within_date_range(phoi.departure_date):
-            add_debt(
-                phoi.customer,
-                phoi.revenue_full,
-                phoi.revenue_collected,
-                phoi.manager_revenue_collected,
-            )
+            if not filter_truck_id or phoi.truck_id == filter_truck_id:
+                add_debt(
+                    phoi.customer,
+                    phoi.revenue_full,
+                    phoi.revenue_collected,
+                    phoi.manager_revenue_collected,
+                )
         for return_trip in phoi.return_trips:
             if within_date_range(return_trip.return_date or phoi.departure_date):
-                add_debt(
-                    return_trip.customer,
-                    return_trip.revenue_full,
-                    return_trip.revenue_collected,
-                    return_trip.manager_revenue_collected,
-                )
+                if not filter_truck_id or phoi.truck_id == filter_truck_id:
+                    add_debt(
+                        return_trip.customer,
+                        return_trip.revenue_full,
+                        return_trip.revenue_collected,
+                        return_trip.manager_revenue_collected,
+                    )
 
     debts = []
     for debt in customer_debts.values():
@@ -102,6 +105,8 @@ def index():
         debts=debts,
         totals=totals,
         customer_search=customer_search,
+        trucks=Truck.query.order_by(Truck.license_plate).all(),
+        filter_truck_id=filter_truck_id,
         payment_status=payment_status,
         start_date=start_date,
         end_date=end_date,
