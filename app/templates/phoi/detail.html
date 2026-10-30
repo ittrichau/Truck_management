@@ -140,11 +140,12 @@
                     {% else %}
                     · <span class="badge bg-secondary">Chủ xe trả</span>
                     {% endif %}
+                    · {% if fuel.is_home_station %}Cây xăng nhà{% else %}Đổ bên ngoài{% endif %}
                 </div>
-                {% if fuel.paid_by == 'driver' and fuel.receipts.count() %}
+                {% if fuel.receipts.count() %}
                 <div class="small text-muted mt-1">
                     {% for receipt in fuel.receipts.all() %}
-                    <a href="{{ url_for('fuel.view_receipt', id=fuel.id, receipt_id=receipt.id) }}" target="_blank"><i class="bi bi-receipt"></i> Hóa đơn {{ loop.index }}</a>{% if not loop.last %}, {% endif %}
+                    <a href="{{ url_for('fuel.view_receipt', id=fuel.id, receipt_id=receipt.id) }}" target="_blank"><i class="bi bi-receipt"></i> {{ 'Ảnh số lít' if receipt.image_type == 'liters' else 'Hóa đơn' }} {{ loop.index }}</a>{% if not loop.last %}, {% endif %}
                     {% endfor %}
                 </div>
                 {% endif %}

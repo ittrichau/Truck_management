@@ -65,11 +65,12 @@ def create():
             paid_by = request.form.get('paid_by', 'owner')
             if paid_by not in ('owner', 'driver'):
                 raise ValueError('Hình thức thanh toán không hợp lệ.')
+            is_home_station = request.form.get('is_home_station') == '1'
             receipt_files = [file for file in request.files.getlist('receipts') if file and file.filename]
-            if paid_by == 'driver' and not receipt_files:
-                raise ValueError('Tài xế tự trả tiền phải tải lên ít nhất một ảnh hóa đơn.')
+            if not receipt_files:
+                raise ValueError('Mọi lần đổ xăng phải tải lên ít nhất một ảnh chứng từ.')
             if len(receipt_files) > 5:
-                raise ValueError('Chỉ được tải tối đa 5 ảnh hóa đơn mỗi lần đổ xăng.')
+                raise ValueError('Chỉ được tải tối đa 5 ảnh chứng từ mỗi lần đổ xăng.')
             refuel_date_str = request.form.get('refuel_date', '')
             refuel_date = datetime.strptime(refuel_date_str, '%Y-%m-%d').date() if refuel_date_str else date.today()
 
@@ -96,6 +97,7 @@ def create():
                 price_per_liter=price,
                 total_cost=liters * price,
                 paid_by=paid_by,
+                is_home_station=is_home_station,
                 refuel_date=refuel_date,
                 is_substitute=is_substitute,
                 notes=request.form.get('notes', '').strip(),
@@ -108,15 +110,21 @@ def create():
             if not selected_phoi_record or selected_phoi_record.status not in ['draft', 'submitted']:
                 flash('Phải chọn đúng một phơi đang thực hiện để ghi nhận lần đổ xăng.', 'danger')
                 return render_template('fuel/create.html', trucks=trucks, phois=phois,
-                                       current_price=_get_active_price_or_none())
+                                       current_price=_get_active_price_or_none(),
+                                       selected_truck_id=truck_id, selected_phoi_id=selected_phoi_id,
+                                       is_home_station=is_home_station)
             if current_user.is_driver() and selected_phoi_record.driver_id != current_user.id:
                 flash('Tài xế chỉ được gắn đổ xăng vào phơi của mình.', 'danger')
                 return render_template('fuel/create.html', trucks=trucks, phois=phois,
-                                       current_price=_get_active_price_or_none())
+                                       current_price=_get_active_price_or_none(),
+                                       selected_truck_id=truck_id, selected_phoi_id=selected_phoi_id,
+                                       is_home_station=is_home_station)
             if selected_phoi_record.truck_id != truck_id:
                 flash(f'Phơi {selected_phoi_record.phoi_number} không thuộc xe đã chọn. Vui lòng chọn phơi của cùng xe.', 'danger')
                 return render_template('fuel/create.html', trucks=trucks, phois=phois,
-                                       current_price=_get_active_price_or_none())
+                                       current_price=_get_active_price_or_none(),
+                                       selected_truck_id=truck_id, selected_phoi_id=selected_phoi_id,
+                                       is_home_station=is_home_station)
             log.phois.append(selected_phoi_record)
 
             db.session.add(log)
@@ -126,7 +134,11 @@ def create():
                 for file in receipt_files:
                     metadata = save_phoi_attachment(file, log.id)
                     saved_keys.append(metadata['storage_key'])
-                    db.session.add(FuelReceipt(fuel_log_id=log.id, uploaded_by_id=current_user.id, **metadata))
+                    image_type = 'liters' if is_home_station else 'receipt'
+                    db.session.add(FuelReceipt(
+                        fuel_log_id=log.id, uploaded_by_id=current_user.id,
+                        image_type=image_type, **metadata
+                    ))
                 db.session.commit()
             except Exception:
                 for storage_key in saved_keys:
@@ -172,13 +184,38 @@ def edit(id):
             liters = float(request.form.get('liters', 0))
             if liters <= 0:
                 raise ValueError('Số lít phải lớn hơn 0.')
+            is_home_station = request.form.get('is_home_station') == '1'
+            existing_receipts = log.receipts.all()
+            receipt_files = [file for file in request.files.getlist('receipts') if file and file.filename]
+            if not existing_receipts and not receipt_files:
+                raise ValueError('Cần có ít nhất một ảnh chứng từ cho lần đổ xăng này.')
+            if len(receipt_files) + len(existing_receipts) > 5:
+                raise ValueError('Chỉ được lưu tối đa 5 ảnh chứng từ mỗi lần đổ xăng.')
             refuel_date_str = request.form.get('refuel_date', '')
             if not refuel_date_str:
                 raise ValueError('Vui lòng chọn ngày đổ xăng.')
             log.liters = liters
+            log.is_home_station = is_home_station
             log.refuel_date = datetime.strptime(refuel_date_str, '%Y-%m-%d').date()
             log.total_cost = liters * log.price_per_liter
-            db.session.commit()
+            saved_keys = []
+            try:
+                image_type = 'liters' if is_home_station else 'receipt'
+                for receipt in existing_receipts:
+                    receipt.image_type = image_type
+                for file in receipt_files:
+                    metadata = save_phoi_attachment(file, log.id)
+                    saved_keys.append(metadata['storage_key'])
+                    db.session.add(FuelReceipt(
+                        fuel_log_id=log.id, uploaded_by_id=current_user.id,
+                        image_type=image_type, **metadata
+                    ))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                for storage_key in saved_keys:
+                    delete_attachment_file(storage_key)
+                raise
             flash('Đã cập nhật số lít và ngày đổ xăng.', 'success')
             if len(linked_phois) == 1:
                 return redirect(url_for('phoi.detail', id=linked_phois[0].id))

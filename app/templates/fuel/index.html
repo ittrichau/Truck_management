@@ -54,15 +54,16 @@
                 <td>
                     {% if log.paid_by == 'driver' %}
                     <span class="badge bg-warning text-dark">Tài xế trả</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Chủ xe trả</span>
+                    {% endif %}
+                    <small class="d-block">{% if log.is_home_station %}Cây xăng nhà{% else %}Đổ bên ngoài{% endif %}</small>
                     {% if log.receipts.count() %}
                     <small class="d-block text-muted">
                         {% for receipt in log.receipts.all() %}
-                        <a href="{{ url_for('fuel.view_receipt', id=log.id, receipt_id=receipt.id) }}" target="_blank">Hóa đơn {{ loop.index }}</a>{% if not loop.last %}, {% endif %}
+                        <a href="{{ url_for('fuel.view_receipt', id=log.id, receipt_id=receipt.id) }}" target="_blank">{{ 'Ảnh số lít' if receipt.image_type == 'liters' else 'Hóa đơn' }} {{ loop.index }}</a>{% if not loop.last %}, {% endif %}
                         {% endfor %}
                     </small>
-                    {% endif %}
-                    {% else %}
-                    <span class="badge bg-secondary">Chủ xe trả</span>
                     {% endif %}
                 </td>
                 <td>

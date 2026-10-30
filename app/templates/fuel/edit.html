@@ -10,11 +10,30 @@
         Bản ghi lịch sử này đang gắn {{ linked_phois|length }} phơi; chỉ sửa số lít và ngày đổ.
         {% endif %}
     </div>
-    <form method="POST" class="card"><div class="card-body">
+    <form method="POST" enctype="multipart/form-data" class="card"><div class="card-body">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
             <label class="form-label">Số lít *</label>
-            <input type="number" step="0.1" min="0.1" name="liters" class="form-control" required value="{{ '{:.2f}'.format(log.liters).rstrip('0').rstrip('.') }}" inputmode="decimal">
+            <input type="number" step="0.001" min="0.001" name="liters" class="form-control" required value="{{ '{:.2f}'.format(log.liters).rstrip('0').rstrip('.') }}" inputmode="decimal">
+        </div>
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="is_home_station" id="is_home_station" value="1" {% if log.is_home_station %}checked{% endif %}>
+            <label class="form-check-label" for="is_home_station">Đổ tại cây xăng nhà</label>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Chứng từ</label>
+            <div class="small">
+                {% for receipt in log.receipts.all() %}
+                <a class="d-block" href="{{ url_for('fuel.view_receipt', id=log.id, receipt_id=receipt.id) }}" target="_blank">{{ 'Ảnh số lít' if receipt.image_type == 'liters' else 'Hóa đơn' }} {{ loop.index }}</a>
+                {% else %}
+                <span class="text-danger">Chưa có ảnh chứng từ. Hãy quay lại lần tạo mới để đính kèm.</span>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="receipts">Thêm ảnh chứng từ{% if not log.receipts.count() %} *{% endif %}</label>
+            <input type="file" name="receipts" id="receipts" class="form-control" accept="image/jpeg,image/png,image/webp" multiple {% if not log.receipts.count() %}required{% endif %}>
+            <small class="text-muted">Ảnh sẽ được phân loại theo lựa chọn cây xăng nhà/bên ngoài. Tổng tối đa 5 ảnh.</small>
         </div>
         <div class="mb-3">
             <label class="form-label">Ngày đổ *</label>

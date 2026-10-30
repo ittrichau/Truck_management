@@ -530,6 +530,7 @@ class FuelLog(db.Model):
     price_per_liter = db.Column(db.Numeric(12, 2), nullable=False)
     total_cost = db.Column(db.Numeric(12, 2), nullable=False)
     paid_by = db.Column(db.String(20), nullable=False, default='owner', comment='owner hoặc driver')
+    is_home_station = db.Column(db.Boolean, nullable=False, default=False, comment='Đổ tại cây xăng nhà')
     km_at_refuel = db.Column(db.Integer)
     refuel_date = db.Column(db.Date, nullable=False)
     is_substitute = db.Column(db.Boolean, default=False, comment='Tài xế đổ xăng cho xe không phải xe mặc định của mình (chạy giùm)')
@@ -555,7 +556,7 @@ class FuelLog(db.Model):
         return f'<FuelLog {self.liters}L on {self.refuel_date}>'
 
 class FuelReceipt(db.Model):
-    """Hóa đơn cho lần đổ xăng do tài xế tự thanh toán."""
+    """Ảnh hóa đơn hoặc ảnh xác nhận số lít cho lần đổ xăng."""
     __tablename__ = 'fuel_receipts'
     id = db.Column(db.Integer, primary_key=True)
     fuel_log_id = db.Column(db.Integer, db.ForeignKey('fuel_logs.id', ondelete='CASCADE'), nullable=False, index=True)
@@ -566,6 +567,7 @@ class FuelReceipt(db.Model):
     width = db.Column(db.Integer, nullable=False)
     height = db.Column(db.Integer, nullable=False)
     uploaded_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    image_type = db.Column(db.String(20), nullable=False, default='receipt', comment='receipt hoặc liters')
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     uploaded_by = db.relationship('User', backref='fuel_receipts')
