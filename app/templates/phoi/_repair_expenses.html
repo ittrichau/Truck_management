@@ -65,7 +65,9 @@
     addButton.addEventListener('click', () => addRepair());
     document.getElementById('phoi-form').addEventListener('submit', reindex);
     window.addRepair = addRepair;
-    {% if phoi is defined %}{% for expense in phoi.expenses.filter_by(category='repair').all() %}addRepair({id: '{{ expense.id }}', description: {{ expense.description|tojson }}, amount: '{{ expense.amount }}', isHome: {{ expense.is_home_repair|tojson }}, location: {{ expense.repair_location|default('', true)|tojson }}, driverPaid: {{ expense.driver_paid|tojson }}, hasReceipt: {{ (expense.attachments.filter_by(attachment_type='repair_receipt').count() > 0)|tojson }}});{% endfor %}{% endif %}
+    {# Pass whole VND, matching the other currency fields. Raw Numeric values
+       include .00, which the currency formatter would turn into extra zeros. #}
+    {% if phoi is defined %}{% for expense in phoi.expenses.filter_by(category='repair').all() %}addRepair({id: '{{ expense.id }}', description: {{ expense.description|tojson }}, amount: '{{ '{:,.0f}'.format(expense.amount) }}', isHome: {{ expense.is_home_repair|tojson }}, location: {{ expense.repair_location|default('', true)|tojson }}, driverPaid: {{ expense.driver_paid|tojson }}, hasReceipt: {{ (expense.attachments.filter_by(attachment_type='repair_receipt').count() > 0)|tojson }}});{% endfor %}{% endif %}
     refresh();
 })();
 </script>
