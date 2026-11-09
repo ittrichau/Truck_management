@@ -526,7 +526,7 @@ class FuelLog(db.Model):
     __tablename__ = 'fuel_logs'
     id = db.Column(db.Integer, primary_key=True)
     truck_id = db.Column(db.Integer, db.ForeignKey('trucks.id'), nullable=False)
-    liters = db.Column(db.Numeric(12, 2), nullable=False)
+    liters = db.Column(db.Numeric(13, 3), nullable=False)
     price_per_liter = db.Column(db.Numeric(12, 2), nullable=False)
     total_cost = db.Column(db.Numeric(12, 2), nullable=False)
     paid_by = db.Column(db.String(20), nullable=False, default='owner', comment='owner hoặc driver')

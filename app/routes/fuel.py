@@ -4,6 +4,7 @@ from app import db
 from app.models import FuelLog, FuelPrice, FuelReceipt, Truck, Phoi
 from app.phoi_attachments import save_phoi_attachment, delete_attachment_file, attachment_path
 from datetime import datetime, date, timedelta
+from decimal import Decimal, InvalidOperation
 
 bp = Blueprint('fuel', __name__)
 
@@ -39,6 +40,22 @@ def _get_active_price_or_none(for_date=None):
     return FuelPrice.get_active_price(dt)
 
 
+def _parse_liters(value):
+    try:
+        liters = Decimal(value)
+    except InvalidOperation:
+        raise ValueError('Số lít không hợp lệ.') from None
+    if not liters.is_finite():
+        raise ValueError('Số lít không hợp lệ.')
+    if liters <= 0:
+        raise ValueError('Số lít phải lớn hơn 0.')
+    if liters > Decimal('9999999999.999'):
+        raise ValueError('Số lít vượt quá giới hạn cho phép.')
+    if liters != liters.quantize(Decimal('0.001')):
+        raise ValueError('Số lít chỉ được có tối đa 3 chữ số thập phân.')
+    return liters
+
+
 @bp.route('/fuel/create', methods=['GET', 'POST'])
 @login_required
 def create():
@@ -59,9 +76,7 @@ def create():
 
     if request.method == 'POST':
         try:
-            liters = float(request.form.get('liters', 0))
-            if liters <= 0:
-                raise ValueError('Số lít phải lớn hơn 0.')
+            liters = _parse_liters(request.form.get('liters', '0'))
             paid_by = request.form.get('paid_by', 'owner')
             if paid_by not in ('owner', 'driver'):
                 raise ValueError('Hình thức thanh toán không hợp lệ.')
@@ -77,9 +92,11 @@ def create():
             # Tự động lấy giá xăng từ bảng FuelPrice
             fuel_price = _get_active_price_or_none(refuel_date)
             if fuel_price:
-                price = float(fuel_price.price_per_liter)
+                price = fuel_price.price_per_liter
             else:
-                price = float(request.form.get('price_per_liter', 0))
+                price = Decimal(request.form.get('price_per_liter', '0').replace(',', '').strip())
+                if not price.is_finite():
+                    raise ValueError('Giá xăng không hợp lệ.')
                 if price <= 0:
                     flash('Chưa có giá xăng cho ngày này. Vui lòng nhập giá thủ công.', 'warning')
 
@@ -181,9 +198,7 @@ def edit(id):
 
     if request.method == 'POST':
         try:
-            liters = float(request.form.get('liters', 0))
-            if liters <= 0:
-                raise ValueError('Số lít phải lớn hơn 0.')
+            liters = _parse_liters(request.form.get('liters', '0'))
             is_home_station = request.form.get('is_home_station') == '1'
             existing_receipts = log.receipts.all()
             receipt_files = [file for file in request.files.getlist('receipts') if file and file.filename]
