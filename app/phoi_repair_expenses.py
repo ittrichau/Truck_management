@@ -7,12 +7,12 @@ from flask_login import current_user
 from app import db
 from app.models import PhoiAttachment, PhoiExpense
 from app.phoi_attachments import save_phoi_attachment
+from app.phoi_other_expenses import sync_outbound_other_expense
 
 
 def _sync_standard_expenses(phoi):
     standard_expenses = [
         ('porter_fee', 'Bồi dưỡng bốc vác'),
-        ('other', 'Chi phí khác'),
     ]
     # Phí đường được trừ trực tiếp từ tài khoản chủ xe, chỉ quản lý/admin được nhập.
     if current_user.is_manager_or_admin():
@@ -25,7 +25,7 @@ def _sync_standard_expenses(phoi):
             raise ValueError(f'{label} phải là số hợp lệ.')
         if not amount.is_finite() or amount < 0:
             raise ValueError(f'{label} không được âm.')
-        expense = PhoiExpense.query.filter_by(phoi_id=phoi.id, category=category).first()
+        expense = PhoiExpense.query.filter_by(phoi_id=phoi.id, category=category, return_trip_id=None).first()
         if amount > 0:
             if expense:
                 expense.amount, expense.description = amount, label
@@ -33,6 +33,8 @@ def _sync_standard_expenses(phoi):
                 db.session.add(PhoiExpense(phoi_id=phoi.id, category=category, description=label, amount=amount))
         elif expense:
             db.session.delete(expense)
+
+    sync_outbound_other_expense(phoi)
 
 
 def _sync_repair_expenses(phoi):

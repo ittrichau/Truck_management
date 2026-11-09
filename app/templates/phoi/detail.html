@@ -88,6 +88,9 @@
                 {% if phoi.customer %}
                 <div class="col-12"><small class="text-muted">Khách hàng</small><br><strong>{{ phoi.customer.name }}</strong></div>
                 {% endif %}
+                {% for expense in phoi.expenses.filter_by(category='other', return_trip_id=none).all() %}
+                <div class="col-12"><strong>Chi phí khác chuyến đi (tài xế ứng): {{ '{:,.0f}'.format(expense.amount) }} VNĐ</strong><br>{{ expense.description }}</div>
+                {% endfor %}
             </div>
             <hr>
             <div class="row g-2">
@@ -113,6 +116,9 @@
                 {% for attachment in trip.attachments.filter_by(attachment_type='weigh_ticket').all() %}
                 <div class="small mt-1"><a target="_blank" href="{{ url_for('phoi.view_attachment', id=phoi.id, attachment_id=attachment.id) }}"><i class="bi bi-image"></i> {{ attachment.original_filename }}</a></div>
                 {% else %}<div class="small text-muted">Chưa có ảnh phiếu cân.</div>{% endfor %}
+                {% for expense in trip.expenses.filter_by(category='other').all() %}
+                <div class="small mt-1"><strong>Chi phí khác (tài xế ứng): {{ '{:,.0f}'.format(expense.amount) }} VNĐ</strong> · {{ expense.description }}</div>
+                {% endfor %}
                 {% if (phoi.status == 'draft' and (current_user.is_manager_or_admin() or (current_user.is_driver() and phoi.driver_id == current_user.id))) or (phoi.status == 'submitted' and current_user.is_manager_or_admin()) or (phoi.status == 'confirmed' and current_user.is_admin()) %}
                 <form action="{{ url_for('phoi.upload_attachment', id=phoi.id) }}" method="POST" enctype="multipart/form-data" class="mt-2">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="attachment_type" value="weigh_ticket"><input type="hidden" name="return_trip_id" value="{{ trip.id }}">
@@ -127,6 +133,12 @@
         </div>
     </div>
 
+    {% if phoi.notes %}
+    <div class="card mb-3">
+        <div class="card-header">📝 Ghi chú</div>
+        <div class="card-body"><p class="mb-0">{{ phoi.notes }}</p></div>
+    </div>
+    {% endif %}
     <div class="card mb-3">
         <div class="card-header">⛽ Lần đổ xăng đã gắn ({{ phoi.fuel_logs|length }})</div>
         <div class="card-body p-0">
@@ -274,12 +286,6 @@
     </div>
     {% endif %}
 
-    {% if phoi.notes %}
-    <div class="card mb-3">
-        <div class="card-header">📝 Ghi chú</div>
-        <div class="card-body"><p class="mb-0">{{ phoi.notes }}</p></div>
-    </div>
-    {% endif %}
 </div>
 
 {% if (current_user.is_manager_or_admin() and phoi.status == 'draft') or (current_user.is_admin() and phoi.status == 'confirmed') %}

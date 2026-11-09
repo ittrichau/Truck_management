@@ -2,7 +2,7 @@
 {% block title %}{{ phoi.phoi_number }} - In Phơi{% endblock %}
 
 {% block extra_head %}
-<style>
+<style id="phoi-print-styles">
 /* Corporate minimal preview, scoped to the print page. */
 .phoi-print-wrapper {
     --print-ink: #26384c;
@@ -15,6 +15,8 @@
     box-shadow: 0 2px 18px rgba(0, 0, 0, .12);
 }
 .phoi-print-wrapper * { box-sizing: border-box; }
+.phoi-print-wrapper h3, .phoi-print-wrapper h4 { line-height: inherit; }
+.phoi-print-wrapper small { font-size: .85em; }
 
 .phoi-print-header {
     display: flex;
@@ -118,6 +120,11 @@
 .return-trip-field .print-value { display: inline; }
 .return-trip-field .print-label { margin-right: 3px; }
 .return-trip-notes { grid-column: 1 / -1; }
+.other-expense-print { grid-column: 1 / -1; border-left: 2px solid #26384c; padding: 2px 6px; overflow-wrap: anywhere; font-size: 10pt; }
+.other-expense-print strong { font-weight: 700; }
+.finance-columns { display: grid; grid-template-columns: 1fr 1.2fr; gap: 14px; align-items: start; }
+.phoi-financial-table td:first-child { overflow-wrap: anywhere; }
+.notes-block .print-value { white-space: pre-wrap; }
 .return-trip-empty { font-size: 10.5pt; }
 
 .phoi-financial-table {
@@ -198,7 +205,8 @@
     .container { width: auto !important; max-width: none !important; margin: 0 !important; padding: 0 !important; }
     .phoi-print-wrapper {
         --print-font: 11pt;
-        width: auto;
+        width: 100%;
+        zoom: var(--print-scale, 1);
         max-width: none;
         min-height: 0;
         margin: 0;
@@ -221,6 +229,9 @@
     .return-trip-item { padding: 4px 0; }
     .return-trip-route { margin-bottom: 2px; font-size: 10.5pt; }
     .return-trip-meta { gap: 2px 8px; }
+    .return-trip-meta { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .other-expense-print { font-size: 10pt; padding: 1px 5px; }
+    .finance-columns { gap: 10px; }
     .return-trip-field .print-label { font-size: 9pt; }
     .return-trip-field .print-value { font-size: 10pt; }
     .phoi-financial-table { font-size: 10.5pt; }
@@ -234,7 +245,7 @@
     .print-signatures { display: flex; margin-top: 9px; }
     .print-signature { min-height: 40px; }
     .print-controls, .fit-warning, nav, .navbar, .mobile-nav, footer,
-    #loading-overlay, #required-fields-modal, .alert, .offcanvas {
+    #loading-overlay, #required-fields-modal, .alert, .offcanvas, .no-print {
         display: none !important;
     }
 
@@ -255,6 +266,7 @@
     .density-dense .phoi-financial-table { font-size: 9.5pt; }
     .density-dense .return-trip-item { padding: 1px 0; }
     .density-dense .return-trip-route { font-size: 9.5pt; }
+    .density-dense .other-expense-print { font-size: 9.5pt; }
     .density-dense .settlement-amount { font-size: 14pt; }
     .density-dense .print-signatures { margin-top: 4px; }
 }
@@ -317,10 +329,10 @@
                 <div class="return-trip-field"><span class="print-label">Quản lý đã thu:</span> <span class="print-value">{{ '{:,.0f}'.format(phoi.manager_revenue_collected) }} VNĐ</span></div>
                 {% endif %}
                 {% endif %}
-                {% if phoi.notes %}
-                <div class="return-trip-field return-trip-notes"><span class="print-label">Ghi chú:</span> <span class="print-value">{{ phoi.notes }}</span></div>
-                {% endif %}
             </div>
+            {% for expense in phoi.expenses.filter_by(category='other', return_trip_id=none).all() %}
+            <div class="other-expense-print"><strong>Chi phí khác chuyến đi (tài xế ứng): {{ '{:,.0f}'.format(expense.amount) }} VNĐ</strong> · {{ expense.description }}</div>
+            {% endfor %}
         </div>
     </section>
 
@@ -329,78 +341,71 @@
         {% for trip in phoi.return_trips.all() %}
         <div class="return-trip-item">
             <div class="return-trip-route">Chuyến về #{{ trip.trip_order }}: {{ trip.origin }} → {{ trip.destination }}</div>
-            <table class="phoi-info-table return-trip-table">
-                <tr>
-                    <td class="label">Ngày về</td>
-                    <td class="value">{{ trip.return_date.strftime('%d/%m/%Y') if trip.return_date else '--' }}</td>
-                    <td class="label">Khách hàng</td>
-                    <td class="value">{{ trip.customer.name if trip.customer else '--' }}</td>
-                </tr>
-                <tr>
-                    <td class="label">Hàng hóa</td>
-                    <td class="value">{{ trip.cargo_description or '--' }}</td>
-                    <td class="label">Khối lượng</td>
-                    <td class="value">{{ trip.cargo_weight_tons or '--' }} tấn</td>
-                </tr>
+            <div class="return-trip-meta">
+                <div class="return-trip-field"><span class="print-label">Ngày về:</span> <span class="print-value">{{ trip.return_date.strftime('%d/%m/%Y') if trip.return_date else '--' }}</span></div>
+                <div class="return-trip-field"><span class="print-label">Khách hàng:</span> <span class="print-value">{{ trip.customer.name if trip.customer else '--' }}</span></div>
+                <div class="return-trip-field"><span class="print-label">Hàng hóa:</span> <span class="print-value">{{ trip.cargo_description or '--' }}</span></div>
+                <div class="return-trip-field"><span class="print-label">Khối lượng:</span> <span class="print-value">{{ trip.cargo_weight_tons or '--' }} tấn</span></div>
                 {% if current_user.is_manager_or_admin() %}
-                <tr>
-                    <td class="label">Doanh thu</td>
-                    <td class="value">{{ '{:,.0f}'.format(trip.revenue_full or 0) }} VNĐ{% if trip.payment_method == 'per_ton' and trip.price_per_ton %} ({{ '{:,.0f}'.format(trip.price_per_ton) }} VNĐ/tấn){% else %} (bao chuyến){% endif %}</td>
-                    <td class="label">Tài xế đã thu</td>
-                    <td class="value">{{ '{:,.0f}'.format(trip.revenue_collected or 0) }} VNĐ</td>
-                </tr>
+                <div class="return-trip-field"><span class="print-label">Doanh thu:</span> <span class="print-value">{{ '{:,.0f}'.format(trip.revenue_full or 0) }} VNĐ{% if trip.payment_method == 'per_ton' and trip.price_per_ton %} ({{ '{:,.0f}'.format(trip.price_per_ton) }} VNĐ/tấn){% else %} (bao chuyến){% endif %}</span></div>
+                <div class="return-trip-field"><span class="print-label">Tài xế đã thu:</span> <span class="print-value">{{ '{:,.0f}'.format(trip.revenue_collected or 0) }} VNĐ</span></div>
                 {% if trip.manager_revenue_collected %}
-                <tr>
-                    <td class="label">Quản lý đã thu</td>
-                    <td class="value">{{ '{:,.0f}'.format(trip.manager_revenue_collected) }} VNĐ</td>
-                    <td class="label">Bốc vác</td>
-                    <td class="value">{{ '{:,.0f}'.format(trip.porter_fee or 0) }} VNĐ</td>
-                </tr>
-                {% elif trip.porter_fee %}
-                <tr>
-                    <td class="label">Bốc vác</td>
-                    <td class="value">{{ '{:,.0f}'.format(trip.porter_fee) }} VNĐ</td>
-                    <td class="label">Phiếu cân</td>
-                    <td class="value">{{ trip.attachment_count('weigh_ticket') }} ảnh</td>
-                </tr>
+                <div class="return-trip-field"><span class="print-label">Quản lý đã thu:</span> <span class="print-value">{{ '{:,.0f}'.format(trip.manager_revenue_collected) }} VNĐ</span></div>
                 {% endif %}
+                {% endif %}
+                {% if current_user.is_manager_or_admin() and trip.porter_fee %}
+                <div class="return-trip-field"><span class="print-label">Bốc vác (tài xế ứng):</span> <span class="print-value">{{ '{:,.0f}'.format(trip.porter_fee) }} VNĐ</span></div>
+                {% endif %}
+                {% if trip.attachment_count('weigh_ticket') %}
+                <div class="return-trip-field"><span class="print-label">Phiếu cân:</span> <span class="print-value">{{ trip.attachment_count('weigh_ticket') }} ảnh</span></div>
                 {% endif %}
                 {% if trip.notes %}
-                <tr><td class="label">Ghi chú</td><td class="value" colspan="3">{{ trip.notes }}</td></tr>
+                <div class="return-trip-field return-trip-notes"><span class="print-label">Ghi chú:</span> <span class="print-value">{{ trip.notes }}</span></div>
                 {% endif %}
-                {% if trip.attachment_count('weigh_ticket') and (trip.manager_revenue_collected or trip.porter_fee) %}
-                <tr><td class="label">Phiếu cân</td><td class="value" colspan="3">{{ trip.attachment_count('weigh_ticket') }} ảnh</td></tr>
-                {% endif %}
-            </table>
+                {% for expense in trip.expenses.filter_by(category='other').all() %}
+                <div class="other-expense-print"><strong>Chi phí khác chuyến về #{{ trip.trip_order }} (tài xế ứng): {{ '{:,.0f}'.format(expense.amount) }} VNĐ</strong> · {{ expense.description }}</div>
+                {% endfor %}
+            </div>
         </div>
         {% else %}
         <div class="return-trip-empty">Chưa có chuyến về.</div>
         {% endfor %}
     </section>
 
+    {% if phoi.notes %}
+    <section class="print-section notes-block">
+        <h4 class="print-section-title">GHI CHÚ</h4>
+        <div class="print-value">{{ phoi.notes }}</div>
+    </section>
+    {% endif %}
+
     {% if current_user.is_manager_or_admin() %}
     <section class="print-section finance-section">
         <h4 class="print-section-title">03 / TỔNG HỢP TÀI CHÍNH <span style="float:right;font-size:9pt;font-weight:400;">Đơn vị: VNĐ</span></h4>
+        <div class="finance-columns">
         <table class="phoi-financial-table">
             <tr><td>Doanh thu chuyến đi</td><td class="amount">{{ '{:,.0f}'.format(phoi.revenue_full) }} VNĐ</td></tr>
             <tr><td>Doanh thu chuyến về ({{ phoi.return_trips.count() }})</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full() - phoi.revenue_full) }} VNĐ</td></tr>
             <tr class="total-row"><td>TỔNG DOANH THU</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full()) }} VNĐ</td></tr>
             <tr><td>Tài xế đã thu</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ</td></tr>
-            <tr><td colspan="2"><hr style="margin:4px 0;"></td></tr>
+            <tr class="total-row"><td>Công tài xế</td><td class="amount">{{ '{:,.0f}'.format(phoi.driver_wage) }} VNĐ</td></tr>
+        </table>
+        <table class="phoi-financial-table">
             <tr style="font-weight:600; color:#555;"><td>Chi phí</td><td></td></tr>
-            {% for exp in phoi.expenses.all() %}
+            {% for exp in phoi.expenses.all() if exp.category != 'other' %}
             <tr class="sub-row"><td>{{ exp.category_label() }}{% if exp.category == 'repair' %}<br><small>{{ exp.description }} · {% if exp.is_home_repair %}Sửa tại nhà{% else %}{{ exp.repair_location }} · Có hóa đơn{% endif %}</small>{% endif %}</td><td class="amount">{{ '{:,.0f}'.format(exp.amount) }} VNĐ</td></tr>
-            {% else %}
-            <tr class="sub-row"><td style="color:#aaa;">Không có chi phí khác</td><td></td></tr>
             {% endfor %}
+            {% set other_total = phoi.expenses.filter_by(category='other').all()|sum(attribute='amount') %}
+            {% if other_total %}
+            <tr class="sub-row"><td>Chi phí khác (chi tiết theo chuyến ở trên)</td><td class="amount">{{ '{:,.0f}'.format(other_total) }} VNĐ</td></tr>
+            {% endif %}
             {% for trip in phoi.return_trips.all() if trip.porter_fee %}
             <tr class="sub-row"><td>Bốc vác về #{{ trip.trip_order }}</td><td class="amount">{{ '{:,.0f}'.format(trip.porter_fee) }} VNĐ</td></tr>
             {% endfor %}
             <tr class="sub-row"><td>Xăng ({{ phoi.fuel_logs|length }}){% if phoi.driver_fuel_expenses() %} <small style="color:#856404;">(Tài xế tự trả: {{ '{:,.0f}'.format(phoi.driver_fuel_expenses()) }} VNĐ)</small>{% endif %}</td><td class="amount">{{ '{:,.0f}'.format(phoi.fuel_expenses()) }} VNĐ</td></tr>
             <tr class="total-row"><td><strong>Tổng chi</strong></td><td class="amount">{{ '{:,.0f}'.format(phoi.total_expenses()) }} VNĐ</td></tr>
-            <tr><td colspan="2"><hr style="margin:4px 0;"></td></tr>
-            <tr class="total-row"><td><strong>Công tài xế</strong></td><td class="amount" style="color:#0d6efd;">{{ '{:,.0f}'.format(phoi.driver_wage) }} VNĐ</td></tr>
         </table>
+        </div>
     </section>
     {% endif %}
 
@@ -427,13 +432,6 @@
         </div>
     </section>
 
-    {% if phoi.notes %}
-    <section class="print-section notes-block">
-        <h4 class="print-section-title">GHI CHÚ</h4>
-        <div class="print-value">{{ phoi.notes }}</div>
-    </section>
-    {% endif %}
-
     <!-- Chỉ hiển thị khi in -->
     <div class="print-signatures">
         <div class="print-signature">
@@ -455,31 +453,8 @@
         </a>
     </div>
 
-    <script>
-    (() => {
-        const sheet = document.getElementById('phoi-print-sheet');
-        const warning = document.querySelector('.fit-warning');
-        if (!sheet || !warning) return;
-
-        const pageHeightPx = (297 - 16) * 96 / 25.4;
-        const tiers = ['', 'density-compact', 'density-dense'];
-
-        function assessPrintFit() {
-            sheet.classList.remove('density-compact', 'density-dense');
-            warning.hidden = true;
-            for (const tier of tiers) {
-                if (tier) sheet.classList.add(tier);
-                if (sheet.scrollHeight <= pageHeightPx) return;
-            }
-            warning.textContent = 'Nội dung dài hơn một trang A4 kể cả ở chế độ gọn; bản in sẽ tiếp tục sang trang tiếp theo, không bị cắt.';
-            warning.hidden = false;
-        }
-
-        window.addEventListener('load', assessPrintFit, { once: true });
-        window.addEventListener('beforeprint', assessPrintFit);
-        window.addEventListener('resize', assessPrintFit);
-        if (document.fonts && document.fonts.ready) document.fonts.ready.then(assessPrintFit);
-    })();
-    </script>
 </div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/phoi_print.js') }}"></script>
 {% endblock %}

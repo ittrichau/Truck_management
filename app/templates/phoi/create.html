@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'phoi/_other_expense_fields.html' import other_expense_fields %}
 {% block title %}Tạo Phơi Mới{% endblock %}
 {% block extra_head %}
 <script>
@@ -197,10 +198,7 @@ async function onCustomerChange(select) {
                     </div>
                     {% endif %}
                 </div>
-                <div class="mb-2">
-                    <label class="form-label">Chi phí khác{% if current_user.is_driver() %} <small class="text-muted">(tài xế tự chi/ứng)</small>{% endif %}</label>
-                    <input type="text" name="expense_other" class="form-control currency-input" value="0" inputmode="numeric">
-                </div>
+                {{ other_expense_fields() }}
                 {% include 'phoi/_repair_expenses.html' %}
             </div>
         </div>
@@ -215,14 +213,7 @@ async function onCustomerChange(select) {
             </div>
         </div>
 
-        <!-- GHI CHÚ -->
-        <span class="section-title collapsible-section-title" data-collapse-target="notes-section" role="button" tabindex="0" aria-controls="notes-section" aria-expanded="true"><i class="bi bi-chat-left-text"></i> Ghi chú <i class="bi bi-chevron-up section-toggle-icon" aria-hidden="true"></i></span>
-        <div class="card mb-3" id="notes-section"><div class="card-body">
-            <label class="form-label">Ghi chú thêm</label>
-            <textarea name="notes" class="form-control" rows="2" placeholder="Ghi chú nếu có..."></textarea>
-        </div></div>
-
-        <!-- CÁC CHUYẾN VỀ: luôn hiển thị cuối biểu mẫu -->
+        <!-- CÁC CHUYẾN VỀ -->
         <span class="section-title collapsible-section-title" data-collapse-target="return-trips-section" role="button" tabindex="0" aria-controls="return-trips-section" aria-expanded="true"><i class="bi bi-arrow-return-left"></i> Các chuyến về <i class="bi bi-chevron-up section-toggle-icon" aria-hidden="true"></i></span>
         <div class="card mb-3" id="return-trips-section">
             <div class="card-body">
@@ -231,6 +222,13 @@ async function onCustomerChange(select) {
                 <button type="button" class="btn btn-outline-primary btn-sm" onclick="addReturnTrip()"><i class="bi bi-plus-lg"></i> Thêm chuyến về</button>
             </div>
         </div>
+
+        <!-- GHI CHÚ -->
+        <span class="section-title collapsible-section-title" data-collapse-target="notes-section" role="button" tabindex="0" aria-controls="notes-section" aria-expanded="true"><i class="bi bi-chat-left-text"></i> Ghi chú <i class="bi bi-chevron-up section-toggle-icon" aria-hidden="true"></i></span>
+        <div class="card mb-3" id="notes-section"><div class="card-body">
+            <label class="form-label">Ghi chú thêm</label>
+            <textarea name="notes" class="form-control" rows="2" placeholder="Ghi chú nếu có..."></textarea>
+        </div></div>
 
         <!-- SUBMIT -->
         <div class="d-grid gap-2 mb-5">
@@ -245,6 +243,7 @@ async function onCustomerChange(select) {
 {% endif %}
 {% endblock %}
 {% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/phoi_other_expenses.js') }}"></script>
 <script>
 // Set default date to today
 document.addEventListener('DOMContentLoaded', function() {
@@ -355,6 +354,7 @@ function addReturnTrip(values = {}) {
                 <div class="col-12" data-payment-calculator><label class="form-label">Cách tính tiền *</label><select name="return_trip_payment_method[]" class="form-select form-select-sm payment-method"><option value="fixed" ${values.paymentMethod === 'per_ton' ? '' : 'selected'}>Bao chuyến — tiền cố định</option><option value="per_ton" ${values.paymentMethod === 'per_ton' ? 'selected' : ''}>Theo tấn — số tấn × giá/tấn</option></select><div class="row g-2 mt-1"><div class="col-6 fixed-revenue-field"><label class="form-label">Tiền bao chuyến (VNĐ)</label><input type="text" name="return_trip_revenue_full[]" class="form-control form-control-sm currency-input calculated-revenue" inputmode="numeric" value="${values.revenueFull || ''}"></div><div class="col-6 per-ton-field d-none"><label class="form-label">Số tấn</label><input type="text" name="return_trip_cargo_weight_tons[]" class="form-control form-control-sm cargo-weight" inputmode="numeric" autocomplete="off" placeholder="Ví dụ: 18.500" value="${values.cargoWeightTons || ''}"><div class="invalid-feedback">Số tấn phải từ 1.000 đến 99.999 tấn (1.000 - 99.999 kg).</div></div><div class="col-6 per-ton-field d-none"><label class="form-label">Giá 1 tấn (VNĐ)</label><input type="text" name="return_trip_price_per_ton[]" class="form-control form-control-sm currency-input price-per-ton" inputmode="numeric" value="${values.pricePerTon || ''}"></div></div></div>
                 <div class="col-6"><label class="form-label">Đã thu tạm (VNĐ)</label><input type="text" name="return_trip_revenue_collected[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="${values.revenueCollected || ''}"></div>
                 <div class="col-12"><label class="form-label">Tiền bốc vác <small class="text-muted">(tài xế ứng trước)</small></label><input type="text" name="return_trip_porter_fee[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="${values.porterFee || '0'}"></div>
+                {{ other_expense_fields(true) }}
                 <div class="col-12"><label class="form-label">Ghi chú</label><input type="text" name="return_trip_notes[]" class="form-control form-control-sm" value="${values.notes || ''}"></div>
             </div>
         </div>`;

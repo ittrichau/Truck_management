@@ -5,6 +5,7 @@ from app import db
 from app.models import ActivityLog, Phoi, PhoiAttachment, PhoiExpense, PhoiReturnTrip, FuelLog, Customer, Truck, User, generate_phoi_number
 from app.phoi_attachments import attachment_path, delete_attachment_file, save_phoi_attachment
 from app.phoi_repair_expenses import _sync_standard_expenses, _sync_repair_expenses, _save_repair_receipts
+from app.phoi_other_expenses import sync_other_expense
 from datetime import datetime, date
 from decimal import Decimal, InvalidOperation
 
@@ -295,12 +296,25 @@ def _sync_return_trips(phoi):
     manager_collecteds = request.form.getlist('return_trip_manager_revenue_collected[]')
     porter_fees = request.form.getlist('return_trip_porter_fee[]')
     notes = request.form.getlist('return_trip_notes[]')
+    other_flags = request.form.getlist('return_trip_has_other[]')
+    other_amounts = request.form.getlist('return_trip_expense_other[]')
+    other_descriptions = request.form.getlist('return_trip_expense_other_description[]')
+    has_other_fields = any(name in request.form for name in (
+        'return_trip_has_other[]', 'return_trip_expense_other[]',
+        'return_trip_expense_other_description[]',
+    ))
+    if has_other_fields and any(len(values) != len(origins) for values in (
+        other_flags, other_amounts, other_descriptions,
+    )):
+        raise ValueError('Chi phí khác của các chuyến về không đầy đủ. Vui lòng tải lại biểu mẫu.')
     synced_trips = []
 
     for index, origin in enumerate(origins):
         origin = origin.strip()
         destination = destinations[index].strip() if index < len(destinations) else ''
         if not origin and not destination:
+            if has_other_fields and other_flags[index] != '0':
+                raise ValueError(f'Chuyến về #{index + 1} có chi phí khác phải có đủ điểm đi và điểm đến.')
             continue
         if not origin or not destination:
             raise ValueError(f'Chuyến về #{index + 1} phải có đủ điểm đi và điểm đến.')
@@ -314,6 +328,11 @@ def _sync_return_trips(phoi):
             prices_per_ton[index] if index < len(prices_per_ton) else 0,
         )
         submitted_trip_id = trip_ids[index] if index < len(trip_ids) else ''
+        if submitted_trip_id and (
+            submitted_trip_id not in existing_trips
+            or existing_trips[submitted_trip_id].id in retained_trip_ids
+        ):
+            raise ValueError('Chuyến về không hợp lệ hoặc bị gửi trùng.')
         trip = existing_trips.get(submitted_trip_id)
         if trip:
             retained_trip_ids.add(trip.id)
@@ -336,6 +355,8 @@ def _sync_return_trips(phoi):
             trip.manager_revenue_collected = _money(manager_collecteds[index])
         trip.porter_fee = _money(porter_fees[index] if index < len(porter_fees) else 0)
         trip.notes = notes[index].strip() if index < len(notes) else ''
+        if has_other_fields:
+            sync_other_expense(phoi, trip, other_flags[index], other_amounts[index], other_descriptions[index])
         synced_trips.append((index, trip))
 
     for trip in existing_trips.values():

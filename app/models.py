@@ -386,6 +386,10 @@ class PhoiReturnTrip(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     customer = db.relationship('Customer', backref=db.backref('return_trips', lazy='dynamic'))
+    expenses = db.relationship(
+        'PhoiExpense', backref='return_trip', lazy='dynamic',
+        cascade='all, delete-orphan', foreign_keys='PhoiExpense.return_trip_id'
+    )
     attachments = db.relationship(
         'PhoiAttachment',
         backref='return_trip',
@@ -443,6 +447,10 @@ class PhoiExpense(db.Model):
     __tablename__ = 'phoi_expenses'
     id = db.Column(db.Integer, primary_key=True)
     phoi_id = db.Column(db.Integer, db.ForeignKey('phoi.id'), nullable=False)
+    return_trip_id = db.Column(
+        db.Integer, db.ForeignKey('phoi_return_trips.id', ondelete='CASCADE'),
+        nullable=True, index=True
+    )
     category = db.Column(db.String(30), nullable=False)  # porter_fee, toll_fee, repair, other
     description = db.Column(db.String(200))
     amount = db.Column(db.Numeric(12, 2), nullable=False, default=0)

@@ -1,0 +1,19 @@
+{% macro other_expense_fields(is_return=false, expense=none) -%}
+<div class="col-12 mb-2 other-expense" data-other-expense>
+    <input type="hidden" data-other-enabled name="{{ 'return_trip_has_other[]' if is_return else 'has_other' }}" value="{{ '1' if expense else '0' }}">
+    <label class="form-check-label d-block mb-2">
+        <input type="checkbox" class="form-check-input me-1" data-other-toggle {% if expense %}checked{% endif %}>
+        Có chi phí khác <small class="text-muted">(tài xế tự chi/ứng)</small>
+    </label>
+    <div data-other-details {% if not expense %}class="d-none"{% endif %}>
+        <div class="mb-2">
+            <label class="form-label">Số tiền chi phí khác (VNĐ) *</label>
+            <input type="text" name="{{ 'return_trip_expense_other[]' if is_return else 'expense_other' }}" data-other-amount class="form-control currency-input" inputmode="numeric" value="{{ '{:,.0f}'.format(expense.amount) if expense else '' }}" {% if expense %}required{% endif %}>
+        </div>
+        <div class="mb-2">
+            <label class="form-label">Nội dung chi phí khác *</label>
+            <input type="text" name="{{ 'return_trip_expense_other_description[]' if is_return else 'expense_other_description' }}" data-other-description class="form-control" maxlength="200" placeholder="Ví dụ: Vá lốp, rửa xe, phí vào kho..." value="{{ expense.description if expense else '' }}" {% if expense %}required{% endif %}>
+        </div>
+    </div>
+</div>
+{%- endmacro %}
