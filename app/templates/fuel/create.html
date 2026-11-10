@@ -51,11 +51,11 @@
         <fieldset class="mb-3">
             <legend class="form-label mb-2">Ai trả tiền xăng? *</legend>
             <div class="form-check mb-2">
-                <input class="form-check-input" type="radio" name="paid_by" id="paid_by_owner" value="owner" checked>
-                <label class="form-check-label" for="paid_by_owner"><strong>Chủ xe trả</strong> — tài xế chỉ nhập đúng số lít.</label>
+                <input class="form-check-input" type="radio" name="paid_by" id="paid_by_owner" value="owner" {% if request.form.get('paid_by', 'owner') != 'driver' %}checked{% endif %}>
+                <label class="form-check-label" for="paid_by_owner"><strong>Chủ xe trả</strong></label>
             </div>
             <div class="form-check">
-                <input class="form-check-input" type="radio" name="paid_by" id="paid_by_driver" value="driver">
+                <input class="form-check-input" type="radio" name="paid_by" id="paid_by_driver" value="driver" {% if request.form.get('paid_by') == 'driver' %}checked{% endif %}>
                 <label class="form-check-label" for="paid_by_driver"><strong>Tài xế tự trả tiền</strong> — hiển thị số tiền và bắt buộc có hóa đơn.</label>
             </div>
         </fieldset>
@@ -66,25 +66,32 @@
         <div class="row g-2 mb-3">
             <div class="col-12">
                 <label class="form-label">Số lít *</label>
-                <input type="number" step="0.001" min="0.001" name="liters" id="liters" class="form-control" required placeholder="0.000" inputmode="decimal">
+                <input type="text" data-fuel-liters name="liters" id="liters" class="form-control" required placeholder="0.000" inputmode="decimal" pattern="[0-9]+([.][0-9]{1,3})?" value="{{ request.form.get('liters', '') }}">
             </div>
         </div>
-        <div id="driver-payment-fields" class="d-none">
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="use_manual_price" id="use_manual_price" value="1" {% if request.form.get('use_manual_price') == '1' or not current_price %}checked{% endif %}>
+            <label class="form-check-label" for="use_manual_price">Tự nhập giá thực tế tại nơi đổ</label>
+            <small class="d-block text-muted">Bỏ chọn để dùng bảng giá của hệ thống theo ngày đổ.</small>
+        </div>
+        <div id="fuel-price-fields">
             <div class="row g-2 mb-3">
                 <div class="col-6">
                     <label class="form-label">Đơn giá (VNĐ/lít) *</label>
                     <input type="text" name="price_per_liter" id="price_per_liter" class="form-control currency-input" placeholder="25,000" inputmode="numeric"
-                        value="{{ '{:,.0f}'.format(current_price.price_per_liter) if current_price else '' }}">
+                        data-default-price="{{ '{:,.0f}'.format(current_price.price_per_liter) if current_price else '' }}"
+                        value="{{ request.form.get('price_per_liter', '{:,.0f}'.format(current_price.price_per_liter) if current_price else '') }}">
                     {% if not current_price %}
                     <small class="text-warning">Chưa có giá xăng cho hôm nay, vui lòng nhập tay</small>
                     {% endif %}
                 </div>
                 <div class="col-6">
-                    <label class="form-label">Số tiền</label>
+                    <label class="form-label">Số tiền tạm tính</label>
                     <input type="text" id="total_cost_preview" class="form-control" readonly value="0 VNĐ">
                 </div>
             </div>
         </div>
+        <small class="d-block text-muted mb-3">Khi dùng bảng giá, số tiền lưu được tính theo giá có hiệu lực vào ngày đổ đã chọn.</small>
         <div class="mb-3">
             <label class="form-label" id="proof-label">Ảnh hóa đơn *</label>
             <input type="file" name="receipts" id="receipts" class="form-control" accept="image/jpeg,image/png,image/webp" multiple required>
@@ -120,7 +127,7 @@ document.addEventListener('DOMContentLoaded', function() {
     toggleSubstituteNote(truckSelect);
 
     const paymentRadios = document.querySelectorAll('input[name="paid_by"]');
-    const driverPaymentFields = document.getElementById('driver-payment-fields');
+    const manualPriceInput = document.getElementById('use_manual_price');
     const priceInput = document.getElementById('price_per_liter');
     const litersInput = document.getElementById('liters');
     const totalPreview = document.getElementById('total_cost_preview');
@@ -134,10 +141,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updatePaymentFields() {
-        const driverPays = document.getElementById('paid_by_driver').checked;
-        driverPaymentFields.classList.toggle('d-none', !driverPays);
         receiptsInput.required = true;
         updateProofLabel();
+        updateTotalPreview();
+    }
+
+    let manualPrice = priceInput.value;
+    function updatePriceMode() {
+        const manual = manualPriceInput.checked;
+        if (!manual) manualPrice = priceInput.value;
+        priceInput.value = manual ? manualPrice : priceInput.dataset.defaultPrice;
+        priceInput.readOnly = !manual;
+        priceInput.required = manual;
         updateTotalPreview();
     }
 
@@ -158,6 +173,8 @@ document.addEventListener('DOMContentLoaded', function() {
     homeStationInput.addEventListener('change', updateProofLabel);
     litersInput.addEventListener('input', updateTotalPreview);
     priceInput.addEventListener('input', updateTotalPreview);
+    manualPriceInput.addEventListener('change', updatePriceMode);
+    updatePriceMode();
     updatePaymentFields();
 });
 

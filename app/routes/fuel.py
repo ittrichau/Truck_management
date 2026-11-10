@@ -56,6 +56,20 @@ def _parse_liters(value):
     return liters
 
 
+def _parse_fuel_price(value):
+    try:
+        price = Decimal(value.replace(',', '').strip())
+    except (InvalidOperation, AttributeError):
+        raise ValueError('Giá xăng không hợp lệ.') from None
+    if not price.is_finite() or price <= 0:
+        raise ValueError('Giá xăng phải là số lớn hơn 0.')
+    if price > Decimal('9999999999.99'):
+        raise ValueError('Giá xăng vượt quá giới hạn cho phép.')
+    if price != price.quantize(Decimal('0.01')):
+        raise ValueError('Giá xăng chỉ được có tối đa 2 chữ số thập phân.')
+    return price
+
+
 @bp.route('/fuel/create', methods=['GET', 'POST'])
 @login_required
 def create():
@@ -89,16 +103,14 @@ def create():
             refuel_date_str = request.form.get('refuel_date', '')
             refuel_date = datetime.strptime(refuel_date_str, '%Y-%m-%d').date() if refuel_date_str else date.today()
 
-            # Tự động lấy giá xăng từ bảng FuelPrice
+            # Chỉ dùng bảng giá khi người nhập không chọn giá thực tế.
             fuel_price = _get_active_price_or_none(refuel_date)
-            if fuel_price:
+            if fuel_price and request.form.get('use_manual_price') != '1':
                 price = fuel_price.price_per_liter
             else:
-                price = Decimal(request.form.get('price_per_liter', '0').replace(',', '').strip())
-                if not price.is_finite():
-                    raise ValueError('Giá xăng không hợp lệ.')
-                if price <= 0:
-                    flash('Chưa có giá xăng cho ngày này. Vui lòng nhập giá thủ công.', 'warning')
+                price = _parse_fuel_price(request.form.get('price_per_liter', ''))
+            if liters * price > Decimal('9999999999.99'):
+                raise ValueError('Tổng tiền xăng vượt quá giới hạn cho phép.')
 
             truck_id = int(request.form.get('truck_id', 0))
 

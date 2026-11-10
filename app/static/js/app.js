@@ -192,6 +192,62 @@ function prepareCurrencyInput(input) {
     formatCurrencyInput(input);
 }
 
+// Giữ số đang nhập khi bàn phím/IME hoặc thao tác dán chứa ký tự không hợp lệ.
+const lastNumericValues = new WeakMap();
+
+function isGuardedNumericInput(input) {
+    return input instanceof HTMLInputElement && (
+        isCurrencyInput(input) || input.hasAttribute('data-fuel-liters')
+    );
+}
+
+function validNumericText(input, value) {
+    return input.hasAttribute('data-fuel-liters')
+        ? /^\d*(\.\d{0,3})?$/.test(value)
+        : /^[\d,]*$/.test(value);
+}
+
+function rememberNumericInput(input) {
+    if (isGuardedNumericInput(input) && validNumericText(input, input.value)) {
+        lastNumericValues.set(input, input.value);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('input').forEach(rememberNumericInput);
+});
+document.addEventListener('focusin', event => rememberNumericInput(event.target));
+
+document.addEventListener('beforeinput', function(event) {
+    const input = event.target;
+    if (!isGuardedNumericInput(input) || !event.inputType.startsWith('insert')) return;
+    rememberNumericInput(input);
+    const text = event.data ?? event.dataTransfer?.getData('text/plain');
+    if (text == null) return;
+    const next = input.value.slice(0, input.selectionStart) + text + input.value.slice(input.selectionEnd);
+    if (!validNumericText(input, next)) event.preventDefault();
+});
+
+document.addEventListener('paste', function(event) {
+    const input = event.target;
+    if (!isGuardedNumericInput(input)) return;
+    const text = event.clipboardData?.getData('text/plain');
+    if (text == null) return;
+    const next = input.value.slice(0, input.selectionStart) + text + input.value.slice(input.selectionEnd);
+    if (!validNumericText(input, next)) event.preventDefault();
+});
+
+// Capture chạy trước các hàm tính tiền tại ô nhập và bộ định dạng dùng chung.
+document.addEventListener('input', function(event) {
+    const input = event.target;
+    if (!isGuardedNumericInput(input)) return;
+    if (!validNumericText(input, input.value)) {
+        input.value = lastNumericValues.get(input) ?? '';
+    } else {
+        lastNumericValues.set(input, input.value);
+    }
+}, true);
+
 // Định dạng trường số tấn (1.000 -> 99.999 tấn, tương ứng 1.000 - 99.999 kg).
 // Khi nhập 12000 -> 12.000, 7000 -> 7.000. Giới hạn 1000 -> 99999.
 const weightInputNames = new Set([
