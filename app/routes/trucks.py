@@ -60,6 +60,12 @@ def create():
         return redirect(url_for('phoi.index'))
 
     if request.method == 'POST':
+        insurance_value = request.form.get('insurance_expiry_date', '').strip()
+        insurance_expiry_date = _parse_date(insurance_value)
+        if insurance_value and insurance_expiry_date is None:
+            flash('Ngày hết hạn bảo hiểm không hợp lệ.', 'danger')
+            return render_template('trucks/create.html')
+
         license_plate = request.form.get('license_plate').strip()
         if Truck.query.filter_by(license_plate=license_plate).first():
             flash('Biển số xe đã tồn tại.', 'danger')
@@ -76,6 +82,7 @@ def create():
             inspection_expiry_months=int(request.form.get('inspection_expiry_months', 6) or 6),
             permit_date=_parse_date(request.form.get('permit_date')),
             permit_expiry_months=int(request.form.get('permit_expiry_months', 12) or 12),
+            insurance_expiry_date=insurance_expiry_date,
             status=request.form.get('status', 'available'),
             notes=request.form.get('notes', '').strip()
         )
@@ -117,6 +124,17 @@ def edit(id):
     ).first()
 
     if request.method == 'POST':
+        insurance_value = request.form.get('insurance_expiry_date', '').strip()
+        insurance_expiry_date = _parse_date(insurance_value)
+        if insurance_value and insurance_expiry_date is None:
+            flash('Ngày hết hạn bảo hiểm không hợp lệ.', 'danger')
+            return render_template(
+                'trucks/edit.html',
+                truck=truck,
+                available_drivers=available_drivers,
+                current_driver=current_driver
+            )
+
         truck.license_plate = request.form.get('license_plate', '').strip()
         truck.brand = request.form.get('brand', '').strip()
         truck.capacity_ton = float(request.form.get('capacity_ton', 0) or 0)
@@ -127,6 +145,8 @@ def edit(id):
         truck.inspection_expiry_months = int(request.form.get('inspection_expiry_months', 6) or 6)
         truck.permit_date = _parse_date(request.form.get('permit_date'))
         truck.permit_expiry_months = int(request.form.get('permit_expiry_months', 12) or 12)
+        if 'insurance_expiry_date' in request.form:
+            truck.insurance_expiry_date = insurance_expiry_date
         truck.status = request.form.get('status', 'available')
         truck.notes = request.form.get('notes', '').strip()
 

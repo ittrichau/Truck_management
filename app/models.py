@@ -74,6 +74,7 @@ class Truck(db.Model):
     # Ngày cấp phù hiệu & hạn (tháng)
     permit_date = db.Column(db.Date, nullable=True, comment='Ngày cấp phù hiệu gần nhất')
     permit_expiry_months = db.Column(db.Integer, nullable=True, default=12, comment='Hạn phù hiệu (tháng)')
+    insurance_expiry_date = db.Column(db.Date, nullable=True, comment='Ngày hết hạn bảo hiểm')
     
     # Notification tracking (cách 2 ngày nhắc lại)
     last_inspection_notified_at = db.Column(db.DateTime, nullable=True, comment='Lần cuối thông báo đăng kiểm sắp hết hạn')
@@ -128,6 +129,12 @@ class Truck(db.Model):
         if not expiry:
             return None
         return (expiry - date.today()).days
+
+    def insurance_days_until_expiry(self):
+        """Days until the entered insurance expiry date; None when unknown."""
+        if not self.insurance_expiry_date:
+            return None
+        return (self.insurance_expiry_date - date.today()).days
 
     def inspection_should_notify(self):
         """Check if should notify about inspection expiry (within 15 days + every 2 days)."""

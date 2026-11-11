@@ -19,6 +19,7 @@
                 <th>Tài xế</th>
                 <th class="text-center" style="width:70px">Đăng kiểm</th>
                 <th class="text-center" style="width:70px">Phù hiệu</th>
+                <th class="text-center">Hết hạn bảo hiểm</th>
                 <th style="width:90px"></th>
             </tr>
         </thead>
@@ -63,6 +64,21 @@
                         <span class="text-muted small">--</span>
                     {% endif %}
                 </td>
+                <td class="text-center">
+                    {% if truck.insurance_expiry_date %}
+                        <small class="text-nowrap">{{ truck.insurance_expiry_date.strftime('%d/%m/%Y') }}</small>
+                        {% set days = truck.insurance_days_until_expiry() %}
+                        {% if days < 0 %}
+                            <br><span class="badge bg-danger">Quá hạn {{ -days }} ngày</span>
+                        {% elif days == 0 %}
+                            <br><span class="badge bg-danger">Hết hạn hôm nay</span>
+                        {% elif days <= 15 %}
+                            <br><span class="badge bg-warning text-dark">Còn {{ days }} ngày</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="text-muted small">Chưa nhập</span>
+                    {% endif %}
+                </td>
                 <td>
                     <div class="d-flex gap-1">
                         <a href="{{ url_for('trucks.edit', id=truck.id) }}" class="btn btn-outline-primary btn-sm py-0 px-1"><i class="bi bi-pencil"></i></a>
@@ -74,7 +90,7 @@
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="5" class="text-center text-muted py-4">Chưa có xe nào.</td></tr>
+            <tr><td colspan="6" class="text-center text-muted py-4">Chưa có xe nào.</td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -87,7 +103,7 @@ function filterTable() {
     const table = document.getElementById('truckTable');
     const rows = table.querySelectorAll('tbody tr');
     rows.forEach(row => {
-        if (row.querySelectorAll('td').length < 5) return;
+        if (row.querySelectorAll('td').length < 6) return;
         const plate = row.cells[0].textContent.toLowerCase();
         row.style.display = (!filter || plate.includes(filter)) ? '' : 'none';
     });
