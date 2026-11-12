@@ -89,8 +89,16 @@
                             <br><code class="small">{{ log.resource_id }}</code>
                             {% endif %}
                         </td>
-                        <td class="small {% if log.action == 'ALERT' %}fw-semibold text-danger{% endif %}" style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                            {% if log.details %}
+                        {% set adjustment = log.debt_collection_details() %}
+                        <td class="small {% if log.action == 'ALERT' %}fw-semibold text-danger{% endif %}" {% if not adjustment %}style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"{% endif %}>
+                            {% if adjustment %}
+                            <details>
+                                <summary>Điều chỉnh tiền thu — {{ adjustment.customer_name }}</summary>
+                                <div>Phơi {{ adjustment.phoi_number }} · {% if adjustment.return_trip_id %}Chuyến về #{{ adjustment.trip_order }}{% else %}Chuyến đi{% endif %}</div>
+                                <div>Trước: {{ "{:,.2f}".format(adjustment.old_amount|float) }} đ → Sau: {{ "{:,.2f}".format(adjustment.new_amount|float) }} đ</div>
+                                <div class="text-break">Lý do: {{ adjustment.reason }}</div>
+                            </details>
+                            {% elif log.details %}
                             {{ log.details|truncate(120) }}
                             {% endif %}
                         </td>

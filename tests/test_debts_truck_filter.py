@@ -106,9 +106,10 @@ class DebtTruckFilterTests(unittest.TestCase):
             '&payment_status=all'
         )
         self.assertEqual(detail.status_code, 200)
-        self.assertIn(b'Tong cong no hien tai', detail.data)
-        self.assertIn(b'1,050', detail.data)
-        self.assertIn(b'2,300', detail.data)
+        self.assertIn('Tổng công nợ hiện tại'.encode(), detail.data)
+        # Fixtures: 1,000 + 300 revenue, less 200 + 100 + 50 collected.
+        self.assertIn(b'950', detail.data)
+        self.assertIn(b'1,300', detail.data)
         self.assertNotIn(b'5,000', detail.data)
         self.assertIn(b'2</span>', detail.data)
 
@@ -116,8 +117,9 @@ class DebtTruckFilterTests(unittest.TestCase):
         response = self.client.get('/debts')
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b'7,300', response.data)
-        self.assertIn(b'5,950', response.data)
+        # All four fixture rows: 1,000 + 2,000 + 300 + 5,000.
+        self.assertIn(b'8,300', response.data)
+        self.assertIn(b'6,450', response.data)
 
 
 if __name__ == '__main__':

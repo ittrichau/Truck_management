@@ -1,12 +1,13 @@
 from collections import defaultdict
 from datetime import datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy.exc import SQLAlchemyError
 
 from app import db
-from app.models import Customer, Phoi, PhoiReturnTrip, Truck
+from app.models import Customer, Phoi, PhoiReturnTrip, Truck, adjust_manager_collection, collection_amount
 
 bp = Blueprint('debts', __name__)
 
@@ -242,11 +243,10 @@ def collect_payment(customer_id):
     customer = Customer.query.get_or_404(customer_id)
 
     try:
-        amount_str = request.form.get('amount', '').strip().replace(',', '')
-        amount = Decimal(amount_str)
+        amount = collection_amount(request.form.get('amount', ''))
         if amount <= 0:
             raise ValueError
-    except (InvalidOperation, ValueError):
+    except ValueError:
         flash('Số tiền không hợp lệ.', 'danger')
         return redirect(url_for('debts.customer_detail', customer_id=customer_id))
 
@@ -310,3 +310,61 @@ def collect_payment(customer_id):
         msg += f' Ghi chú: {notes}.'
     flash(msg, 'success')
     return redirect(url_for('debts.customer_detail', customer_id=customer_id))
+
+
+@bp.route('/debts/customer/<int:customer_id>/adjust/<trip_type>/<int:trip_id>', methods=['GET', 'POST'])
+@login_required
+def adjust_payment(customer_id, trip_type, trip_id):
+    """Correct only the manager's collection, scoped to this customer's confirmed trip."""
+    if not current_user.is_manager_or_admin():
+        flash('Bạn không có quyền thực hiện thao tác này.', 'danger')
+        return redirect(url_for('phoi.index'))
+
+    customer = Customer.query.get_or_404(customer_id)
+    if trip_type == 'phoi':
+        target = Phoi.query.filter_by(
+            id=trip_id, customer_id=customer_id, status='confirmed',
+        ).first_or_404()
+        phoi = target
+    elif trip_type == 'return_trip':
+        target = PhoiReturnTrip.query.join(Phoi).filter(
+            PhoiReturnTrip.id == trip_id,
+            PhoiReturnTrip.customer_id == customer_id,
+            Phoi.status == 'confirmed',
+        ).first_or_404()
+        phoi = target.phoi
+    else:
+        abort(404)
+
+    # Preserve only known filters; never redirect to a client-supplied URL.
+    filters = {key: request.args[key] for key in (
+        'truck_id', 'start_date', 'end_date', 'payment_status', 'all',
+    ) if key in request.args}
+    back_url = url_for('debts.customer_detail', customer_id=customer_id, **filters)
+    error = None
+    status_code = 200
+    if request.method == 'POST':
+        try:
+            adjust_manager_collection(
+                target, request.form.get('amount', ''),
+                request.form.get('expected_amount', ''), request.form.get('reason', ''),
+                current_user, request.remote_addr,
+            )
+            db.session.commit()
+        except ValueError as exc:
+            db.session.rollback()
+            error = str(exc)
+            status_code = 400
+        except SQLAlchemyError:
+            db.session.rollback()
+            current_app.logger.exception('Không thể lưu điều chỉnh tiền thu công nợ.')
+            error = 'Không thể lưu điều chỉnh. Dữ liệu chưa được thay đổi, vui lòng thử lại.'
+            status_code = 500
+        else:
+            flash('Đã điều chỉnh tiền quản lý đã thu và lưu nhật ký thay đổi.', 'success')
+            return redirect(back_url)
+
+    return render_template(
+        'debts/adjust_payment.html', customer=customer, target=target, phoi=phoi,
+        trip_type=trip_type, back_url=back_url, error=error,
+    ), status_code

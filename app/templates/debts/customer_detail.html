@@ -61,8 +61,8 @@
                 <div class="col-12 col-md-5">
                     <label class="form-label">Số tiền thu <span class="text-danger">*</span></label>
                     <div class="input-group">
-                        <input type="text" name="amount" class="form-control"
-                               placeholder="Ví dụ: 10000000"
+                        <input type="text" name="amount" class="form-control currency-input"
+                               placeholder="Ví dụ: 400,000"
                                inputmode="numeric"
                                required>
                         <span class="input-group-text">đ</span>
@@ -139,6 +139,11 @@
     </div>
 </form>
 
+<p class="small text-muted">
+    Nhập nhầm tiền thu? Chọn <strong>Điều chỉnh tiền thu</strong> ở chuyến tương ứng.
+    Với chuyến đã trả hết, chọn thanh toán <strong>Tất cả</strong> hoặc <strong>Đã thanh toán</strong>.
+</p>
+
 {% if rows %}
 <div class="card">
     <div class="table-responsive">
@@ -150,7 +155,7 @@
                     <th class="text-end">Phải thu</th>
                     <th class="text-end">Đã thu</th>
                     <th class="text-end amount-negative">Còn nợ</th>
-                    <th class="text-center d-none d-md-table-cell"></th>
+                    <th class="text-center">Thao tác</th>
                 </tr>
             </thead>
             <tbody>
@@ -158,8 +163,9 @@
                 <tr>
                     <td>
                         <strong>{{ row.truck_number }}</strong>
+                        <small class="d-block text-muted">{{ row.phoi.phoi_number }}</small>
                         {% if row.return_trip %}
-                        <span class="badge bg-secondary ms-1" style="font-size: 0.65rem;">Về</span>
+                        <span class="badge bg-secondary ms-1" style="font-size: 0.65rem;">Về #{{ row.return_trip.trip_order }}</span>
                         {% endif %}
                     </td>
                     <td class="text-nowrap">
@@ -170,11 +176,20 @@
                         {% endif %}
                     </td>
                     <td class="text-end">{{ "{:,.0f}".format(row.revenue_full) }} đ</td>
-                    <td class="text-end amount-positive">{{ "{:,.0f}".format(row.revenue_collected) }} đ</td>
+                    {% set target = row.return_trip or row.phoi %}
+                    <td class="text-end amount-positive">
+                        {{ "{:,.0f}".format(row.revenue_collected) }} đ
+                        <small class="d-block text-muted">Tài xế: {{ "{:,.0f}".format(target.revenue_collected or 0) }} đ</small>
+                        <small class="d-block text-muted">Quản lý: {{ "{:,.0f}".format(target.manager_revenue_collected or 0) }} đ</small>
+                    </td>
                     <td class="text-end amount-negative">{{ "{:,.0f}".format(row.outstanding) }} đ</td>
-                    <td class="text-center d-none d-md-table-cell">
+                    <td class="text-center">
+                        <a href="{{ url_for('debts.adjust_payment', customer_id=customer.id, trip_type='return_trip' if row.return_trip else 'phoi', trip_id=target.id, truck_id=filter_truck_id or '', start_date=start_date, end_date=end_date, payment_status=payment_status, all='1' if show_all else '') }}"
+                           class="btn btn-outline-primary btn-sm mb-1">
+                            <i class="bi bi-pencil-square"></i> Điều chỉnh tiền thu
+                        </a>
                         <a href="{{ url_for('phoi.detail', id=row.phoi.id) }}"
-                           class="btn btn-outline-secondary btn-sm"
+                           class="btn btn-outline-secondary btn-sm d-none d-md-inline-block"
                            title="Xem phơi {{ row.phoi.phoi_number }}">
                             <i class="bi bi-box-arrow-up-right"></i>
                         </a>

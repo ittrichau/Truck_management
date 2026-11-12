@@ -2,7 +2,85 @@ from app import db, login_manager
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, date
+from decimal import Decimal
 import json
+import re
+
+
+def collection_amount(value):
+    """Parse a currency form value without rounding or accepting non-finite numbers."""
+    text = str(value).strip()
+    if len(text) > 32 or not re.fullmatch(
+        r'(?:[0-9]+|[0-9]{1,3}(?:,[0-9]{3})+)(?:\.[0-9]{1,2})?', text
+    ):
+        raise ValueError('Số tiền không hợp lệ.')
+    amount = Decimal(text.replace(',', ''))
+    if amount > Decimal('9999999999.99'):
+        raise ValueError('Số tiền vượt quá giới hạn cho phép.')
+    return amount
+
+
+def adjust_manager_collection(target, amount, expected_amount, reason, actor, ip_address=None):
+    """Adjust one confirmed debt row and its audit log in the caller's transaction."""
+    if not actor.is_manager_or_admin():
+        raise ValueError('Bạn không có quyền thực hiện thao tác này.')
+    reason = reason.strip()
+    if not reason or len(reason) > 500:
+        raise ValueError('Vui lòng nhập lý do điều chỉnh, tối đa 500 ký tự.')
+    new_amount = collection_amount(amount)
+    expected = collection_amount(expected_amount)
+    old_amount = target.manager_revenue_collected or Decimal('0')
+    phoi = target if isinstance(target, Phoi) else target.phoi
+    if phoi.status != 'confirmed':
+        raise ValueError('Chỉ được điều chỉnh tiền thu của chuyến đã xác nhận.')
+    if expected != old_amount:
+        raise ValueError('Tiền đã thu vừa thay đổi. Vui lòng kiểm tra lại trước khi lưu.')
+    if new_amount + (target.revenue_collected or Decimal('0')) > (target.revenue_full or Decimal('0')):
+        raise ValueError('Tổng tiền tài xế và quản lý đã thu không thể vượt quá tiền phải thu.')
+    if new_amount == old_amount:
+        raise ValueError('Số tiền mới chưa thay đổi so với số tiền đã lưu.')
+
+    # Compare-and-set: a stale correction must not overwrite a new collection.
+    model = type(target)
+    query = model.query.filter(
+        model.id == target.id,
+        model.manager_revenue_collected == expected,
+        model.customer_id == target.customer_id,
+        model.revenue_full == target.revenue_full,
+        model.revenue_collected == target.revenue_collected,
+    )
+    if isinstance(target, Phoi):
+        query = query.filter(Phoi.status == 'confirmed')
+    else:
+        query = query.filter(
+            model.phoi_id == target.phoi_id,
+            Phoi.query.filter(Phoi.id == model.phoi_id, Phoi.status == 'confirmed').exists(),
+        )
+    if query.update({model.manager_revenue_collected: new_amount}, synchronize_session=False) != 1:
+        raise ValueError('Dữ liệu chuyến vừa thay đổi. Vui lòng tải lại và kiểm tra trước khi lưu.')
+    db.session.add(ActivityLog(
+        user_id=actor.id,
+        username=actor.username,
+        action='UPDATE',
+        resource_type='debt_collection',
+        resource_id=str(target.id),
+        details=json.dumps({
+            'customer_id': target.customer_id,
+            'customer_name': target.customer.name if target.customer else '',
+            'phoi_id': phoi.id,
+            'phoi_number': phoi.phoi_number,
+            'return_trip_id': target.id if isinstance(target, PhoiReturnTrip) else None,
+            'trip_order': target.trip_order if isinstance(target, PhoiReturnTrip) else None,
+            'old_amount': str(old_amount),
+            'new_amount': str(new_amount),
+            'reason': reason,
+        }, ensure_ascii=False),
+        ip_address=ip_address,
+        method='POST',
+        endpoint='debts.adjust_payment',
+        status_code=302,
+    ))
+    db.session.expire(target, ['manager_revenue_collected'])
 
 def generate_phoi_number():
     """Generate phoi number: P-YYYYMMDD-NNN"""
@@ -605,6 +683,16 @@ class ActivityLog(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
     user = db.relationship('User', backref='activity_logs')
+
+    def debt_collection_details(self):
+        """Structured correction details for the Vietnamese audit view."""
+        if self.resource_type != 'debt_collection':
+            return None
+        try:
+            details = json.loads(self.details or '{}')
+        except (TypeError, ValueError):
+            return None
+        return details if isinstance(details, dict) else None
 
     def __repr__(self):
         return f'<ActivityLog {self.action} {self.resource_type} by {self.username}>'
