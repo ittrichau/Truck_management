@@ -4,6 +4,12 @@
 - Không có.
 
 ## Recent completed
+- **2026-11-12 — Sửa nút Chưa thu khi chưa nhập doanh thu (đã được người dùng duyệt):**
+  - Phạm vi/quyết định: chỉ coi tài xế đã thu đủ khi doanh thu lớn hơn 0 và phần còn lại không dương. Khi doanh thu và tiền tài xế đã thu đều bằng 0, form xác nhận quản lý mặc định Chưa thu, mở lựa chọn và không hiện nhãn Tài xế đã thu đủ; áp dụng chung chuyến đi/về.
+  - File mã: `app/templates/phoi/confirm.html` (một dòng). Giữ tên trường, route, dữ liệu, công thức tài chính và điều kiện xác nhận backend.
+  - Xác thực: Flask test client với SQLite in-memory, 7 tình huống cho cả chuyến đi/về: chưa nhập doanh thu, chưa thu, tài xế thu một phần/đủ/vượt, quản lý thu đủ/một phần; kiểm tra thuộc tính disabled của input/label, đúng một lựa chọn checked và nhãn đã thu đủ. POST thiếu doanh thu bị từ chối và rollback phí đường; POST Chưa thu với doanh thu hợp lệ xác nhận thành công, tiền thu bằng 0, balance/lợi nhuận đúng. `git diff --check` đạt.
+  - Rủi ro/giới hạn/rollback: rủi ro thấp, chỉ đổi điều kiện UI; chưa kiểm thử trình duyệt thực tế, không chạy development server, không đổi DB thực hoặc triển khai. Hoàn tác bằng trả lại dòng điều kiện cũ.
+  - Không lặp lại: không suy ra đã thu đủ chỉ từ 0 - 0 = 0; không nới điều kiện xác nhận để bỏ qua doanh thu hợp lệ.
 - **2026-11-11 — Ngày hết hạn bảo hiểm xe (người dùng xác nhận nhập trực tiếp ngày hết hạn):**
   - Phạm vi/quyết định: thêm `Truck.insurance_expiry_date` kiểu Date, nullable; nhập trực tiếp một ngày ở form thêm/sửa xe. Danh sách xe thêm cột ngày hết hạn định dạng dd/mm/yyyy, báo còn 1–15 ngày, hết hạn hôm nay hoặc quá hạn; chưa có dữ liệu hiển thị “Chưa nhập”. Backend từ chối ngày không hợp lệ trước khi thay đổi xe/gán tài xế; form cũ không gửi trường này giữ nguyên ngày đã lưu, gửi rỗng cho phép xóa ngày.
   - File mã: `app/models.py`, `app/routes/trucks.py`, `app/templates/trucks/create.html`, `app/templates/trucks/edit.html`, `app/templates/trucks/index.html`, `migrations/versions/f8a9b0c1d2e3_add_truck_insurance_expiry_date.py`; kiểm thử: `tests/test_truck_insurance.py`.
