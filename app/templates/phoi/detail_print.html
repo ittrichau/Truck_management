@@ -371,7 +371,7 @@
         {% endfor %}
     </section>
 
-    {% if phoi.notes %}
+    {% if phoi.notes and phoi.notes.strip() %}
     <section class="print-section notes-block">
         <h4 class="print-section-title">GHI CHÚ</h4>
         <div class="print-value">{{ phoi.notes }}</div>
