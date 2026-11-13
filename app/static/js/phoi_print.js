@@ -16,6 +16,11 @@
     frame.className = 'phoi-print-measure';
     document.body.append(frame);
     const doc = frame.contentDocument;
+    // Match the page's standards mode: a blank iframe uses quirks-mode table
+    // metrics and can underestimate rows with small text on multiple lines.
+    doc.open();
+    doc.write('<!DOCTYPE html><html lang="vi"></html>');
+    doc.close();
     const style = doc.createElement('style');
     style.textContent = document.getElementById('phoi-print-styles').textContent
         .replace('@media print', '@media all') + '\nhtml,body{margin:0;padding:0;}';

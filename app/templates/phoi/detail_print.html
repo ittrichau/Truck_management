@@ -328,6 +328,7 @@
                 {% if phoi.manager_revenue_collected %}
                 <div class="return-trip-field"><span class="print-label">Quản lý đã thu:</span> <span class="print-value">{{ '{:,.0f}'.format(phoi.manager_revenue_collected) }} VNĐ</span></div>
                 {% endif %}
+                <div class="return-trip-field"><span class="print-label">Còn phải thu:</span> <span class="print-value">{{ '{:,.0f}'.format(phoi.revenue_full - phoi.revenue_collected - phoi.manager_revenue_collected) }} VNĐ</span></div>
                 {% endif %}
             </div>
             {% for expense in phoi.expenses.filter_by(category='other', return_trip_id=none).all() %}
@@ -352,9 +353,7 @@
                 {% if trip.manager_revenue_collected %}
                 <div class="return-trip-field"><span class="print-label">Quản lý đã thu:</span> <span class="print-value">{{ '{:,.0f}'.format(trip.manager_revenue_collected) }} VNĐ</span></div>
                 {% endif %}
-                {% endif %}
-                {% if current_user.is_manager_or_admin() and trip.porter_fee %}
-                <div class="return-trip-field"><span class="print-label">Bốc vác (tài xế ứng):</span> <span class="print-value">{{ '{:,.0f}'.format(trip.porter_fee) }} VNĐ</span></div>
+                <div class="return-trip-field"><span class="print-label">Còn phải thu:</span> <span class="print-value">{{ '{:,.0f}'.format(trip.revenue_full - trip.revenue_collected - trip.manager_revenue_collected) }} VNĐ</span></div>
                 {% endif %}
                 {% if trip.attachment_count('weigh_ticket') %}
                 <div class="return-trip-field"><span class="print-label">Phiếu cân:</span> <span class="print-value">{{ trip.attachment_count('weigh_ticket') }} ảnh</span></div>
@@ -388,21 +387,28 @@
             <tr><td>Doanh thu chuyến về ({{ phoi.return_trips.count() }})</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full() - phoi.revenue_full) }} VNĐ</td></tr>
             <tr class="total-row"><td>TỔNG DOANH THU</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full()) }} VNĐ</td></tr>
             <tr><td>Tài xế đã thu</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ</td></tr>
+            {% set manager_collected = phoi.manager_revenue_collected + phoi.return_trips.all()|sum(attribute='manager_revenue_collected') %}
+            <tr><td>Quản lý/chủ xe đã thu</td><td class="amount">{{ '{:,.0f}'.format(manager_collected) }} VNĐ</td></tr>
+            <tr class="total-row"><td>Công nợ còn lại</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full() - phoi.total_revenue_collected() - manager_collected) }} VNĐ</td></tr>
             <tr class="total-row"><td>Công tài xế</td><td class="amount">{{ '{:,.0f}'.format(phoi.driver_wage) }} VNĐ</td></tr>
         </table>
         <table class="phoi-financial-table">
             <tr style="font-weight:600; color:#555;"><td>Chi phí</td><td></td></tr>
-            {% for exp in phoi.expenses.all() if exp.category != 'other' %}
+            {% for exp in phoi.expenses.all() if exp.category not in ['other', 'porter_fee'] %}
             <tr class="sub-row"><td>{{ exp.category_label() }}{% if exp.category == 'repair' %}<br><small>{{ exp.description }} · {% if exp.is_home_repair %}Sửa tại nhà{% else %}{{ exp.repair_location }} · Có hóa đơn{% endif %}</small>{% endif %}</td><td class="amount">{{ '{:,.0f}'.format(exp.amount) }} VNĐ</td></tr>
             {% endfor %}
             {% set other_total = phoi.expenses.filter_by(category='other').all()|sum(attribute='amount') %}
             {% if other_total %}
             <tr class="sub-row"><td>Chi phí khác (chi tiết theo chuyến ở trên)</td><td class="amount">{{ '{:,.0f}'.format(other_total) }} VNĐ</td></tr>
             {% endif %}
-            {% for trip in phoi.return_trips.all() if trip.porter_fee %}
-            <tr class="sub-row"><td>Bốc vác về #{{ trip.trip_order }}</td><td class="amount">{{ '{:,.0f}'.format(trip.porter_fee) }} VNĐ</td></tr>
+            {% set porter_total = phoi.expenses.filter_by(category='porter_fee').all()|sum(attribute='amount') + phoi.return_trips.all()|sum(attribute='porter_fee') %}
+            <tr class="sub-row"><td>Tổng bồi dưỡng bốc vác</td><td class="amount">{{ '{:,.0f}'.format(porter_total) }} VNĐ</td></tr>
+            {% for fuel in phoi.fuel_logs|sort(attribute='id')|sort(attribute='refuel_date') %}
+            {% set attached_count = fuel.attached_phoi_count() %}
+            <tr class="sub-row"><td>Dầu ({{ '{:,.3f}'.format(fuel.liters).rstrip('0').rstrip('.') }} lít)<br><small>{{ fuel.refuel_date.strftime('%d/%m/%Y') }} · {{ 'Tài xế tự trả' if fuel.paid_by == 'driver' else 'Chủ xe trả' }}{% if attached_count > 1 %} · Phân bổ 1/{{ attached_count }} chi phí{% endif %}</small></td><td class="amount">{{ '{:,.0f}'.format(fuel.total_cost / attached_count if attached_count else 0) }} VNĐ</td></tr>
+            {% else %}
+            <tr class="sub-row"><td>Dầu (0 lít)</td><td class="amount">0 VNĐ</td></tr>
             {% endfor %}
-            <tr class="sub-row"><td>Xăng ({{ phoi.fuel_logs|length }}){% if phoi.driver_fuel_expenses() %} <small style="color:#856404;">(Tài xế tự trả: {{ '{:,.0f}'.format(phoi.driver_fuel_expenses()) }} VNĐ)</small>{% endif %}</td><td class="amount">{{ '{:,.0f}'.format(phoi.fuel_expenses()) }} VNĐ</td></tr>
             <tr class="total-row"><td><strong>Tổng chi</strong></td><td class="amount">{{ '{:,.0f}'.format(phoi.total_expenses()) }} VNĐ</td></tr>
         </table>
         </div>

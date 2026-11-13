@@ -63,7 +63,7 @@
     <div class="card mb-3 border-primary">
         <div class="card-header bg-primary text-white">✅ Điều kiện để chốt phơi</div>
         <div class="card-body py-2">
-            <div class="d-flex justify-content-between"><span>{% if phoi.return_trips.count() %}✅{% else %}❌{% endif %} Ít nhất một chuyến về</span><strong>{{ phoi.return_trips.count() }}</strong></div>
+            <div class="d-flex justify-content-between text-muted"><span>Chuyến về (không bắt buộc)</span><strong>{{ phoi.return_trips.count() }}</strong></div>
             <div class="d-flex justify-content-between"><span>{% if phoi.fuel_logs %}✅{% else %}❌{% endif %} Ít nhất một lần đổ xăng</span><strong>{{ phoi.fuel_logs|length }}</strong></div>
             <div class="d-flex justify-content-between"><span>{% if phoi.km_end %}✅{% else %}❌{% endif %} KM cuối đã nhập</span><strong>{{ phoi.km_end or '--' }}</strong></div>
             <div class="d-flex justify-content-between text-muted"><span>Ảnh phiếu cân (nếu có)</span><strong>{{ phoi.attachment_count('weigh_ticket') }}</strong></div>

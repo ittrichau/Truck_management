@@ -9,9 +9,7 @@ def can_manage_phoi(user, phoi):
 
 def submission_error(phoi):
     """Return the first unmet completion requirement, or None when ready."""
-    if phoi.return_trips.count() == 0:
-        return 'Phơi chưa có chuyến về. Vui lòng thêm ít nhất một chuyến về trước khi chốt.'
-    if phoi.fuel_logs.count() == 0:
+    if not phoi.fuel_logs:
         return 'Phơi chưa được gắn lần đổ xăng nào. Vui lòng ghi nhận đổ xăng trước khi chốt.'
     return None
 

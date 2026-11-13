@@ -15,7 +15,7 @@ from unittest.mock import patch
 from flask import g
 
 from app import create_app, db
-from app.models import Phoi, PhoiExpense, PhoiReturnTrip, Truck, User
+from app.models import FuelLog, Phoi, PhoiExpense, PhoiReturnTrip, Truck, User
 from config import TestingConfig
 
 
@@ -137,6 +137,13 @@ class PrintBrowserTests(unittest.TestCase):
                 for category, amount in (('porter_fee', 80000), ('toll_fee', 350000), ('repair', 250000)):
                     db.session.add(PhoiExpense(phoi_id=phoi.id, category=category, amount=amount,
                                               description='Thay van bánh xe', is_home_repair=True))
+                for n in range(min(count, 3)):
+                    fuel = FuelLog(truck_id=truck.id, refuel_date=date(2026, 11, 9 + n),
+                                   liters=('137.335', '80', '12.5')[n], price_per_liter=20000,
+                                   total_cost=('2746700', '1600000', '250000')[n],
+                                   paid_by='driver' if n == 2 else 'owner')
+                    fuel.phois.append(phoi)
+                    db.session.add(fuel)
                 for n in range(count):
                     trip = PhoiReturnTrip(phoi_id=phoi.id, trip_order=n + 1, origin='Tây Ninh',
                                           destination='Bến Tre', cargo_description='Lúa giống',

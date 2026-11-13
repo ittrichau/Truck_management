@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Điều chỉnh tiền thu – {{ customer.name }}{% endblock %}
+{% block content %}
+<a href="{{ back_url }}" class="btn btn-outline-secondary btn-sm mb-3">
+    <i class="bi bi-arrow-left"></i> Quay lại công nợ
+</a>
+<div class="card">
+    <div class="card-header">Điều chỉnh tiền quản lý đã thu</div>
+    <div class="card-body">
+        <p class="mb-1"><strong>{{ customer.name }}</strong> — Phơi {{ phoi.phoi_number }}</p>
+        <p class="text-muted">
+            {{ phoi.truck.license_plate if phoi.truck else '' }} ·
+            {% if trip_type == 'return_trip' %}Chuyến về #{{ target.trip_order }}{% else %}Chuyến đi{% endif %}
+            · {{ target.origin }} → {{ target.destination }}
+        </p>
+        <dl class="row">
+            <dt class="col-7">Phải thu</dt>
+            <dd class="col-5 text-end">{{ "{:,.2f}".format(target.revenue_full or 0) }} đ</dd>
+            <dt class="col-7">Tài xế đã thu</dt>
+            <dd class="col-5 text-end">{{ "{:,.2f}".format(target.revenue_collected or 0) }} đ</dd>
+            <dt class="col-7">Quản lý đã thu hiện tại</dt>
+            <dd class="col-5 text-end">{{ "{:,.2f}".format(target.manager_revenue_collected or 0) }} đ</dd>
+        </dl>
+        <div class="alert alert-info">
+            Nhập <strong>tổng tiền quản lý đã thu đúng của chuyến này</strong>, không phải số tiền chênh lệch.
+            Nhập 0 nếu quản lý chưa nhận tiền của chuyến này.
+            Nếu thu nhầm khách hàng, giảm khoản thu nhầm tại đây rồi ghi thu lại ở đúng khách hàng.
+            Nếu khoản thu được phân bổ nhiều chuyến, cần điều chỉnh từng chuyến liên quan.
+        </div>
+        {% if error %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endif %}
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="expected_amount" value="{{ target.manager_revenue_collected or 0 }}">
+            <div class="mb-3">
+                <label for="amount" class="form-label">Tổng tiền quản lý đã thu đúng (đ) <span class="text-danger">*</span></label>
+                <input id="amount" name="amount" type="text" inputmode="numeric"
+                       class="form-control currency-input" placeholder="Ví dụ: 400,000" required>
+            </div>
+            <div class="mb-3">
+                <label for="reason" class="form-label">Lý do điều chỉnh <span class="text-danger">*</span></label>
+                <textarea id="reason" name="reason" class="form-control" rows="3" maxlength="500"
+                          placeholder="Ví dụ: Khách A trả tiền nhưng ghi nhầm vào khách B" required>{{ request.form.get('reason', '') }}</textarea>
+            </div>
+            <p class="small text-muted">Lần điều chỉnh sẽ lưu người sửa, thời điểm, số tiền trước/sau và lý do trong Nhật ký.</p>
+            <button type="submit" class="btn btn-primary">Lưu điều chỉnh</button>
+            <a href="{{ back_url }}" class="btn btn-outline-secondary">Hủy</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

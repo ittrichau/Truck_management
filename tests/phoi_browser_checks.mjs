@@ -36,9 +36,10 @@ async function evaluate(expression) {
     return result.result.value;
 }
 async function open(file) {
-    await page('Page.navigate', {url: pathToFileURL(file).href});
+    const url = pathToFileURL(file).href;
+    await page('Page.navigate', {url});
     for (let attempt = 0; attempt < 100; attempt++) {
-        if (await evaluate('document.readyState === "complete"')) return;
+        if (await evaluate(`location.href === ${JSON.stringify(url)} && document.readyState === "complete"`)) return;
         await new Promise(resolve => setTimeout(resolve, 50));
     }
     throw new Error(`Load timed out: ${file}`);
@@ -58,12 +59,15 @@ try {
             if (await evaluate('Boolean(document.querySelector("[data-print-sheet]")?.dataset.printScale)')) break;
             await new Promise(resolve => setTimeout(resolve, 50));
         }
+        assert.ok(await evaluate('Boolean(document.querySelector(".phoi-print-measure"))'), `${sample.name}: missing print measurement frame`);
         const metrics = await evaluate(`(() => {
             const sheet = document.querySelector('[data-print-sheet]');
             return {scale: sheet.dataset.printScale, expenses: sheet.querySelectorAll('.other-expense-print').length,
+                measureMode: document.querySelector('.phoi-print-measure').contentDocument.compatMode,
                 text: sheet.textContent, warning: document.querySelector('.fit-warning').textContent};
         })()`);
         assert.ok(Number(metrics.scale) > 0, 'Fitting script did not run');
+        assert.equal(metrics.measureMode, 'CSS1Compat', 'Print measurements must use standards mode');
         assert.equal(metrics.expenses, sample.expenseCount);
         for (const marker of sample.markers) assert.ok(metrics.text.includes(marker), marker);
         delete metrics.text;
@@ -86,14 +90,26 @@ try {
         const pdf = Buffer.from(data, 'base64');
         const pages = [...pdf.toString('latin1').matchAll(/\/Type\s*\/Page\b/g)].length;
         fs.writeFileSync(sample.pdf, pdf);
-        assert.equal(pages, 1, `${sample.name}: ${pages} pages; ${JSON.stringify(metrics)}`);
-        results.push({name: sample.name, pages, scale: Number(metrics.scale), expenses: metrics.expenses});
         if (sample.screenshot) {
             await page('Emulation.setDeviceMetricsOverride', {width: 726, height: 1063, deviceScaleFactor: 1, mobile: false});
             await page('Emulation.setEmulatedMedia', {media: 'print'});
             const image = await page('Page.captureScreenshot', {format: 'png', captureBeyondViewport: true});
             fs.writeFileSync(sample.screenshot, Buffer.from(image.data, 'base64'));
         }
+        if (pages !== 1) {
+            await page('Emulation.setEmulatedMedia', {media: 'print'});
+            metrics.layout = await evaluate(`(() => {
+                const sheet = document.querySelector('[data-print-sheet]');
+                const clone = document.querySelector('.phoi-print-measure').contentDocument.querySelector('[data-print-sheet]');
+                const rects = node => [node, ...node.querySelectorAll('section,.print-signatures')].map(el => ({
+                    name: el.className, height: el.getBoundingClientRect().height,
+                    width: el.getBoundingClientRect().width, top: el.getBoundingClientRect().top,
+                }));
+                return {actual: rects(sheet), measured: rects(clone)};
+            })()`);
+        }
+        assert.equal(pages, 1, `${sample.name}: ${pages} pages; ${JSON.stringify(metrics)}`);
+        results.push({name: sample.name, pages, scale: Number(metrics.scale), expenses: metrics.expenses});
     }
     for (const form of manifest.forms) {
         await page('Emulation.setEmulatedMedia', {media: ''});

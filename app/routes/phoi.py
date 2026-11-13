@@ -17,8 +17,6 @@ def can_manage_phoi(user, phoi):
 
 
 def submission_error(phoi):
-    if phoi.return_trips.count() == 0:
-        return 'Phơi chưa có chuyến về. Vui lòng thêm ít nhất một chuyến về trước khi chốt.'
     # FuelLog.phois creates this backref as a regular list, not a query.
     if not phoi.fuel_logs:
         return 'Phơi chưa được gắn lần đổ xăng nào. Vui lòng ghi nhận đổ xăng trước khi chốt.'
@@ -554,7 +552,7 @@ def create():
             truck.status = 'in_trip'
 
             db.session.commit()
-            flash(f'Đã tạo phơi {phoi.phoi_number}. Phơi đang thực hiện, hãy thêm chuyến về và lần đổ xăng trước khi chốt.', 'success')
+            flash(f'Đã tạo phơi {phoi.phoi_number}. Phơi đang thực hiện, hãy ghi nhận đổ dầu và nhập KM cuối trước khi chốt. Chuyến về không bắt buộc.', 'success')
             return redirect(url_for('phoi.index'))
 
         except (ValueError, TypeError) as e:
