@@ -10,9 +10,15 @@ MAX_HEALTH_ATTEMPTS="${MAX_HEALTH_ATTEMPTS:-30}"
 
 cd "$APP_DIR"
 
+# A deployment may update this script itself. Compare the loaded version before
+# checkout and re-exec after checkout so Bash cannot continue stale commands.
+DEPLOY_SCRIPT_VERSION="$(git hash-object deploy/deploy-vps.sh)"
 echo "Deploying origin/$BRANCH to $APP_DIR"
 git fetch --prune origin "$BRANCH"
 git checkout --detach "origin/$BRANCH"
+if [ "$(git hash-object deploy/deploy-vps.sh)" != "$DEPLOY_SCRIPT_VERSION" ]; then
+    exec bash "$APP_DIR/deploy/deploy-vps.sh"
+fi
 
 # The first server setup creates these directories and assigns them to UID/GID
 # 10001, the non-root account used inside the application container.
