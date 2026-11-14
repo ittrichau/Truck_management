@@ -41,6 +41,11 @@ class DebtTruckFilterTests(unittest.TestCase):
         ])
         db.session.flush()
 
+        self.truck_one.manager_id = self.manager.id
+        self.truck_two.manager_id = self.manager.id
+        self.customer_one.managers.append(self.manager)
+        self.customer_two.managers.append(self.manager)
+
         self._add_phoi(
             'P-TEST-001', self.truck_one, self.customer_one,
             Decimal('1000'), Decimal('200'),

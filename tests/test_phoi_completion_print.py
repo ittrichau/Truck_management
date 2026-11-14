@@ -55,6 +55,8 @@ class PhoiCompletionPrintTests(unittest.TestCase):
         self.truck = Truck(license_plate='PRINT-001')
         db.session.add_all([self.driver, self.manager, self.admin, self.other, self.truck])
         db.session.flush()
+        self.truck.manager_id = self.manager.id
+        self.driver.manager_id = self.manager.id
         self.phoi = Phoi(phoi_number='COMPLETION-PRINT', driver_id=self.driver.id,
                          truck_id=self.truck.id, departure_date=date(2026, 11, 13),
                          origin='A', destination='B', km_start=0, km_end=650, km_total=650,
@@ -165,7 +167,7 @@ class PhoiCompletionPrintTests(unittest.TestCase):
         self.login(self.other)
         self.client.post(f'/phoi/{self.phoi.id}/submit')
         self.assertEqual(self.phoi.status, 'draft')
-        self.assertEqual(self.client.get(f'/phoi/{self.phoi.id}/print').status_code, 302)
+        self.assertEqual(self.client.get(f'/phoi/{self.phoi.id}/print').status_code, 404)
 
     def test_print_debt_and_porter_totals_do_not_change_finances(self):
         self.returns()

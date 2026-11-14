@@ -31,6 +31,8 @@ class OtherExpenseTests(unittest.TestCase):
         self.truck = Truck(license_plate='OTHER-001')
         db.session.add_all([self.driver, self.manager, self.truck])
         db.session.flush()
+        self.truck.manager_id = self.manager.id
+        self.driver.manager_id = self.manager.id
         self.driver.current_truck_id = self.truck.id
         db.session.commit()
         self.client = self.app.test_client()

@@ -31,6 +31,9 @@ def adjust_manager_collection(target, amount, expected_amount, reason, actor, ip
     expected = collection_amount(expected_amount)
     old_amount = target.manager_revenue_collected or Decimal('0')
     phoi = target if isinstance(target, Phoi) else target.phoi
+    from app.access import can_access_phoi
+    if not can_access_phoi(actor, phoi):
+        raise ValueError('Chuyến không thuộc phạm vi được giao.')
     if phoi.status != 'confirmed':
         raise ValueError('Chỉ được điều chỉnh tiền thu của chuyến đã xác nhận.')
     if expected != old_amount:
@@ -56,6 +59,14 @@ def adjust_manager_collection(target, amount, expected_amount, reason, actor, ip
             model.phoi_id == target.phoi_id,
             Phoi.query.filter(Phoi.id == model.phoi_id, Phoi.status == 'confirmed').exists(),
         )
+    if not actor.is_admin():
+        # Recheck ownership in the write predicate, not just before reading.
+        from app.access import phois_query
+        allowed_phois = phois_query(actor).with_entities(Phoi.id)
+        if isinstance(target, Phoi):
+            query = query.filter(Phoi.id.in_(allowed_phois))
+        else:
+            query = query.filter(model.phoi_id.in_(allowed_phois))
     if query.update({model.manager_revenue_collected: new_amount}, synchronize_session=False) != 1:
         raise ValueError('Dữ liệu chuyến vừa thay đổi. Vui lòng tải lại và kiểm tra trước khi lưu.')
     db.session.add(ActivityLog(
@@ -63,6 +74,7 @@ def adjust_manager_collection(target, amount, expected_amount, reason, actor, ip
         username=actor.username,
         action='UPDATE',
         resource_type='debt_collection',
+        scope_truck_id=phoi.truck_id,
         resource_id=str(target.id),
         details=json.dumps({
             'customer_id': target.customer_id,
@@ -106,6 +118,8 @@ class User(UserMixin, db.Model):
     role = db.Column(db.String(20), nullable=False, default='driver')  # driver, manager, admin
     is_active = db.Column(db.Boolean, default=True)
     current_truck_id = db.Column(db.Integer, db.ForeignKey('trucks.id'), nullable=True)
+    manager_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
+    manager = db.relationship('User', remote_side=[id], foreign_keys=[manager_id])
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Ràng buộc cứng: mỗi current_truck_id chỉ xuất hiện tối đa 1 lần
@@ -140,6 +154,8 @@ class Truck(db.Model):
     __tablename__ = 'trucks'
     id = db.Column(db.Integer, primary_key=True)
     license_plate = db.Column(db.String(20), unique=True, nullable=False)
+    manager_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
+    manager = db.relationship('User', foreign_keys=[manager_id])
     brand = db.Column(db.String(50))
     capacity_ton = db.Column(db.Float)
     year = db.Column(db.Integer)
@@ -277,6 +293,13 @@ class Truck(db.Model):
     def __repr__(self):
         return f'<Truck {self.license_plate}>'
 
+manager_customers = db.Table(
+    'manager_customers',
+    db.Column('manager_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
+    db.Column('customer_id', db.Integer, db.ForeignKey('customers.id'), primary_key=True),
+)
+
+
 class Customer(db.Model):
     __tablename__ = 'customers'
     id = db.Column(db.Integer, primary_key=True)
@@ -292,6 +315,7 @@ class Customer(db.Model):
     
     # Relations
     created_by = db.relationship('User', backref='customers')
+    managers = db.relationship('User', secondary='manager_customers', lazy='select')
     phois = db.relationship('Phoi', backref='customer', lazy='dynamic')
     
     def __repr__(self):
@@ -670,6 +694,8 @@ class ActivityLog(db.Model):
     __tablename__ = 'activity_logs'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    scope_truck_id = db.Column(db.Integer, db.ForeignKey('trucks.id'), nullable=True, index=True)
+    scope_manager_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
     username = db.Column(db.String(50), nullable=True)
     action = db.Column(db.String(20), nullable=False)  # CREATE, UPDATE, DELETE, LOGIN, LOGOUT
     resource_type = db.Column(db.String(50), nullable=True)
@@ -682,7 +708,7 @@ class ActivityLog(db.Model):
     status_code = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
-    user = db.relationship('User', backref='activity_logs')
+    user = db.relationship('User', foreign_keys=[user_id], backref='activity_logs')
 
     def debt_collection_details(self):
         """Structured correction details for the Vietnamese audit view."""

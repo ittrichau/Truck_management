@@ -60,7 +60,16 @@ def create_app(config_name=None):
     # Configure logging
     _configure_logging(app)
 
+    @app.before_request
+    def reject_inactive_session():
+        from flask import abort
+        from flask_login import current_user, logout_user
+        if current_user.get_id() is not None and not current_user.is_active:
+            logout_user()
+            abort(403)
+
     # Register blueprints
+    from app.routes.management import bp as management_bp
     from app.routes.auth import bp as auth_bp
     from app.routes.trucks import bp as trucks_bp
     from app.routes.customers import bp as customers_bp
@@ -70,6 +79,7 @@ def create_app(config_name=None):
     from app.routes.debts import bp as debts_bp
     from app.routes.activity_logs import bp as activity_logs_bp
 
+    app.register_blueprint(management_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(trucks_bp)
     app.register_blueprint(customers_bp)
@@ -161,6 +171,9 @@ def _configure_logging(app):
         if not current_user.is_authenticated:
             return response
 
+        if response.status_code >= 400:
+            db.session.rollback()
+
         try:
             # Suy ra action từ endpoint name
             endpoint = request.endpoint or ''
@@ -192,7 +205,29 @@ def _configure_logging(app):
                     resource_id = str(val)
                     break
 
+            # Attach a trustworthy scope, never derive ownership from posted IDs.
+            from app.models import Phoi, FuelLog, Truck
+            scope_truck_id = None
+            scope_manager_id = None
+            identity = (request.view_args or {}).get('id')
+            if response.status_code < 400:
+                if resource_type == 'phoi' and identity:
+                    record = db.session.get(Phoi, identity)
+                    scope_truck_id = record.truck_id if record else None
+                elif resource_type == 'fuel' and identity:
+                    record = db.session.get(FuelLog, identity)
+                    scope_truck_id = record.truck_id if record else None
+                elif resource_type == 'trucks' and identity:
+                    scope_truck_id = identity
+                elif resource_type == 'debts':
+                    # Collection may span vehicles; do not publish its submitted total.
+                    scope_manager_id = current_user.id if current_user.role == 'manager' else None
+                elif resource_type in ('customers', 'drivers', 'auth'):
+                    scope_manager_id = current_user.id if current_user.role == 'manager' else None
+
             log_entry = ActivityLog(
+                scope_truck_id=scope_truck_id,
+                scope_manager_id=scope_manager_id,
                 user_id=current_user.id,
                 username=current_user.username,
                 action=action,

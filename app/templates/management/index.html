@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block title %}Phân quyền quản lý{% endblock %}
+{% block content %}
+<h5><i class="bi bi-shield-lock"></i> Phân quyền quản lý</h5>
+<div class="alert alert-info small">
+  Xe và tài xế chỉ thuộc một quản lý; khách hàng có thể cấp cho nhiều quản lý.
+  Dữ liệu chưa gán chỉ admin thấy. Khi chuyển xe, tài xế đang giữ xe và toàn bộ lịch sử, công nợ của xe chuyển theo.
+  Hãy cấp thêm các khách hàng cần dùng cho quản lý mới; lịch sử công nợ của xe vẫn xem được khi khách chưa được cấp để tạo chuyến mới.
+</div>
+{% if not managers %}<div class="alert alert-warning">Chưa có quản lý đang hoạt động. <a href="{{ url_for('drivers.create') }}">Thêm quản lý</a> trước khi phân quyền.</div>{% endif %}
+{% for kind, title, resources in [('truck', 'Xe', trucks), ('driver', 'Tài xế', drivers)] %}
+<div class="card mb-3"><div class="card-header"><strong>{{ title }}</strong></div><div class="card-body">
+{% for item in resources %}
+<form method="post" class="border-bottom pb-3 mb-3">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="kind" value="{{ kind }}">
+  <input type="hidden" name="resource_id" value="{{ item.id }}">
+  <input type="hidden" name="expected" value="{{ item.manager_id if item.manager_id is not none else '' }}">
+  <label class="form-label" for="{{ kind }}-{{ item.id }}">{{ item.license_plate if kind == 'truck' else item.full_name }}{% if not item.is_active %} (đã ngừng hoạt động){% endif %}</label>
+  {% if kind == 'driver' and item.current_truck %}<div class="small text-muted mb-1">Đang giữ xe {{ item.current_truck.license_plate }} — chuyển quyền tại mục Xe.</div>{% endif %}
+  <div class="d-flex gap-2">
+    <select name="manager_id" id="{{ kind }}-{{ item.id }}" class="form-select">
+      <option value="">Chưa gán — chỉ admin</option>
+      {% for manager in managers %}<option value="{{ manager.id }}" {% if manager.id == item.manager_id %}selected{% endif %}>{{ manager.full_name }} ({{ manager.username }})</option>{% endfor %}
+    </select>
+    <button class="btn btn-primary" type="submit">Lưu</button>
+  </div>
+</form>
+{% else %}<p class="text-muted">Chưa có dữ liệu.</p>{% endfor %}
+</div></div>
+{% endfor %}
+<div class="card"><div class="card-header"><strong>Khách hàng dùng chung</strong></div><div class="card-body">
+{% for customer in customers %}
+<form method="post" class="border-bottom pb-3 mb-3">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="kind" value="customer">
+  <input type="hidden" name="resource_id" value="{{ customer.id }}">
+  <input type="hidden" name="expected" value="{{ customer.managers|map(attribute='id')|sort|join(',') }}">
+  <strong>{{ customer.name }}</strong>{% if not customer.is_active %} (đã ngừng hoạt động){% endif %}
+  <div class="row mt-2">
+  {% for manager in managers %}
+    <div class="col-md-4 mb-2"><div class="form-check">
+      <input type="checkbox" class="form-check-input" name="manager_ids" value="{{ manager.id }}" id="customer-{{ customer.id }}-{{ manager.id }}" {% if manager in customer.managers %}checked{% endif %}>
+      <label class="form-check-label" for="customer-{{ customer.id }}-{{ manager.id }}">{{ manager.full_name }} ({{ manager.username }})</label>
+    </div></div>
+  {% endfor %}
+  </div>
+  <button class="btn btn-primary btn-sm" type="submit">Lưu quyền khách hàng</button>
+</form>
+{% else %}<p class="text-muted">Chưa có khách hàng.</p>{% endfor %}
+</div></div>
+{% endblock %}

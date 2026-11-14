@@ -18,7 +18,13 @@ git checkout --detach "origin/$BRANCH"
 # 10001, the non-root account used inside the application container.
 mkdir -p instance/uploads logs
 
-docker compose up -d --build --remove-orphans
+# Build without replacing the live container. Override the entrypoint so this
+# one-off backup process cannot run migrations or start the application server.
+# A failed backup stops deployment while the current application keeps running.
+docker compose build web
+docker compose run --rm --no-deps --entrypoint python web -m deploy.backup_database
+
+docker compose up -d --no-build --remove-orphans
 
 for attempt in $(seq 1 "$MAX_HEALTH_ATTEMPTS"); do
     if curl --fail --silent --show-error "$HEALTH_URL"; then

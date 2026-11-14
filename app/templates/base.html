@@ -226,6 +226,9 @@
               >
             </li>
             {% endif %}
+            {% if current_user.is_admin() %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('management.index') }}"><i class="bi bi-shield-lock"></i> Phân quyền</a></li>
+            {% endif %}
           </ul>
           <ul class="navbar-nav">
             <li class="nav-item dropdown">
@@ -343,6 +346,9 @@
       </div>
       <div class="offcanvas-body pt-0">
         <div class="list-group list-group-flush">
+          {% if current_user.is_admin() %}
+          <a href="{{ url_for('management.index') }}" class="list-group-item list-group-item-action py-3"><i class="bi bi-shield-lock me-2 text-primary"></i> Phân quyền quản lý</a>
+          {% endif %}
           <a href="{{ url_for('debts.index') }}" class="list-group-item list-group-item-action py-3">
             <i class="bi bi-cash-stack me-2 text-primary"></i> Công nợ
           </a>

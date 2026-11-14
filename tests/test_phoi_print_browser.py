@@ -110,6 +110,8 @@ class PrintBrowserTests(unittest.TestCase):
             truck = Truck(license_plate='71C-123.45')
             db.session.add_all([driver, manager, truck])
             db.session.flush()
+            truck.manager_id = manager.id
+            driver.manager_id = manager.id
             driver.current_truck_id = truck.id
             db.session.commit()
             client = app.test_client()

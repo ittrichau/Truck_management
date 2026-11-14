@@ -1,7 +1,9 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
+from flask import abort, Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required, current_user
 from app import db
-from app.models import Customer
+from app.models import Customer, Phoi, PhoiReturnTrip
+
+from app.access import customers_query, phois_query
 
 bp = Blueprint('customers', __name__)
 
@@ -12,7 +14,7 @@ def index():
         flash('Bạn không có quyền truy cập.', 'danger')
         return redirect(url_for('phoi.index'))
     
-    customers = Customer.query.filter_by(is_active=True).order_by(Customer.name).all()
+    customers = customers_query().filter_by(is_active=True).order_by(Customer.name).all()
     return render_template('customers/index.html', customers=customers)
 
 @bp.route('/customers/create', methods=['GET', 'POST'])
@@ -32,6 +34,8 @@ def create():
             notes=request.form.get('notes', '').strip(),
             created_by_id=current_user.id
         )
+        if current_user.role == 'manager':
+            customer.managers.append(current_user._get_current_object())
         db.session.add(customer)
         db.session.commit()
         flash(f'Đã thêm hàng: {customer.name}.', 'success')
@@ -46,7 +50,7 @@ def edit(id):
         flash('Bạn không có quyền truy cập.', 'danger')
         return redirect(url_for('phoi.index'))
     
-    customer = Customer.query.get_or_404(id)
+    customer = customers_query().filter_by(id=id).first_or_404()
     
     if request.method == 'POST':
         customer.name = request.form.get('name', '').strip()
@@ -68,7 +72,14 @@ def delete(id):
         flash('Bạn không có quyền truy cập.', 'danger')
         return redirect(url_for('phoi.index'))
     
-    customer = Customer.query.get_or_404(id)
+    customer = customers_query().filter_by(id=id).first_or_404()
+    if not current_user.is_admin():
+        own_ids = phois_query().with_entities(Phoi.id)
+        used_elsewhere = (Phoi.query.filter(Phoi.customer_id == customer.id, ~Phoi.id.in_(own_ids)).first()
+            or PhoiReturnTrip.query.filter(PhoiReturnTrip.customer_id == customer.id,
+                                          ~PhoiReturnTrip.phoi_id.in_(own_ids)).first())
+        if used_elsewhere or any(manager.id != current_user.id for manager in customer.managers):
+            abort(403, description='Chỉ admin được xóa khách hàng đang dùng chung.')
     customer.is_active = False
     db.session.commit()
     flash(f'Đã xóa hàng: {customer.name}.', 'success')
@@ -78,7 +89,7 @@ def delete(id):
 @bp.route('/api/customers')
 @login_required
 def api_customers():
-    customers = Customer.query.filter_by(is_active=True).order_by(Customer.name).all()
+    customers = customers_query().filter_by(is_active=True).order_by(Customer.name).all()
     data = []
     for c in customers:
         data.append({
@@ -93,7 +104,7 @@ def api_customers():
 @bp.route('/api/customers/<int:id>')
 @login_required
 def api_customer_detail(id):
-    customer = Customer.query.get_or_404(id)
+    customer = customers_query().filter_by(id=id).first_or_404()
     return jsonify({
         'id': customer.id,
         'name': customer.name,

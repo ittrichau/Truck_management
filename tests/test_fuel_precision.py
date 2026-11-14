@@ -10,7 +10,7 @@ from unittest.mock import patch
 from flask_migrate import downgrade, upgrade
 from flask import g
 from PIL import Image
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
 from app import create_app, db
 from app.models import FuelLog, FuelPrice, FuelReceipt, Phoi, Truck, User
@@ -52,6 +52,8 @@ class FuelPrecisionTests(unittest.TestCase):
         self.truck = Truck(license_plate='FUEL-001')
         db.session.add_all([self.driver, self.admin, self.manager, self.truck])
         db.session.flush()
+        self.truck.manager_id = self.manager.id
+        self.driver.manager_id = self.manager.id
         self.driver.current_truck_id = self.truck.id
         self.phoi = Phoi(
             phoi_number='P-FUEL-001', driver_id=self.driver.id,
@@ -197,9 +199,15 @@ class FuelPrecisionTests(unittest.TestCase):
         db.session.remove()
         db.drop_all()
         upgrade(directory=MIGRATIONS, revision='c4d5e6f7a8b9')
-        self.seed()
-        log = self.add_log('137.33')
-        log_id, phoi_id = log.id, self.phoi.id
+        # Seed the historical schema with SQL, not today's ORM columns.
+        with db.engine.begin() as connection:
+            connection.execute(text("INSERT INTO users (id, username, full_name, password_hash, role, is_active) VALUES (1, 'old-driver', 'Driver', 'unused', 'driver', 1)"))
+            connection.execute(text("INSERT INTO trucks (id, license_plate, is_active) VALUES (1, 'OLD-FUEL', 1)"))
+            connection.execute(text("INSERT INTO phoi (id, phoi_number, driver_id, truck_id, departure_date, origin, destination, status) VALUES (1, 'OLD-FUEL-PHOI', 1, 1, '2026-11-09', 'A', 'B', 'draft')"))
+            connection.execute(text("INSERT INTO fuel_logs (id, truck_id, liters, price_per_liter, total_cost, refuel_date, paid_by, created_by_id) VALUES (1, 1, 137.33, 25000, 3433250, '2026-11-09', 'driver', 1)"))
+            connection.execute(text('INSERT INTO fuel_log_phois (fuel_log_id, phoi_id) VALUES (1, 1)'))
+            connection.execute(text("INSERT INTO fuel_receipts (fuel_log_id, uploaded_by_id, original_filename, storage_key, mime_type, file_size, width, height, image_type, created_at) VALUES (1, 1, 'existing.png', 'existing.png', 'image/png', 10, 4, 4, 'receipt', '2026-11-09')"))
+        log_id, phoi_id = 1, 1
         # Close ORM read transactions before Alembic opens a DDL connection.
         # PostgreSQL otherwise waits for this test's own table locks.
         db.session.remove()

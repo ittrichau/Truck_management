@@ -4,6 +4,9 @@ from sqlalchemy.exc import IntegrityError
 from app import db
 from app.models import User, Truck
 
+from flask import abort
+from app.access import trucks_query, drivers_query, require_driver_truck, has_assignments
+
 bp = Blueprint('drivers', __name__)
 
 @bp.route('/drivers')
@@ -19,7 +22,7 @@ def index():
         drivers = User.query.filter(User.role.in_(['driver', 'manager']), User.is_active == True).order_by(User.full_name).all()
     else:
         # Manager chỉ thấy tài xế
-        drivers = User.query.filter_by(role='driver', is_active=True).order_by(User.full_name).all()
+        drivers = drivers_query().filter_by(is_active=True).order_by(User.full_name).all()
     return render_template('drivers/index.html', drivers=drivers, is_admin=is_admin)
 
 @bp.route('/drivers/create', methods=['GET', 'POST'])
@@ -37,7 +40,7 @@ def create():
         User.is_active == True,
         User.current_truck_id.isnot(None)
     ).all()]
-    available_trucks = Truck.query.filter(
+    available_trucks = trucks_query().filter(
         Truck.is_active == True,
         ~Truck.id.in_(assigned_truck_ids) if assigned_truck_ids else True
     ).order_by(Truck.license_plate).all()
@@ -75,10 +78,16 @@ def create():
             username=username,
             full_name=full_name,
             phone=phone,
-            role=role
+            role=role,
+            manager_id=current_user.id if current_user.role == 'manager' else None,
         )
         if role == 'driver' and truck_id:
-            driver.current_truck_id = int(truck_id)
+            truck = trucks_query().filter_by(id=int(truck_id), is_active=True).first_or_404()
+            # Admin-created drivers inherit the selected truck's assignment.
+            if is_admin:
+                driver.manager_id = truck.manager_id
+            require_driver_truck(driver, truck)
+            driver.current_truck_id = truck.id
         driver.set_password(password)
         db.session.add(driver)
         try:
@@ -103,7 +112,7 @@ def edit(id):
 
     is_admin = current_user.is_admin()
 
-    user = User.query.get_or_404(id)
+    user = (User.query if is_admin else drivers_query()).filter_by(id=id).first_or_404()
 
     if not is_admin and user.role != 'driver':
         flash('Không thể sửa người dùng này.', 'danger')
@@ -121,12 +130,15 @@ def edit(id):
         User.current_truck_id.isnot(None),
         User.id != id
     ).all()]
-    available_trucks = Truck.query.filter(
+    available_trucks = trucks_query().filter(
         Truck.is_active == True,
         ~Truck.id.in_(assigned_truck_ids) if assigned_truck_ids else True
     ).order_by(Truck.license_plate).all()
 
     if request.method == 'POST':
+        if request.form.get('password', '').strip() != request.form.get('confirm_password', '').strip():
+            flash('Mật khẩu xác nhận không khớp.', 'danger')
+            return render_template('drivers/edit.html', driver=user, trucks=available_trucks, is_admin=is_admin)
         user.full_name = request.form.get('full_name', '').strip()
         user.phone = request.form.get('phone', '').strip()
 
@@ -134,7 +146,11 @@ def edit(id):
         if is_admin:
             new_role = request.form.get('role', user.role)
             if new_role in ('driver', 'manager'):
+                if user.role == 'manager' and new_role != 'manager' and has_assignments(user):
+                    abort(400, description='Hãy chuyển hết quyền quản lý trước khi đổi vai trò.')
                 user.role = new_role
+                if new_role == 'manager':
+                    user.manager_id = None
                 # Nếu đổi thành manager, clear xe mặc định
                 if new_role == 'manager':
                     user.current_truck_id = None
@@ -143,7 +159,9 @@ def edit(id):
         if user.role == 'driver':
             truck_id = request.form.get('current_truck_id')
             if truck_id:
-                user.current_truck_id = int(truck_id)
+                truck = trucks_query().filter_by(id=int(truck_id), is_active=True).first_or_404()
+                require_driver_truck(user, truck)
+                user.current_truck_id = truck.id
             else:
                 user.current_truck_id = None
         else:
@@ -178,7 +196,7 @@ def delete(id):
         return redirect(url_for('phoi.index'))
 
     is_admin = current_user.is_admin()
-    user = User.query.get_or_404(id)
+    user = (User.query if is_admin else drivers_query()).filter_by(id=id).first_or_404()
 
     # Manager chỉ xóa được driver
     if not is_admin and user.role != 'driver':
@@ -189,6 +207,9 @@ def delete(id):
     if user.role == 'admin':
         flash('Không thể xóa tài khoản admin.', 'danger')
         return redirect(url_for('drivers.index'))
+
+    if user.role == 'manager' and has_assignments(user):
+        abort(400, description='Hãy chuyển hết quyền quản lý trước khi xóa quản lý.')
 
     # Giải phóng xe nếu có
     user.current_truck_id = None

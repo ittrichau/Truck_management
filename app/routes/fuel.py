@@ -6,6 +6,8 @@ from app.phoi_attachments import save_phoi_attachment, delete_attachment_file, a
 from datetime import datetime, date, timedelta
 from decimal import Decimal, InvalidOperation
 
+from app.access import trucks_query, phois_query, fuel_query
+
 bp = Blueprint('fuel', __name__)
 
 
@@ -13,15 +15,15 @@ bp = Blueprint('fuel', __name__)
 @login_required
 def index():
     page = request.args.get('page', 1, type=int)
-    query = FuelLog.query.order_by(FuelLog.refuel_date.desc())
+    query = fuel_query().order_by(FuelLog.refuel_date.desc())
     logs = query.paginate(page=page, per_page=20, error_out=False)
 
-    trucks = Truck.query.filter_by(is_active=True).all()
+    trucks = trucks_query().filter_by(is_active=True).all()
 
     truck_stats = {}
     for t in trucks:
         trip_count = Phoi.query.filter_by(truck_id=t.id, status='confirmed').count()
-        last_fuel = FuelLog.query.filter_by(truck_id=t.id).order_by(FuelLog.refuel_date.desc()).first()
+        last_fuel = fuel_query().filter_by(truck_id=t.id).order_by(FuelLog.refuel_date.desc()).first()
         days_since = None
         if last_fuel:
             days_since = (date.today() - last_fuel.refuel_date).days
@@ -73,15 +75,15 @@ def _parse_fuel_price(value):
 @bp.route('/fuel/create', methods=['GET', 'POST'])
 @login_required
 def create():
-    trucks = Truck.query.filter_by(is_active=True).all()
-    phoi_query = Phoi.query.filter(Phoi.status.in_(['draft', 'submitted']))
+    trucks = trucks_query().filter_by(is_active=True).all()
+    phoi_query = phois_query().filter(Phoi.status.in_(['draft', 'submitted']))
     if current_user.is_driver():
         phoi_query = phoi_query.filter_by(driver_id=current_user.id)
     phois = phoi_query.order_by(Phoi.created_at.desc()).all()
 
     selected_phoi_id = request.args.get('phoi_id', type=int)
     selected_truck_id = request.args.get('truck_id', type=int)
-    selected_phoi = Phoi.query.get(selected_phoi_id) if selected_phoi_id else None
+    selected_phoi = phois_query().filter_by(id=selected_phoi_id).first() if selected_phoi_id else None
     if selected_phoi:
         if selected_phoi.status == 'confirmed' or (current_user.is_driver() and selected_phoi.driver_id != current_user.id):
             flash('Bạn không có quyền ghi nhận đổ xăng cho phơi này.', 'danger')
@@ -113,6 +115,8 @@ def create():
                 raise ValueError('Tổng tiền xăng vượt quá giới hạn cho phép.')
 
             truck_id = int(request.form.get('truck_id', 0))
+            if not trucks_query().filter_by(id=truck_id, is_active=True).first():
+                raise ValueError('Xe không thuộc phạm vi được giao.')
 
             # Kiểm tra chạy giùm: tài xế đổ xăng cho xe không phải xe mặc định
             is_substitute = False
@@ -135,7 +139,7 @@ def create():
 
             # Mỗi lần đổ xăng chỉ được tính cho một phơi đang thực hiện cùng xe.
             selected_phoi_id = request.form.get('phoi_id', type=int)
-            selected_phoi_record = Phoi.query.get(selected_phoi_id) if selected_phoi_id else None
+            selected_phoi_record = phois_query().filter_by(id=selected_phoi_id).first() if selected_phoi_id else None
             if not selected_phoi_record or selected_phoi_record.status not in ['draft', 'submitted']:
                 flash('Phải chọn đúng một phơi đang thực hiện để ghi nhận lần đổ xăng.', 'danger')
                 return render_template('fuel/create.html', trucks=trucks, phois=phois,
@@ -192,7 +196,7 @@ def create():
 @bp.route('/fuel/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit(id):
-    log = FuelLog.query.get_or_404(id)
+    log = fuel_query().filter_by(id=id).first_or_404()
     linked_phois = log.phois.all()
     if current_user.is_driver() and (
         log.created_by_id != current_user.id
@@ -256,7 +260,7 @@ def edit(id):
 @bp.route('/fuel/<int:id>/receipts/<int:receipt_id>')
 @login_required
 def view_receipt(id, receipt_id):
-    log = FuelLog.query.get_or_404(id)
+    log = fuel_query().filter_by(id=id).first_or_404()
     if current_user.is_driver() and log.created_by_id != current_user.id:
         flash('Bạn không có quyền xem hóa đơn này.', 'danger')
         return redirect(url_for('fuel.index'))
@@ -273,7 +277,7 @@ def view_receipt(id, receipt_id):
 @bp.route('/fuel/<int:id>/delete', methods=['POST'])
 @login_required
 def delete(id):
-    log = FuelLog.query.get_or_404(id)
+    log = fuel_query().filter_by(id=id).first_or_404()
     linked_phois = log.phois.all()
     if current_user.is_driver() and (
         log.created_by_id != current_user.id
