@@ -61,3 +61,73 @@ def assign_resource(kind, identity, form, actor):
         details=json.dumps({'kind': kind, 'before': before, 'after': after}, ensure_ascii=False),
         method='POST', endpoint='management.index', status_code=302,
     ))
+
+
+def assign_resources(form, actor):
+    """Validate the edited rows first, then apply the whole batch atomically.
+
+    Unedited rows do not overwrite concurrent changes. Linked drivers follow
+    their truck even when the submitted driver row still has its original owner.
+    The caller commits all resource changes and their audits in one transaction.
+    """
+    from werkzeug.datastructures import MultiDict
+
+    if not actor.is_admin():
+        raise ValueError('Chỉ admin được phân quyền quản lý.')
+    models = {'truck': Truck, 'driver': User, 'customer': Customer}
+    tokens = form.getlist('rows')
+    if len(tokens) != len(set(tokens)):
+        raise ValueError('Có mục phân quyền bị gửi trùng. Vui lòng tải lại trang.')
+    changes = []
+    for token in sorted(tokens):
+        parts = token.split(':')
+        if len(parts) != 2 or parts[0] not in models or not parts[1].isdecimal():
+            raise ValueError('Dữ liệu phân quyền không hợp lệ.')
+        kind, raw_id = parts
+        identity = int(raw_id)
+        if identity <= 0 or str(identity) != raw_id:
+            raise ValueError('Dữ liệu phân quyền không hợp lệ.')
+        key = f'{kind}_{identity}'
+        expected = form.get(f'expected_{key}')
+        if expected is None:
+            raise ValueError('Biểu mẫu thiếu dữ liệu đối chiếu. Vui lòng tải lại trang.')
+        if kind == 'customer':
+            values = form.getlist(f'managers_{key}')
+            if any(not value.isdecimal() for value in values):
+                raise ValueError('Quản lý không hợp lệ.')
+            desired = ','.join(map(str, sorted(set(map(int, values)))))
+        else:
+            # Disabled controls for linked drivers are intentionally not sent.
+            desired = form.get(f'manager_{key}', expected)
+            if desired and not desired.isdecimal():
+                raise ValueError('Quản lý không hợp lệ.')
+        if desired == expected:
+            continue
+        resource = models[kind].query.filter_by(id=identity).with_for_update().first()
+        if resource is None or (kind == 'driver' and resource.role != 'driver'):
+            raise ValueError('Mục đã chỉnh không còn tồn tại. Vui lòng tải lại trang.')
+        current = (','.join(map(str, sorted(user.id for user in resource.managers)))
+                   if kind == 'customer' else owner_token(resource.manager_id))
+        if expected != current:
+            raise ValueError('Quyền của một mục vừa thay đổi. Chưa lưu mục nào; vui lòng tải lại trang và kiểm tra.')
+        managers = [int(value) for value in desired.split(',') if value]
+        valid = User.query.filter(User.id.in_(managers), User.role == 'manager', User.is_active.is_(True)).count()
+        if valid != len(managers):
+            raise ValueError('Quản lý không tồn tại hoặc đã ngừng hoạt động. Chưa lưu mục nào.')
+        changes.append((kind, identity, desired, resource))
+
+    # Apply truck transfers first so any explicitly edited linked driver is
+    # validated against the final truck owner, independent of form row order.
+    order = {'truck': 0, 'driver': 1, 'customer': 2}
+    for kind, identity, desired, resource in sorted(changes, key=lambda item: (order[item[0]], item[1])):
+        expected = (','.join(map(str, sorted(user.id for user in resource.managers)))
+                    if kind == 'customer' else owner_token(resource.manager_id))
+        if expected == desired:
+            continue  # The truck transfer already updated this linked driver.
+        row = MultiDict([('expected', expected)])
+        if kind == 'customer':
+            row.setlist('manager_ids', desired.split(',') if desired else [])
+        else:
+            row['manager_id'] = desired
+        assign_resource(kind, identity, row, actor)
+    return len(changes)

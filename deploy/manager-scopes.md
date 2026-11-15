@@ -5,6 +5,7 @@ Sau triển khai, đăng nhập admin → **Phân quyền** (điện thoại: **
 1. Gán xe cho quản lý. Tài xế đang giữ xe tự chuyển cùng; không đổi liên kết xe/tài xế.
 2. Gán tài xế chưa giữ xe ở mục Tài xế; sau đó chọn xe cùng quản lý ở trang sửa tài xế/xe.
 3. Đánh dấu các quản lý được dùng từng khách hàng; có thể cấp chung. Dữ liệu admin tạo mới chưa gán mặc định chỉ admin quản lý.
+4. Bấm **Lưu toàn bộ** một lần để lưu tất cả mục vừa chỉnh. Nút lưu luôn nằm ở đầu vùng đang cuộn. Nếu có mục lỗi thì chưa lưu mục nào và giữ các lựa chọn để sửa tiếp. Mục không chỉnh không ghi đè thay đổi của admin khác; mục đã chỉnh nhưng dữ liệu gốc vừa đổi yêu cầu tải lại để đối chiếu.
 
 Quản lý chỉ nhìn thấy xe/tài xế/khách được cấp. Phơi, công nợ, nhiên liệu và chứng từ theo xe; kể cả lịch sử trước ngày chuyển xe. Khách hàng của các chuyến lịch sử vẫn xuất hiện trong công nợ của xe sau chuyển, nhưng cần được cấp danh mục để chọn trong phơi mới. Khi sửa đúng phơi, lựa chọn khách cũ được giữ. Tài xế vẫn xem phơi của mình; danh sách xe chạy giùm/khách được giới hạn trong nhóm.
 
