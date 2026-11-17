@@ -147,6 +147,41 @@ try {
         assert.equal(checked, true);
         results.push({form: form.split(/[\\/]/).at(-1), dynamicCheckboxes: 'passed'});
     }
+    for (const form of manifest.confirmations || []) {
+        await open(form);
+        const checked = await evaluate(`(() => {
+            const assert = (condition, label) => {if (!condition) throw new Error(label);};
+            const form = document.querySelector('form.warn-unsaved-changes');
+            const advance = document.querySelector('#driver-advance');
+            document.querySelector('#toll-fee-amount').value = '350,000';
+            document.querySelector('#driver-wage').value = '450,000';
+            advance.value = '1000000';
+            advance.dispatchEvent(new Event('input', {bubbles: true}));
+            assert(advance.value === '1,000,000', 'Advance uses existing currency formatter');
+            let submitted = false;
+            form.addEventListener('submit', event => {
+                submitted = true;
+                event.preventDefault();
+            }, true);
+            for (const [value, valid] of [
+                ['', true], ['0', true], ['200,000', true], ['1,000,000', true],
+                ['-1', false], ['abc', false], ['NaN', false], ['Infinity', false],
+                ['12,34', false], ['1.001', false], ['10000000000', false],
+            ]) {
+                advance.value = value;
+                submitted = false;
+                form.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+                assert(advance.classList.contains('is-invalid') === !valid, 'Advance validity: ' + value);
+                assert(submitted === valid, 'Invalid advance blocks submission: ' + value);
+            }
+            advance.value = '200000';
+            advance.dispatchEvent(new Event('input', {bubbles: true}));
+            assert(!advance.classList.contains('is-invalid'), 'Correcting advance clears error');
+            return true;
+        })()`);
+        assert.equal(checked, true);
+        results.push({form: form.split(/[\\/]/).at(-1), driverAdvance: 'passed'});
+    }
     process.stdout.write(JSON.stringify(results));
 } finally {
     await call('Target.closeTarget', {targetId});

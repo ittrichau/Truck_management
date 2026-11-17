@@ -231,11 +231,11 @@
     {% endif %}
 
     <!-- Kết quả đối chiếu -->
-    <div class="card mb-3 {% if phoi.balance() >= 0 %}border-success{% else %}border-danger{% endif %}">
+    <div class="card mb-3 {% if phoi.settlement_balance() >= 0 %}border-success{% else %}border-danger{% endif %}">
         <div class="card-body">
             <div class="row g-2 text-center">
                 <div class="col-6">
-                    <small class="text-muted">Tài xế đã ứng + Công</small><br>
+                    <small class="text-muted">Tài xế đã chi + Công</small><br>
                     <span class="fs-5 fw-bold">{{ '{:,.0f}'.format(phoi.driver_out_of_pocket_expenses() + phoi.driver_wage) }} VNĐ</span>
                     {% if phoi.driver_wage %}
                     <br><small class="text-primary">Gồm {{ '{:,.0f}'.format(phoi.driver_wage) }} VNĐ tiền công tài xế</small>
@@ -259,10 +259,14 @@
                     <small class="text-muted">Tài xế đã thu</small><br>
                     <span class="fs-5 fw-bold">{{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ</span>
                 </div>
+                <div class="col-12 mt-2">
+                    <small class="text-muted">Tiền quản lý đã ứng cho tài xế (trừ khi quyết toán)</small><br>
+                    <span class="fw-bold">{{ '{:,.0f}'.format(phoi.driver_advance or 0) }} VNĐ</span>
+                </div>
             </div>
             <hr>
             <div class="text-center">
-                {% set bal = phoi.balance() %}
+                {% set bal = phoi.settlement_balance() %}
                 {% if bal >= 0 %}
                 <small class="text-muted">👉 Chủ xe cần trả thêm cho tài xế</small><br>
                 <span class="fs-4 fw-bold amount-positive">{{ '{:,.0f}'.format(bal) }} VNĐ</span>

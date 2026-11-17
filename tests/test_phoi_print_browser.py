@@ -76,7 +76,7 @@ class PrintBrowserTests(unittest.TestCase):
                 ], text=True, capture_output=True, encoding='utf-8', timeout=90)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 checks = json.loads(result.stdout)
-                self.assertEqual(len(checks), len(manifest['prints']) + len(manifest['forms']))
+                self.assertEqual(len(checks), len(manifest['prints']) + len(manifest['forms']) + len(manifest['confirmations']))
                 print('\nBrowser checks:', json.dumps(checks, ensure_ascii=True))
             finally:
                 process.terminate()
@@ -86,7 +86,7 @@ class PrintBrowserTests(unittest.TestCase):
         with patch('app.get_config', return_value=TestingConfig):
             app = create_app('testing')
         app.config.update(SECRET_KEY='print-tests', RATELIMIT_ENABLED=False)
-        manifest = {'prints': [], 'forms': []}
+        manifest = {'prints': [], 'forms': [], 'confirmations': []}
 
         def save(html, name):
             # Keep local application styles/scripts; prevent CDN/network calls.
@@ -127,10 +127,12 @@ class PrintBrowserTests(unittest.TestCase):
                             departure_date=date(2026, 11, 9), origin='Bến Tre', destination='Tây Ninh',
                             cargo_description='Dừa nguyên trái', cargo_weight_tons=18.5,
                             km_start=0, km_end=650, km_total=650, revenue_full=3600000,
-                            revenue_collected=500000, driver_wage=450000, notes='Giao hàng đủ. Giữ lại hóa đơn chi phí để đối soát.')
+                            revenue_collected=500000, driver_wage=450000, driver_advance=200000,
+                            notes='Giao hàng đủ. Giữ lại hóa đơn chi phí để đối soát.')
                 db.session.add(phoi)
                 db.session.flush()
                 markers = ['Vá lốp và phí vào kho chuyến đi.']
+                markers.append('Quản lý đã ứng (trừ khi quyết toán): 200,000 VNĐ')
                 description = 'Phí vào kho, vá lốp và rửa xe sau khi dỡ hàng. ' if long else 'Phí vào kho.'
                 db.session.add(PhoiExpense(phoi_id=phoi.id, category='other', amount=150000,
                                           description=(markers[0] + ' ' + description * (4 if long else 1))[:200]))
@@ -167,6 +169,10 @@ class PrintBrowserTests(unittest.TestCase):
                         **({'screenshot': str(artifacts / f'{name}.png')} if count == 3 and user == manager else {}),
                     })
                 if count == 0:
+                    phoi.status = 'submitted'
+                    db.session.commit()
+                    login(manager)
+                    manifest['confirmations'].append(save(client.get(f'/phoi/{phoi.id}/confirm').get_data(as_text=True), 'confirm-form'))
                     # Dynamic edit fields are tested on a phơi with no return rows.
                     login(driver)
                     empty = Phoi(phoi_number='EMPTY-EDIT', driver_id=driver.id, truck_id=truck.id,

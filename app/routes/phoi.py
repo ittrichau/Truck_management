@@ -2,7 +2,7 @@ from flask import Blueprint, current_app, render_template, redirect, url_for, fl
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 from app import db
-from app.models import ActivityLog, Phoi, PhoiAttachment, PhoiExpense, PhoiReturnTrip, FuelLog, Customer, Truck, User, generate_phoi_number
+from app.models import ActivityLog, Phoi, PhoiAttachment, PhoiExpense, PhoiReturnTrip, FuelLog, Customer, Truck, User, generate_phoi_number, collection_amount
 from app.phoi_attachments import attachment_path, delete_attachment_file, save_phoi_attachment
 from app.phoi_repair_expenses import _sync_standard_expenses, _sync_repair_expenses, _save_repair_receipts
 from app.phoi_other_expenses import sync_other_expense
@@ -417,7 +417,7 @@ def index():
 
     balances = {}
     for p in phois.items:
-        balances[p.id] = p.balance()
+        balances[p.id] = p.settlement_balance()
 
     # Lấy cảnh báo hết hạn đăng kiểm/phù hiệu (chỉ hiện khi đã quá 2 ngày kể từ lần thông báo cuối)
     warnings = []
@@ -1006,6 +1006,8 @@ def confirm(id):
         if driver_wage <= 0:
             raise ValueError('Vui lòng nhập tiền công tài xế lớn hơn 0 trước khi xác nhận.')
         phoi.driver_wage = driver_wage
+        raw_advance = request.form.get('driver_advance', str(phoi.driver_advance or 0))
+        phoi.driver_advance = collection_amount(raw_advance.strip() or '0')
         _sync_confirmation_toll_fee(phoi)
         error = submission_error(phoi) or financial_confirmation_error(phoi)
         if error:
@@ -1021,5 +1023,5 @@ def confirm(id):
         flash(str(exc), 'danger')
         return redirect(url_for('phoi.confirm', id=id))
 
-    flash(f'Đã xác nhận phơi {phoi.phoi_number}. Balance: {phoi.balance():,.0f} VNĐ', 'success')
+    flash(f'Đã xác nhận phơi {phoi.phoi_number}. Số tiền quyết toán: {phoi.settlement_balance():,.0f} VNĐ', 'success')
     return redirect(url_for('phoi.detail', id=id))

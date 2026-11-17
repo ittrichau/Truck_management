@@ -128,13 +128,133 @@ class PhoiCompletionPrintTests(unittest.TestCase):
                 self.client.post(f'/phoi/{self.phoi.id}/submit')
                 self.assertEqual(self.phoi.status, 'draft')
 
-    def confirm(self):
-        self.login(self.manager)
-        return self.client.post(f'/phoi/{self.phoi.id}/confirm', data={
+    def confirm(self, advance=None, user=None):
+        self.login(user or self.manager)
+        data = {
             'outbound_collection_status': 'partial',
             'outbound_manager_revenue_collected': '400000',
             'driver_wage': '450000', 'toll_fee_status': 'incurred', 'toll_fee_amount': '350000',
-        })
+        }
+        if advance is not None:
+            data['driver_advance'] = advance
+        return self.client.post(f'/phoi/{self.phoi.id}/confirm', data=data)
+
+    def test_advance_reduces_settlement_once_without_changing_profit_or_debt(self):
+        self.returns()
+        self.fuel('12.5', '275000', 'driver')
+        self.phoi.status = 'submitted'
+        db.session.commit()
+        base_balance = self.phoi.balance()
+        self.assertEqual(self.confirm('600,000').status_code, 302)
+        db.session.refresh(self.phoi)
+        self.assertEqual(self.phoi.status, 'confirmed')
+        self.assertEqual(self.phoi.driver_advance, Decimal('600000'))
+        self.assertEqual(self.phoi.balance(), base_balance)
+        self.assertEqual(self.phoi.settlement_balance(), base_balance - Decimal('600000'))
+        # Costs remain porter + driver-paid fuel + toll; advance is a transfer.
+        self.assertEqual(self.phoi.total_expenses(), Decimal('855000'))
+        self.assertEqual(self.phoi.owner_profit(), Decimal('14295000'))
+        self.assertEqual(self.phoi.total_revenue_collected(), Decimal('1100000'))
+        for user in (self.driver, self.manager, self.admin):
+            with self.subTest(role=user.role):
+                self.login(user)
+                detail = self.client.get(f'/phoi/{self.phoi.id}').get_data(as_text=True)
+                listing = self.client.get('/phoi?status=confirmed').get_data(as_text=True)
+                printed = self.print_html(user)
+                self.assertIn('Tiền quản lý đã ứng cho tài xế', detail)
+                self.assertIn('600,000 VNĐ', detail)
+                self.assertIn('745,000 VNĐ', detail)
+                self.assertIn('Tài xế nộp lại: 745,000 VNĐ', listing)
+                self.assertIn('Quản lý đã ứng (trừ khi quyết toán): 600,000 VNĐ', printed)
+                self.assertIn('745,000 VNĐ', printed)
+                if user.is_driver():
+                    self.assertNotIn('Lợi nhuận chủ xe', detail)
+                    self.assertNotIn('Lợi nhuận chủ xe', printed)
+                else:
+                    self.assertIn(['Công nợ còn lại', '14,100,000 VNĐ'], TableRows(printed).rows)
+
+    def test_manager_and_admin_can_confirm_with_advance_and_cannot_confirm_twice(self):
+        self.fuel()
+        self.phoi.revenue_collected = 0
+        for user in (self.manager, self.admin):
+            with self.subTest(role=user.role):
+                self.phoi.status = 'submitted'
+                db.session.commit()
+                self.assertEqual(self.confirm('100000', user).status_code, 302)
+                db.session.refresh(self.phoi)
+                self.assertEqual(self.phoi.status, 'confirmed')
+                self.assertEqual(self.phoi.settlement_balance(), Decimal('350000'))
+                self.confirm('900000', user)
+                db.session.refresh(self.phoi)
+                self.assertEqual(self.phoi.driver_advance, Decimal('100000'))
+                self.assertEqual(self.phoi.settlement_balance(), Decimal('350000'))
+
+    def test_no_advance_keeps_previous_result_and_exact_advance_settles_to_zero(self):
+        self.fuel()
+        self.phoi.revenue_collected = 0
+        for amount in (None, '', '0', '450,000'):
+            with self.subTest(amount=amount):
+                self.phoi.status = 'submitted'
+                db.session.commit()
+                self.confirm(amount)
+                db.session.refresh(self.phoi)
+                self.assertEqual(self.phoi.status, 'confirmed')
+                expected = Decimal('450000') if amount == '450,000' else Decimal('0')
+                self.assertEqual(self.phoi.driver_advance, expected)
+                self.assertEqual(self.phoi.settlement_balance(), Decimal('450000') - expected)
+
+    def test_invalid_advance_rolls_back_all_confirmation_changes(self):
+        self.fuel()
+        self.phoi.status = 'submitted'
+        self.phoi.driver_wage = Decimal('200000')
+        self.phoi.manager_revenue_collected = Decimal('100000')
+        db.session.commit()
+        for amount in ('-1', 'abc', 'NaN', 'sNaN', 'Infinity', '1e6', '12,34', '1.001', '10000000000'):
+            with self.subTest(amount=amount):
+                response = self.confirm(amount)
+                self.assertEqual(response.status_code, 302)
+                self.assertTrue(response.location.endswith('/confirm'))
+                db.session.refresh(self.phoi)
+                self.assertEqual(self.phoi.status, 'submitted')
+                self.assertEqual(self.phoi.driver_advance, 0)
+                self.assertEqual(self.phoi.driver_wage, Decimal('200000'))
+                self.assertEqual(self.phoi.manager_revenue_collected, Decimal('100000'))
+                self.assertIsNone(self.phoi.confirmed_at)
+                self.assertEqual(self.phoi.expenses.count(), 0)
+
+    def test_driver_cannot_record_advance_via_submit_or_confirm(self):
+        self.fuel()
+        self.client.post(f'/phoi/{self.phoi.id}/submit', data={'driver_advance': '900000'})
+        db.session.refresh(self.phoi)
+        self.assertEqual(self.phoi.status, 'submitted')
+        self.assertEqual(self.phoi.driver_advance, 0)
+        for driver in (self.driver, self.other):
+            with self.subTest(driver=driver.username):
+                self.assertEqual(self.confirm('900000', driver).status_code, 302)
+                self.assertEqual(self.client.get(f'/phoi/{self.phoi.id}/confirm').status_code, 302)
+                db.session.refresh(self.phoi)
+                self.assertEqual(self.phoi.status, 'submitted')
+                self.assertEqual(self.phoi.driver_advance, 0)
+
+    def test_advance_does_not_bypass_fuel_requirement(self):
+        self.phoi.status = 'submitted'
+        db.session.commit()
+        self.confirm('100000')
+        db.session.refresh(self.phoi)
+        self.assertEqual(self.phoi.status, 'submitted')
+        self.assertEqual(self.phoi.driver_advance, 0)
+        self.assertEqual(self.phoi.expenses.count(), 0)
+
+    def test_confirmation_form_explains_advance_and_defaults_to_zero(self):
+        self.phoi.status = 'submitted'
+        db.session.commit()
+        self.login(self.manager)
+        response = self.client.get(f'/phoi/{self.phoi.id}/confirm')
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('Tiền quản lý đã ứng cho tài xế', html)
+        self.assertIn('name="driver_advance" value="0"', html)
+        self.assertIn('Khoản này được trừ khi quyết toán với tài xế', html)
 
     def test_outbound_only_phoi_can_be_confirmed(self):
         self.fuel()

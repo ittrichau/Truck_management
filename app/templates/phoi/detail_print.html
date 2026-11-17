@@ -418,8 +418,8 @@
     <section class="print-section settlement-section">
         <h4 class="print-section-title">04 / ĐỐI CHIẾU THANH TOÁN</h4>
         <div class="settlement-row">
-            <div class="settlement-summary {% if phoi.balance() >= 0 %}balance-positive{% else %}balance-negative{% endif %}">
-                {% set bal = phoi.balance() %}
+            <div class="settlement-summary {% if phoi.settlement_balance() >= 0 %}balance-positive{% else %}balance-negative{% endif %}">
+                {% set bal = phoi.settlement_balance() %}
                 {% if bal >= 0 %}
                     <div class="settlement-label">Chủ xe trả tài xế</div>
                     <div class="settlement-amount">{{ '{:,.0f}'.format(bal) }} VNĐ</div>
@@ -427,7 +427,7 @@
                     <div class="settlement-label">Tài xế nộp chủ xe</div>
                     <div class="settlement-amount">{{ '{:,.0f}'.format(-bal) }} VNĐ</div>
                 {% endif %}
-                <div class="settlement-details">Ứng + công: {{ '{:,.0f}'.format(phoi.driver_out_of_pocket_expenses() + phoi.driver_wage) }} VNĐ · Đã thu: {{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ</div>
+                <div class="settlement-details">Đã chi + công: {{ '{:,.0f}'.format(phoi.driver_out_of_pocket_expenses() + phoi.driver_wage) }} VNĐ · Đã thu: {{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ<br>Quản lý đã ứng (trừ khi quyết toán): {{ '{:,.0f}'.format(phoi.driver_advance or 0) }} VNĐ</div>
             </div>
             {% if current_user.is_manager_or_admin() %}
             <div class="owner-profit">

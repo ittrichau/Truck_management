@@ -175,7 +175,7 @@ class TruckInsuranceTests(unittest.TestCase):
         upgrade(directory=MIGRATIONS)
         config = Config()
         config.set_main_option('script_location', MIGRATIONS)
-        self.assertEqual(ScriptDirectory.from_config(config).get_heads(), ['f8a9b0c1d2e3'])
+        self.assertEqual(ScriptDirectory.from_config(config).get_heads(), ['a1c2d3e4f5b6'])
 
 
 if __name__ == '__main__':

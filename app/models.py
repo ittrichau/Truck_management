@@ -334,6 +334,10 @@ class Phoi(db.Model):
     revenue_collected = db.Column(db.Numeric(12, 2), default=0, comment='Tiền mặt tài xế đã thu')
     manager_revenue_collected = db.Column(db.Numeric(12, 2), default=0, nullable=False, comment='Tiền quản lý/chủ xe đã nhận trực tiếp')
     driver_wage = db.Column(db.Numeric(12, 2), default=0, comment='Phí công tài xế (manager nhập)')
+    driver_advance = db.Column(
+        db.Numeric(12, 2), nullable=False, default=0, server_default='0',
+        comment='Tiền quản lý/chủ xe đã ứng trước cho tài xế',
+    )
     
     # Trạng thái
     status = db.Column(db.String(20), default='draft')  # draft, submitted, confirmed, cancelled
@@ -437,6 +441,10 @@ class Phoi(db.Model):
         owner_owes = self.driver_out_of_pocket_expenses() + self.driver_wage
         driver_owes = self.total_revenue_collected()
         return owner_owes - driver_owes
+
+    def settlement_balance(self):
+        """Tiền còn quyết toán sau khi trừ tiền quản lý đã ứng, không đổi chi phí/lợi nhuận."""
+        return self.balance() - (self.driver_advance or Decimal('0'))
     
     def owner_profit(self):
         """Lợi nhuận chủ xe của toàn bộ phơi."""
