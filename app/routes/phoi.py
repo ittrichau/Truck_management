@@ -9,11 +9,14 @@ from app.phoi_other_expenses import sync_other_expense
 from datetime import datetime, date
 from decimal import Decimal, InvalidOperation
 
+from app.access import (trucks_query, drivers_query, customers_query, phois_query,
+                        fuel_query, can_access_phoi, permitted_customer_id, require_driver_truck, edit_customers_query)
+
 bp = Blueprint('phoi', __name__)
 
 
 def can_manage_phoi(user, phoi):
-    return user.is_manager_or_admin() or (user.is_driver() and phoi.driver_id == user.id)
+    return can_access_phoi(user, phoi)
 
 
 def submission_error(phoi):
@@ -85,7 +88,7 @@ def update_truck_status(truck):
 
 def _unallocated_fuel_logs(truck_id=None):
     """Fuel released by a cancelled phơi and awaiting manager allocation."""
-    query = FuelLog.query.filter(
+    query = fuel_query().filter(
         FuelLog.allocation_status == 'unallocated',
         FuelLog.unallocated_from_cancelled_phoi_id.isnot(None),
     )
@@ -100,7 +103,7 @@ def _assign_unallocated_fuel_logs(phoi):
         return
     if not current_user.is_manager_or_admin():
         raise ValueError('Chỉ quản lý mới được phân bổ lại lần đổ xăng từ phơi đã hủy.')
-    logs = FuelLog.query.filter(FuelLog.id.in_(selected_ids)).all()
+    logs = fuel_query().filter(FuelLog.id.in_(selected_ids)).all()
     if len(logs) != len(set(selected_ids)):
         raise ValueError('Có lần đổ xăng chờ phân bổ không tồn tại.')
     for log in logs:
@@ -161,6 +164,7 @@ def _record_km_start_warning(phoi, baseline_km, entered_km):
         username=current_user.username,
         action='ALERT',
         resource_type='phoi_km_warning',
+        scope_truck_id=phoi.truck_id,
         resource_id=str(phoi.id),
         details=(
             f'CẢNH BÁO KM: Tài xế sửa KM đầu phơi {phoi.phoi_number} '
@@ -176,8 +180,8 @@ def _record_km_start_warning(phoi, baseline_km, entered_km):
 
 def _active_phoi_options():
     """Return active trucks, drivers, and each truck's default driver."""
-    trucks = Truck.query.filter_by(is_active=True).order_by(Truck.license_plate).all()
-    drivers = User.query.filter_by(role='driver', is_active=True).order_by(User.full_name).all()
+    trucks = trucks_query().filter_by(is_active=True).order_by(Truck.license_plate).all()
+    drivers = drivers_query().filter_by(is_active=True).order_by(User.full_name).all()
     driver_by_truck_id = {
         driver.current_truck_id: driver
         for driver in drivers
@@ -193,7 +197,7 @@ def _selected_driver_and_truck():
     if not truck_id:
         raise ValueError('Vui lòng chọn xe.')
 
-    truck = Truck.query.filter_by(id=truck_id, is_active=True).first()
+    truck = trucks_query().filter_by(id=truck_id, is_active=True).first()
     if not truck:
         raise ValueError('Xe được chọn không tồn tại hoặc đã ngừng hoạt động.')
 
@@ -204,6 +208,7 @@ def _selected_driver_and_truck():
                 raise ValueError('Bạn chưa được gán xe mặc định. Hãy bật chế độ chạy giùm để chọn xe.')
             if truck.id != driver.current_truck_id:
                 raise ValueError('Khi chưa bật chạy giùm, bạn chỉ được tạo phơi cho xe mặc định.')
+        require_driver_truck(driver, truck)
         return driver, truck, is_substitute
 
     if not current_user.is_manager_or_admin():
@@ -213,14 +218,16 @@ def _selected_driver_and_truck():
         driver_id = request.form.get('driver_id', type=int)
         if not driver_id:
             raise ValueError('Vui lòng chọn tài xế chạy giùm.')
-        driver = User.query.filter_by(id=driver_id, role='driver', is_active=True).first()
+        driver = drivers_query().filter_by(id=driver_id, is_active=True).first()
         if not driver:
             raise ValueError('Tài xế được chọn không tồn tại hoặc đã ngừng hoạt động.')
+        require_driver_truck(driver, truck)
         return driver, truck, True
 
-    driver = User.query.filter_by(current_truck_id=truck.id, role='driver', is_active=True).first()
+    driver = drivers_query().filter_by(current_truck_id=truck.id, is_active=True).first()
     if not driver:
         raise ValueError('Xe này chưa được gán tài xế mặc định. Hãy gán tài xế hoặc bật chế độ chạy giùm.')
+    require_driver_truck(driver, truck)
     return driver, truck, False
 
 
@@ -332,13 +339,14 @@ def _sync_return_trips(phoi):
         ):
             raise ValueError('Chuyến về không hợp lệ hoặc bị gửi trùng.')
         trip = existing_trips.get(submitted_trip_id)
+        selected_customer_id = permitted_customer_id(customer_id, trip.customer_id if trip else None)
         if trip:
             retained_trip_ids.add(trip.id)
         else:
             trip = PhoiReturnTrip(phoi_id=phoi.id)
             db.session.add(trip)
 
-        trip.customer_id = int(customer_id) if customer_id else None
+        trip.customer_id = selected_customer_id
         trip.trip_order = index + 1
         trip.return_date = datetime.strptime(dates[index], '%Y-%m-%d').date() if index < len(dates) and dates[index] else None
         trip.origin = origin
@@ -377,9 +385,7 @@ def index():
     start_date = request.args.get('start_date', '')
     end_date = request.args.get('end_date', '')
 
-    query = Phoi.query
-    if not current_user.is_manager_or_admin():
-        query = query.filter(Phoi.driver_id == current_user.id)
+    query = phois_query()
 
     if search:
         keyword = f'%{search}%'
@@ -412,8 +418,8 @@ def index():
             end_date = ''
 
     phois = query.order_by(Phoi.created_at.desc()).paginate(page=page, per_page=20, error_out=False)
-    trucks = Truck.query.order_by(Truck.license_plate).all()
-    drivers = User.query.filter_by(role='driver').order_by(User.full_name).all() if current_user.is_manager_or_admin() else []
+    trucks = trucks_query().order_by(Truck.license_plate).all()
+    drivers = drivers_query().order_by(User.full_name).all() if current_user.is_manager_or_admin() else []
 
     balances = {}
     for p in phois.items:
@@ -423,7 +429,7 @@ def index():
     warnings = []
     notified_truck_ids = set()
     notified_types = {}
-    for truck in Truck.query.filter_by(is_active=True).all():
+    for truck in trucks_query().filter_by(is_active=True).all():
         insp_days = truck.inspection_days_until_expiry()
         if insp_days is not None and insp_days <= 15 and truck.inspection_should_notify():
             label = 'Đăng kiểm' if insp_days >= 0 else 'Đăng kiểm (quá hạn)'
@@ -474,7 +480,7 @@ def create():
         return redirect(url_for('phoi.index'))
 
     trucks, drivers, driver_by_truck_id = _active_phoi_options()
-    customers = Customer.query.filter_by(is_active=True).order_by(Customer.name).all()
+    customers = customers_query().filter_by(is_active=True).order_by(Customer.name).all()
 
     if request.method == 'POST':
         saved_keys = []
@@ -487,9 +493,8 @@ def create():
             phoi.truck_id = truck.id
             phoi.is_substitute = is_substitute
             phoi.created_by_id = current_user.id
-            phoi.customer_id = request.form.get('customer_id') or None
-            if phoi.customer_id:
-                phoi.customer_id = int(phoi.customer_id)
+            phoi.customer_id = permitted_customer_id(
+                request.form.get('customer_id'), phoi.customer_id)
 
             dep = request.form.get('departure_date', '')
             ret = request.form.get('return_date', '')
@@ -579,7 +584,7 @@ def create():
 @bp.route('/phoi/<int:id>')
 @login_required
 def detail(id):
-    phoi = Phoi.query.get_or_404(id)
+    phoi = phois_query().filter_by(id=id).first_or_404()
 
     if current_user.is_driver() and phoi.driver_id != current_user.id:
         flash('Bạn không có quyền xem phơi này.', 'danger')
@@ -591,7 +596,7 @@ def detail(id):
 @bp.route('/phoi/<int:id>/attachments', methods=['POST'])
 @login_required
 def upload_attachment(id):
-    phoi = Phoi.query.get_or_404(id)
+    phoi = phois_query().filter_by(id=id).first_or_404()
     can_update_attachments = (
         (phoi.status == 'draft' and can_manage_phoi(current_user, phoi))
         or (phoi.status == 'submitted' and current_user.is_manager_or_admin())
@@ -654,7 +659,7 @@ def upload_attachment(id):
 @bp.route('/phoi/<int:id>/attachments/<int:attachment_id>')
 @login_required
 def view_attachment(id, attachment_id):
-    phoi = Phoi.query.get_or_404(id)
+    phoi = phois_query().filter_by(id=id).first_or_404()
     if not can_manage_phoi(current_user, phoi):
         flash('Bạn không có quyền xem chứng từ này.', 'danger')
         return redirect(url_for('phoi.index'))
@@ -671,7 +676,7 @@ def view_attachment(id, attachment_id):
 @bp.route('/phoi/<int:id>/attachments/<int:attachment_id>/delete', methods=['POST'])
 @login_required
 def delete_attachment(id, attachment_id):
-    phoi = Phoi.query.get_or_404(id)
+    phoi = phois_query().filter_by(id=id).first_or_404()
     can_delete_attachment = (
         (phoi.status == 'draft' and can_manage_phoi(current_user, phoi))
         or (phoi.status == 'submitted' and current_user.is_manager_or_admin())
@@ -695,7 +700,7 @@ def delete_attachment(id, attachment_id):
 @bp.route('/phoi/<int:id>/print')
 @login_required
 def print_view(id):
-    phoi = Phoi.query.get_or_404(id)
+    phoi = phois_query().filter_by(id=id).first_or_404()
 
     if current_user.is_driver() and phoi.driver_id != current_user.id:
         flash('Bạn không có quyền xem phơi này.', 'danger')
@@ -707,7 +712,7 @@ def print_view(id):
 @bp.route('/phoi/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit(id):
-    phoi = Phoi.query.get_or_404(id)
+    phoi = phois_query().filter_by(id=id).first_or_404()
     can_edit = (
         (phoi.status == 'draft' and can_manage_phoi(current_user, phoi))
         or (phoi.status == 'submitted' and current_user.is_manager_or_admin())
@@ -718,7 +723,7 @@ def edit(id):
         return redirect(url_for('phoi.detail', id=id))
 
     trucks, drivers, driver_by_truck_id = _active_phoi_options()
-    customers = Customer.query.filter_by(is_active=True).order_by(Customer.name).all()
+    customers = edit_customers_query(phoi).order_by(Customer.name).all()
 
     if request.method == 'POST':
         saved_keys = []
@@ -729,9 +734,8 @@ def edit(id):
             phoi.driver_id = driver.id
             phoi.truck_id = truck.id
             phoi.is_substitute = is_substitute
-            phoi.customer_id = request.form.get('customer_id') or None
-            if phoi.customer_id:
-                phoi.customer_id = int(phoi.customer_id)
+            phoi.customer_id = permitted_customer_id(
+                request.form.get('customer_id'), phoi.customer_id)
 
             dep = request.form.get('departure_date', '')
             ret = request.form.get('return_date', '')
@@ -796,6 +800,7 @@ def edit(id):
                     username=current_user.username,
                     action='UPDATE',
                     resource_type='phoi_reconciliation',
+                    scope_truck_id=phoi.truck_id,
                     resource_id=str(phoi.id),
                     details=(
                         f'Đã đối soát và cập nhật phơi {phoi.phoi_number} đã chốt, gồm thông tin '
@@ -813,6 +818,7 @@ def edit(id):
                     username=current_user.username,
                     action='UPDATE',
                     resource_type='phoi_reconciliation',
+                    scope_truck_id=phoi.truck_id,
                     resource_id=str(phoi.id),
                     details=f'Admin đã chỉnh sửa phơi đã xác nhận {phoi.phoi_number}.',
                     ip_address=request.remote_addr,
@@ -853,7 +859,7 @@ def edit(id):
 @bp.route('/phoi/<int:id>/cancel', methods=['POST'])
 @login_required
 def cancel(id):
-    phoi = Phoi.query.get_or_404(id)
+    phoi = phois_query().filter_by(id=id).first_or_404()
     is_allowed_role = current_user.is_manager_or_admin() or current_user.is_admin()
     if not is_allowed_role:
         flash('Chỉ quản lý mới có quyền hủy phơi.', 'danger')
@@ -895,6 +901,7 @@ def cancel(id):
             username=current_user.username,
             action='CANCEL',
             resource_type='phoi',
+            scope_truck_id=phoi.truck_id,
             resource_id=str(phoi.id),
             details=(
                 f'Đã hủy phơi {phoi.phoi_number}. Lý do: {reason}. '
@@ -923,7 +930,7 @@ def cancel(id):
 @bp.route('/phoi/<int:id>/submit', methods=['POST'])
 @login_required
 def submit(id):
-    phoi = Phoi.query.get_or_404(id)
+    phoi = phois_query().filter_by(id=id).first_or_404()
     if not can_manage_phoi(current_user, phoi):
         flash('Bạn không có quyền chốt phơi này.', 'danger')
         return redirect(url_for('phoi.index'))
@@ -961,7 +968,7 @@ def confirm(id):
         flash('Bạn không có quyền xác nhận phơi.', 'danger')
         return redirect(url_for('phoi.index'))
 
-    phoi = Phoi.query.get_or_404(id)
+    phoi = phois_query().filter_by(id=id).first_or_404()
     if phoi.status != 'submitted':
         flash('Chỉ có thể xác nhận phơi đã chốt.', 'warning')
         return redirect(url_for('phoi.detail', id=id))

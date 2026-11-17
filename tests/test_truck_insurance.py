@@ -40,6 +40,8 @@ class TruckInsuranceTests(unittest.TestCase):
         )
         db.session.add_all([self.manager, self.driver, self.truck])
         db.session.flush()
+        self.truck.manager_id = self.manager.id
+        self.driver.manager_id = self.manager.id
         self.driver.current_truck_id = self.truck.id
         db.session.commit()
         self.login(self.manager)
@@ -175,7 +177,7 @@ class TruckInsuranceTests(unittest.TestCase):
         upgrade(directory=MIGRATIONS)
         config = Config()
         config.set_main_option('script_location', MIGRATIONS)
-        self.assertEqual(ScriptDirectory.from_config(config).get_heads(), ['a1c2d3e4f5b6'])
+        self.assertEqual(ScriptDirectory.from_config(config).get_heads(), ['b8d2c4f6a091'])
 
 
 if __name__ == '__main__':

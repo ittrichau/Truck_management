@@ -15,6 +15,39 @@ MIGRATIONS = str(Path(__file__).resolve().parents[1] / 'migrations')
 
 
 class PhoiAdvanceMigrationTests(unittest.TestCase):
+    def test_merge_upgrades_from_either_branch_without_losing_advances_or_assignments(self):
+        for revision, has_scopes in (('a1c2e3f4b5d6', True), ('a1c2d3e4f5b6', False)):
+            with self.subTest(revision=revision):
+                with patch('app.get_config', return_value=TestingConfig):
+                    app = create_app('testing')
+                with app.app_context():
+                    self.assertEqual(str(db.engine.url), 'sqlite:///:memory:')
+                    try:
+                        upgrade(directory=MIGRATIONS, revision=revision)
+                        with db.engine.begin() as connection:
+                            connection.execute(text("INSERT INTO users (id, username, full_name, password_hash, role) VALUES (1, 'manager', 'Manager', 'unused', 'manager'), (2, 'driver', 'Driver', 'unused', 'driver')"))
+                            connection.execute(text("INSERT INTO trucks (id, license_plate) VALUES (1, 'MERGE-LEGACY')"))
+                            connection.execute(text("""INSERT INTO phoi
+                                (id, phoi_number, driver_id, truck_id, departure_date, origin, destination,
+                                 revenue_full, revenue_collected, driver_wage, status)
+                                VALUES (1, 'MERGE-LEGACY', 2, 1, '2026-11-17', 'A', 'B', 1000000, 100000, 300000, 'confirmed')"""))
+                            if has_scopes:
+                                connection.execute(text('UPDATE trucks SET manager_id=1 WHERE id=1'))
+                                connection.execute(text('UPDATE users SET manager_id=1 WHERE id=2'))
+                            else:
+                                connection.execute(text('UPDATE phoi SET driver_advance=150000 WHERE id=1'))
+                        upgrade(directory=MIGRATIONS)
+                        phoi = db.session.get(Phoi, 1)
+                        self.assertEqual(phoi.driver_advance, 0 if has_scopes else 150000)
+                        self.assertEqual(phoi.settlement_balance(), 200000 if has_scopes else 50000)
+                        self.assertEqual(phoi.owner_profit(), 700000)
+                        self.assertEqual(phoi.truck.manager_id, 1 if has_scopes else None)
+                        self.assertEqual(phoi.driver.manager_id, 1 if has_scopes else None)
+                    finally:
+                        db.session.remove()
+                        db.drop_all()
+                        db.engine.dispose()
+
     def test_upgrade_and_downgrade_preserve_legacy_phoi_and_linked_expenses(self):
         with patch('app.get_config', return_value=TestingConfig):
             app = create_app('testing')

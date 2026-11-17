@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %}Phân quyền quản lý{% endblock %}
+{% block content %}
+<style>
+.management-save { position: sticky; top: calc(8px + env(safe-area-inset-top, 0px)); z-index: 10; }
+@media (min-width: 768px) { .management-save { top: 72px; } }
+</style>
+<h5><i class="bi bi-shield-lock"></i> Phân quyền quản lý</h5>
+<div class="alert alert-info small">
+  Chỉnh các xe, tài xế và khách hàng cần thay đổi, rồi bấm <strong>Lưu toàn bộ</strong> một lần.
+  Xe và tài xế chỉ thuộc một quản lý; khách hàng có thể cấp cho nhiều quản lý.
+  Dữ liệu chưa gán chỉ admin thấy. Khi chuyển xe, tài xế đang giữ xe và toàn bộ lịch sử, công nợ của xe chuyển theo.
+  Hãy cấp thêm các khách hàng cần dùng cho quản lý mới; lịch sử công nợ của xe vẫn xem được khi khách chưa được cấp để tạo chuyến mới.
+</div>
+{% if not managers %}<div class="alert alert-warning">Chưa có quản lý đang hoạt động. <a href="{{ url_for('drivers.create') }}">Thêm quản lý</a> trước khi phân quyền.</div>{% endif %}
+<form method="post" id="management-form">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<input type="hidden" name="action" value="save_all">
+<div class="management-save card shadow mb-3"><div class="card-body p-3">
+  <button class="btn btn-primary w-100 btn-lg" type="submit"><i class="bi bi-check-lg"></i> Lưu toàn bộ</button>
+  <div class="small text-muted text-center mt-2">Lưu xe, tài xế và khách hàng cùng một lần.</div>
+</div></div>
+{% for kind, title, resources in [('truck', 'Xe', trucks), ('driver', 'Tài xế', drivers)] %}
+<div class="card mb-3"><div class="card-header"><strong>{{ title }}</strong></div><div class="card-body">
+{% for item in resources %}
+{% set key = kind ~ '_' ~ item.id %}
+{% set posted = submitted is not none and (kind ~ ':' ~ item.id) in submitted.getlist('rows') %}
+{% set original = submitted.get('expected_' ~ key, '') if posted else (item.manager_id|string if item.manager_id is not none else '') %}
+{% set selected = submitted.get('manager_' ~ key, original) if posted else original %}
+<div class="border-bottom pb-3 mb-3">
+  <input type="hidden" name="rows" value="{{ kind }}:{{ item.id }}">
+  <input type="hidden" name="expected_{{ key }}" value="{{ original }}">
+  <label class="form-label" for="{{ kind }}-{{ item.id }}">{{ item.license_plate if kind == 'truck' else item.full_name }}{% if not item.is_active %} (đã ngừng hoạt động){% endif %}</label>
+  {% if kind == 'driver' and item.current_truck %}<div class="small text-muted mb-1">Đang giữ xe {{ item.current_truck.license_plate }} — tự chuyển theo quyền ở mục Xe.</div>{% endif %}
+  <select name="manager_{{ key }}" id="{{ kind }}-{{ item.id }}" class="form-select" {% if kind == 'driver' and item.current_truck_id %}disabled data-truck-id="{{ item.current_truck_id }}"{% endif %}>
+    <option value="">Chưa gán — chỉ admin</option>
+    {% for manager in managers %}<option value="{{ manager.id }}" {% if manager.id|string == selected %}selected{% endif %}>{{ manager.full_name }} ({{ manager.username }})</option>{% endfor %}
+  </select>
+</div>
+{% else %}<p class="text-muted">Chưa có dữ liệu.</p>{% endfor %}
+</div></div>
+{% endfor %}
+<div class="card mb-3"><div class="card-header"><strong>Khách hàng dùng chung</strong></div><div class="card-body">
+{% for customer in customers %}
+{% set key = 'customer_' ~ customer.id %}
+{% set posted = submitted is not none and ('customer:' ~ customer.id) in submitted.getlist('rows') %}
+{% set original = submitted.get('expected_' ~ key, '') if posted else customer.managers|map(attribute='id')|sort|join(',') %}
+{% set selected = submitted.getlist('managers_' ~ key) if posted else customer.managers|map(attribute='id')|map('string')|list %}
+<div class="border-bottom pb-3 mb-3">
+  <input type="hidden" name="rows" value="customer:{{ customer.id }}">
+  <input type="hidden" name="expected_{{ key }}" value="{{ original }}">
+  <strong>{{ customer.name }}</strong>{% if not customer.is_active %} (đã ngừng hoạt động){% endif %}
+  <div class="row mt-2">
+  {% for manager in managers %}
+    <div class="col-md-4 mb-2"><div class="form-check">
+      <input type="checkbox" class="form-check-input" name="managers_{{ key }}" value="{{ manager.id }}" id="customer-{{ customer.id }}-{{ manager.id }}" {% if manager.id|string in selected %}checked{% endif %}>
+      <label class="form-check-label" for="customer-{{ customer.id }}-{{ manager.id }}">{{ manager.full_name }} ({{ manager.username }})</label>
+    </div></div>
+  {% endfor %}
+  </div>
+</div>
+{% else %}<p class="text-muted">Chưa có khách hàng.</p>{% endfor %}
+</div></div>
+</form>
+<script>
+(function () {
+    const form = document.getElementById('management-form');
+    function syncDrivers() {
+        form.querySelectorAll('select[data-truck-id]').forEach(function (driver) {
+            const truck = document.getElementById('truck-' + driver.dataset.truckId);
+            if (truck) driver.value = truck.value;
+        });
+    }
+    form.addEventListener('change', syncDrivers);
+    syncDrivers();
+})();
+</script>
+{% endblock %}

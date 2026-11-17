@@ -5,6 +5,8 @@ from datetime import datetime
 from app import db
 from app.models import Truck, User, Phoi
 
+from app.access import trucks_query, drivers_query, require_driver_truck
+
 bp = Blueprint('trucks', __name__)
 
 
@@ -25,7 +27,7 @@ def index():
         flash('Bạn không có quyền truy cập.', 'danger')
         return redirect(url_for('phoi.index'))
 
-    trucks = Truck.query.filter_by(is_active=True).order_by(Truck.license_plate).all()
+    trucks = trucks_query().filter_by(is_active=True).order_by(Truck.license_plate).all()
 
     # Prepare data: current driver + active phoi status per truck
     truck_data = []
@@ -72,6 +74,7 @@ def create():
             return render_template('trucks/create.html')
 
         truck = Truck(
+            manager_id=current_user.id if current_user.role == 'manager' else None,
             license_plate=license_plate,
             brand=request.form.get('brand', '').strip(),
             capacity_ton=float(request.form.get('capacity_ton', 0) or 0),
@@ -101,7 +104,7 @@ def edit(id):
         flash('Bạn không có quyền truy cập.', 'danger')
         return redirect(url_for('phoi.index'))
 
-    truck = Truck.query.get_or_404(id)
+    truck = trucks_query().filter_by(id=id).first_or_404()
 
     # Lấy danh sách tài xế có thể gán: chưa gán xe + đang giữ xe này (để có thể đổi/chuyển)
     assigned_driver_ids = [u.id for u in User.query.filter(
@@ -110,7 +113,7 @@ def edit(id):
         User.current_truck_id.isnot(None),
         User.current_truck_id != truck.id
     ).all()]
-    available_drivers = User.query.filter(
+    available_drivers = drivers_query().filter(
         User.role == 'driver',
         User.is_active == True,
         ~User.id.in_(assigned_driver_ids) if assigned_driver_ids else True
@@ -158,8 +161,9 @@ def edit(id):
             old_driver.current_truck_id = None
 
         if driver_id:
-            new_driver = User.query.get(int(driver_id))
+            new_driver = drivers_query().filter_by(id=int(driver_id), is_active=True).first_or_404()
             if new_driver and new_driver.role == 'driver':
+                require_driver_truck(new_driver, truck)
                 new_driver.current_truck_id = truck.id
 
         try:
@@ -192,7 +196,7 @@ def delete(id):
         flash('Bạn không có quyền truy cập.', 'danger')
         return redirect(url_for('phoi.index'))
 
-    truck = Truck.query.get_or_404(id)
+    truck = trucks_query().filter_by(id=id).first_or_404()
     truck.is_active = False
     db.session.commit()
     flash(f'Đã xóa xe {truck.license_plate}.', 'success')

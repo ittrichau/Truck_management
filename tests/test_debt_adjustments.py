@@ -39,6 +39,10 @@ class DebtAdjustmentTests(unittest.TestCase):
         self.b = Customer(name='Khách B')
         db.session.add_all([self.manager, self.admin, self.driver, self.truck, self.a, self.b])
         db.session.flush()
+        self.truck.manager_id = self.manager.id
+        self.driver.manager_id = self.manager.id
+        self.a.managers.append(self.manager)
+        self.b.managers.append(self.manager)
         self.main_b = self.phoi('B', self.b, 9, '500000', '100000', '400000')
         self.main_a = self.phoi('A', self.a, 10, '1000000', '0', '0')
         self.return_a = PhoiReturnTrip(

@@ -9,6 +9,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from app import db
 from app.models import Customer, Phoi, PhoiReturnTrip, Truck, adjust_manager_collection, collection_amount
 
+from app.access import phois_query, trucks_query, customers_query, can_access_phoi
+
 bp = Blueprint('debts', __name__)
 
 
@@ -37,7 +39,7 @@ def index():
             end_day = datetime.strptime(end_date, '%Y-%m-%d').date()
         except ValueError:
             end_date = ''
-    phois = Phoi.query.filter_by(status='confirmed').order_by(
+    phois = phois_query().filter_by(status='confirmed').order_by(
         Phoi.departure_date.desc(), Phoi.id.desc()
     ).all()
 
@@ -106,7 +108,7 @@ def index():
         debts=debts,
         totals=totals,
         customer_search=customer_search,
-        trucks=Truck.query.order_by(Truck.license_plate).all(),
+        trucks=trucks_query().order_by(Truck.license_plate).all(),
         filter_truck_id=filter_truck_id,
         payment_status=payment_status,
         start_date=start_date,
@@ -122,7 +124,7 @@ def customer_detail(customer_id):
         flash('Bạn không có quyền truy cập trang công nợ.', 'danger')
         return redirect(url_for('phoi.index'))
 
-    customer = Customer.query.get_or_404(customer_id)
+    customer = customers_query(include_history=True).filter_by(id=customer_id).first_or_404()
     show_all = request.args.get('all') == '1'
     filter_truck_id = request.args.get('truck_id', type=int)
     payment_status = request.args.get('payment_status', 'unpaid')
@@ -145,7 +147,7 @@ def customer_detail(customer_id):
 
     # Phơi chính mà khách là chủ hàng
     main_phois = (
-        Phoi.query
+        phois_query()
         .filter_by(status='confirmed', customer_id=customer_id)
         .order_by(Phoi.departure_date.desc(), Phoi.id.desc())
         .all()
@@ -169,7 +171,7 @@ def customer_detail(customer_id):
         PhoiReturnTrip.query
         .filter_by(customer_id=customer_id)
         .join(Phoi, PhoiReturnTrip.phoi_id == Phoi.id)
-        .filter(Phoi.status == 'confirmed')
+        .filter(Phoi.status == 'confirmed', Phoi.id.in_(phois_query().with_entities(Phoi.id)))
         .order_by(PhoiReturnTrip.return_date.desc(), PhoiReturnTrip.id.desc())
         .all()
     )
@@ -212,7 +214,7 @@ def customer_detail(customer_id):
 
     displayed_rows = all_rows if show_all else all_rows[:20]
     has_more = len(all_rows) > 20 and not show_all
-    trucks = Truck.query.order_by(Truck.license_plate).all()
+    trucks = trucks_query().order_by(Truck.license_plate).all()
 
     return render_template(
         'debts/customer_detail.html',
@@ -240,7 +242,7 @@ def collect_payment(customer_id):
         flash('Bạn không có quyền thực hiện thao tác này.', 'danger')
         return redirect(url_for('phoi.index'))
 
-    customer = Customer.query.get_or_404(customer_id)
+    customer = customers_query(include_history=True).filter_by(id=customer_id).first_or_404()
 
     try:
         amount = collection_amount(request.form.get('amount', ''))
@@ -256,7 +258,7 @@ def collect_payment(customer_id):
     debt_rows = []
 
     main_phois = (
-        Phoi.query
+        phois_query()
         .filter_by(status='confirmed', customer_id=customer_id)
         .order_by(Phoi.departure_date.asc(), Phoi.id.asc())
         .all()
@@ -271,7 +273,7 @@ def collect_payment(customer_id):
         PhoiReturnTrip.query
         .filter_by(customer_id=customer_id)
         .join(Phoi, PhoiReturnTrip.phoi_id == Phoi.id)
-        .filter(Phoi.status == 'confirmed')
+        .filter(Phoi.status == 'confirmed', Phoi.id.in_(phois_query().with_entities(Phoi.id)))
         .order_by(PhoiReturnTrip.return_date.asc(), PhoiReturnTrip.id.asc())
         .all()
     )
@@ -320,7 +322,7 @@ def adjust_payment(customer_id, trip_type, trip_id):
         flash('Bạn không có quyền thực hiện thao tác này.', 'danger')
         return redirect(url_for('phoi.index'))
 
-    customer = Customer.query.get_or_404(customer_id)
+    customer = customers_query(include_history=True).filter_by(id=customer_id).first_or_404()
     if trip_type == 'phoi':
         target = Phoi.query.filter_by(
             id=trip_id, customer_id=customer_id, status='confirmed',
@@ -334,6 +336,9 @@ def adjust_payment(customer_id, trip_type, trip_id):
         ).first_or_404()
         phoi = target.phoi
     else:
+        abort(404)
+
+    if not can_access_phoi(current_user, phoi):
         abort(404)
 
     # Preserve only known filters; never redirect to a client-supplied URL.

@@ -10,15 +10,27 @@ MAX_HEALTH_ATTEMPTS="${MAX_HEALTH_ATTEMPTS:-30}"
 
 cd "$APP_DIR"
 
+# A deployment may update this script itself. Compare the loaded version before
+# checkout and re-exec after checkout so Bash cannot continue stale commands.
+DEPLOY_SCRIPT_VERSION="$(git hash-object deploy/deploy-vps.sh)"
 echo "Deploying origin/$BRANCH to $APP_DIR"
 git fetch --prune origin "$BRANCH"
 git checkout --detach "origin/$BRANCH"
+if [ "$(git hash-object deploy/deploy-vps.sh)" != "$DEPLOY_SCRIPT_VERSION" ]; then
+    exec bash "$APP_DIR/deploy/deploy-vps.sh"
+fi
 
 # The first server setup creates these directories and assigns them to UID/GID
 # 10001, the non-root account used inside the application container.
 mkdir -p instance/uploads logs
 
-docker compose up -d --build --remove-orphans
+# Build without replacing the live container. Override the entrypoint so this
+# one-off backup process cannot run migrations or start the application server.
+# A failed backup stops deployment while the current application keeps running.
+docker compose build web
+docker compose run --rm --no-deps --entrypoint python web -m deploy.backup_database
+
+docker compose up -d --no-build --remove-orphans
 
 for attempt in $(seq 1 "$MAX_HEALTH_ATTEMPTS"); do
     if curl --fail --silent --show-error "$HEALTH_URL"; then

@@ -4,7 +4,8 @@ from app.models import Phoi
 
 def can_manage_phoi(user, phoi):
     """Managers/admins may assist; a driver may manage only their own phơi."""
-    return user.is_manager_or_admin() or (user.is_driver() and phoi.driver_id == user.id)
+    from app.access import can_access_phoi
+    return can_access_phoi(user, phoi)
 
 
 def submission_error(phoi):

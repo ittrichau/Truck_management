@@ -55,6 +55,8 @@ class PhoiCompletionPrintTests(unittest.TestCase):
         self.truck = Truck(license_plate='PRINT-001')
         db.session.add_all([self.driver, self.manager, self.admin, self.other, self.truck])
         db.session.flush()
+        self.truck.manager_id = self.manager.id
+        self.driver.manager_id = self.manager.id
         self.phoi = Phoi(phoi_number='COMPLETION-PRINT', driver_id=self.driver.id,
                          truck_id=self.truck.id, departure_date=date(2026, 11, 13),
                          origin='A', destination='B', km_start=0, km_end=650, km_total=650,
@@ -245,6 +247,20 @@ class PhoiCompletionPrintTests(unittest.TestCase):
         self.assertEqual(self.phoi.driver_advance, 0)
         self.assertEqual(self.phoi.expenses.count(), 0)
 
+    def test_manager_outside_truck_scope_cannot_record_advance(self):
+        outsider = User(username='outside-manager', full_name='Outside Manager',
+                        password_hash='unused', role='manager')
+        db.session.add(outsider)
+        self.fuel()
+        self.phoi.status = 'submitted'
+        db.session.commit()
+        self.assertEqual(self.confirm('900000', outsider).status_code, 404)
+        self.assertEqual(self.client.get(f'/phoi/{self.phoi.id}/confirm').status_code, 404)
+        db.session.refresh(self.phoi)
+        self.assertEqual(self.phoi.status, 'submitted')
+        self.assertEqual(self.phoi.driver_advance, 0)
+        self.assertEqual(self.phoi.manager_revenue_collected, Decimal('400000'))
+
     def test_confirmation_form_explains_advance_and_defaults_to_zero(self):
         self.phoi.status = 'submitted'
         db.session.commit()
@@ -285,7 +301,7 @@ class PhoiCompletionPrintTests(unittest.TestCase):
         self.login(self.other)
         self.client.post(f'/phoi/{self.phoi.id}/submit')
         self.assertEqual(self.phoi.status, 'draft')
-        self.assertEqual(self.client.get(f'/phoi/{self.phoi.id}/print').status_code, 302)
+        self.assertEqual(self.client.get(f'/phoi/{self.phoi.id}/print').status_code, 404)
 
     def test_print_debt_and_porter_totals_do_not_change_finances(self):
         self.returns()

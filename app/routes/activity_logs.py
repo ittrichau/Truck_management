@@ -1,7 +1,9 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 from app import db
-from app.models import ActivityLog, User
+from app.models import ActivityLog, User, Customer
+from app.access import truck_ids, customers_query, drivers_query
+from sqlalchemy import and_, or_, cast, String
 from datetime import datetime
 
 bp = Blueprint('activity_logs', __name__)
@@ -26,6 +28,21 @@ def index():
 
     # Build query
     query = ActivityLog.query
+    if not current_user.is_admin():
+        # Unscoped historical logs are admin-only; actor ownership alone can leak
+        # actions performed on vehicles that have since moved to another manager.
+        query = query.filter(or_(
+            ActivityLog.scope_truck_id.in_(truck_ids()),
+            and_(ActivityLog.scope_truck_id.is_(None),
+                 ActivityLog.scope_manager_id == current_user.id,
+                 or_(
+                     ActivityLog.resource_type == 'auth',
+                     and_(ActivityLog.resource_type == 'customers',
+                          ActivityLog.resource_id.in_(customers_query().with_entities(cast(Customer.id, String)))),
+                     and_(ActivityLog.resource_type == 'drivers',
+                          ActivityLog.resource_id.in_(drivers_query().with_entities(cast(User.id, String)))),
+                 )),
+        ))
 
     if action_filter:
         query = query.filter(ActivityLog.action == action_filter)
@@ -53,7 +70,8 @@ def index():
     logs = pagination.items
 
     # For user filter dropdown
-    users = User.query.order_by(User.full_name).all()
+    visible_user_ids = query.with_entities(ActivityLog.user_id).distinct()
+    users = User.query.filter(User.id.in_(visible_user_ids)).order_by(User.full_name).all()
 
     # Available actions for filter dropdown
     actions = ['CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT', 'ALERT']
