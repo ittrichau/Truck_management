@@ -59,7 +59,6 @@
                 <option value="{{ manager.id }}" {% if filter_manager_id == manager.id|string %}selected{% endif %}>{{ manager.full_name }} ({{ manager.username }}){% if not manager.is_active %} — đã khóa{% endif %}</option>
                 {% endfor %}
             </select>
-            <small id="manager-filter-help" class="text-muted">Theo quản lý đang được gán cho xe.</small>
         </div>
         {% endif %}
         <div class="col-12 col-md-3">
