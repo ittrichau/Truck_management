@@ -133,7 +133,7 @@ async function onCustomerChange(select) {
                 <div class="col-6"><label class="form-label">Tài xế đã thu (VNĐ)</label><input type="text" name="revenue_collected" class="form-control currency-input" value="{{ '{:,.0f}'.format(phoi.revenue_collected) }}" inputmode="numeric"></div>
             </div>
             <div class="mt-3"><label class="form-label">Ảnh phiếu cân</label><input type="file" name="weigh_ticket_images" class="form-control" accept="image/jpeg,image/png,image/webp" multiple><small class="text-muted">Tải thêm ảnh tại đây hoặc xem ảnh đã tải ở trang chi tiết phơi. Tối đa 5 ảnh/lần.</small></div>
-            {% if current_user.is_manager_or_admin() and phoi.status == 'submitted' %}<small class="text-muted d-block mt-2">Tiền quản lý/chủ xe nhận trực tiếp được chọn ở bước <strong>Xác nhận nhanh</strong>.</small>{% endif %}
+            {% if current_user.is_manager_or_admin() and phoi.status == 'submitted' %}<small class="text-muted d-block mt-2">{% if current_user.is_accountant() %}Quản lý sẽ xác nhận tiền chủ xe nhận trực tiếp sau khi đối soát.{% else %}Tiền quản lý/chủ xe nhận trực tiếp được chọn ở bước <strong>Xác nhận nhanh</strong>.{% endif %}</small>{% endif %}
             <small class="text-muted per-ton-field d-none">Tiền full chuyến được tự tính từ số tấn × giá 1 tấn.</small>
         </div></div>
 

@@ -67,6 +67,11 @@ def create_app(config_name=None):
         if current_user.get_id() is not None and not current_user.is_active:
             logout_user()
             abort(403)
+        if current_user.is_authenticated and current_user.is_accountant():
+            from app.access import manager_id
+            if manager_id(current_user) is None:
+                logout_user()
+                abort(403, description='Tài khoản kế toán chưa có quản lý đang hoạt động.')
 
     # Register blueprints
     from app.routes.management import bp as management_bp
@@ -209,6 +214,7 @@ def _configure_logging(app):
 
             # Attach a trustworthy scope, never derive ownership from posted IDs.
             from app.models import Phoi, FuelLog, Truck
+            from app.access import manager_id
             scope_truck_id = None
             scope_manager_id = None
             identity = (request.view_args or {}).get('id')
@@ -223,9 +229,9 @@ def _configure_logging(app):
                     scope_truck_id = identity
                 elif resource_type == 'debts':
                     # Collection may span vehicles; do not publish its submitted total.
-                    scope_manager_id = current_user.id if current_user.role == 'manager' else None
+                    scope_manager_id = manager_id() if current_user.is_manager_or_admin() else None
                 elif resource_type in ('customers', 'drivers', 'auth'):
-                    scope_manager_id = current_user.id if current_user.role == 'manager' else None
+                    scope_manager_id = manager_id() if current_user.is_manager_or_admin() else None
 
             log_entry = ActivityLog(
                 scope_truck_id=scope_truck_id,

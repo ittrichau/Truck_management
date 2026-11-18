@@ -99,7 +99,7 @@
                                 <div class="text-break">Lý do: {{ adjustment.reason }}</div>
                             </details>
                             {% elif log.details %}
-                            {{ log.details|truncate(120) }}
+                            {{ (log.visible_details(current_user) or '')|truncate(120) }}
                             {% endif %}
                         </td>
                         <td class="small text-muted">{{ log.ip_address or '' }}</td>

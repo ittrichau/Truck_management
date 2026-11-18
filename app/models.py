@@ -115,7 +115,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(256), nullable=False)
     full_name = db.Column(db.String(100), nullable=False)
     phone = db.Column(db.String(15))
-    role = db.Column(db.String(20), nullable=False, default='driver')  # driver, manager, admin
+    role = db.Column(db.String(20), nullable=False, default='driver')  # driver, accountant, manager, admin
     is_active = db.Column(db.Boolean, default=True)
     current_truck_id = db.Column(db.Integer, db.ForeignKey('trucks.id'), nullable=True)
     manager_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
@@ -142,7 +142,17 @@ class User(UserMixin, db.Model):
         return self.role == 'driver'
     
     def is_manager_or_admin(self):
+        """Operational staff, including accountants; confirmation is checked separately."""
+        return self.role in ['accountant', 'manager', 'admin']
+
+    def is_accountant(self):
+        return self.role == 'accountant'
+
+    def can_confirm_phoi(self):
         return self.role in ['manager', 'admin']
+
+    def can_view_customer_phone(self):
+        return not self.is_accountant()
     
     def is_admin(self):
         return self.role == 'admin'
@@ -717,6 +727,21 @@ class ActivityLog(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
     user = db.relationship('User', foreign_keys=[user_id], backref='activity_logs')
+
+    def visible_details(self, actor):
+        """Keep customer phone numbers out of the accountant's audit view."""
+        if actor.can_view_customer_phone() or not self.details:
+            return self.details
+        try:
+            details = json.loads(self.details)
+        except (TypeError, ValueError):
+            details = None
+        if isinstance(details, dict):
+            details.pop('contact_phone', None)
+            return json.dumps(details, ensure_ascii=False)
+        if self.resource_type == 'customers':
+            return 'Chi tiết khách hàng đã được ẩn.'
+        return self.details
 
     def debt_collection_details(self):
         """Structured correction details for the Vietnamese audit view."""

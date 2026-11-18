@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta, timezone
 from flask import Blueprint, abort, render_template, request
 from flask_login import current_user, login_required
 
-from app.access import trucks_query
+from app.access import trucks_query, manager_id
 from app.models import Truck, User
 from app.truck_reports import build_truck_report
 
@@ -38,9 +38,9 @@ def index():
             identity = int(filter_manager_id)
             filter_manager_id = str(identity)
             if not current_user.is_admin():
-                if identity != current_user.id:
+                if identity != manager_id():
                     abort(403)
-                selected_manager = current_user
+                selected_manager = User.query.filter_by(id=identity, role='manager').first_or_404()
             else:
                 selected_manager = next((manager for manager in managers if manager.id == identity), None)
                 if selected_manager is None:

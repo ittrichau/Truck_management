@@ -5,9 +5,43 @@ from app import db
 from app.models import User, Truck
 
 from flask import abort
-from app.access import trucks_query, drivers_query, require_driver_truck, has_assignments
+from app.access import trucks_query, drivers_query, require_driver_truck, has_assignments, manager_id
 
 bp = Blueprint('drivers', __name__)
+
+
+def _manageable_users_query():
+    if current_user.is_admin():
+        return User.query
+    if current_user.role == 'manager':
+        return User.query.filter(User.role.in_(('driver', 'accountant')),
+                                 User.manager_id == current_user.id)
+    return drivers_query()
+
+
+def _user_form(template, **context):
+    managers = (User.query.filter_by(role='manager', is_active=True)
+                .order_by(User.full_name).all() if current_user.is_admin() else [])
+    return render_template(template, managers=managers, **context)
+
+
+def _accountant_manager_id():
+    """Managers cannot select another owner; admin must select an active manager."""
+    if not current_user.is_admin():
+        return manager_id()
+    raw_owner = request.form.get('manager_id', '')
+    try:
+        owner = int(raw_owner)
+    except (ValueError, TypeError):
+        abort(400, description='Vui lòng chọn quản lý cấp trên cho kế toán.')
+    manager = User.query.filter_by(id=owner, role='manager', is_active=True).first()
+    if manager is None:
+        abort(400, description='Quản lý cấp trên không hợp lệ hoặc đã bị khóa.')
+    return manager.id
+
+
+def _role_label(role):
+    return {'manager': 'quản lý', 'accountant': 'kế toán', 'driver': 'tài xế'}[role]
 
 @bp.route('/drivers')
 @login_required
@@ -18,11 +52,9 @@ def index():
 
     is_admin = current_user.is_admin()
     if is_admin:
-        # Admin thấy cả tài xế và quản lý
-        drivers = User.query.filter(User.role.in_(['driver', 'manager']), User.is_active == True).order_by(User.full_name).all()
+        drivers = User.query.filter(User.role.in_(['driver', 'accountant', 'manager']), User.is_active == True).order_by(User.full_name).all()
     else:
-        # Manager chỉ thấy tài xế
-        drivers = drivers_query().filter_by(is_active=True).order_by(User.full_name).all()
+        drivers = _manageable_users_query().filter_by(is_active=True).order_by(User.full_name).all()
     return render_template('drivers/index.html', drivers=drivers, is_admin=is_admin)
 
 @bp.route('/drivers/create', methods=['GET', 'POST'])
@@ -53,33 +85,35 @@ def create():
         confirm_password = request.form.get('confirm_password', '').strip()
         truck_id = request.form.get('current_truck_id')
 
-        # Admin có thể chọn role, manager chỉ tạo driver
+        # Quản lý tạo kế toán trực thuộc; kế toán chỉ được tạo tài xế.
         if is_admin:
             role = request.form.get('role', 'driver')
-            if role not in ('driver', 'manager'):
+            if role not in ('driver', 'accountant', 'manager'):
                 flash('Vai trò không hợp lệ.', 'danger')
-                return render_template('drivers/create.html', trucks=available_trucks, is_admin=is_admin)
+                return _user_form('drivers/create.html', trucks=available_trucks, is_admin=is_admin)
+        elif current_user.role == 'manager' and request.form.get('role') == 'accountant':
+            role = 'accountant'
         else:
             role = 'driver'
 
         if not username or not full_name or not password:
             flash('Vui lòng điền đầy đủ thông tin bắt buộc.', 'danger')
-            return render_template('drivers/create.html', trucks=available_trucks, is_admin=is_admin)
+            return _user_form('drivers/create.html', trucks=available_trucks, is_admin=is_admin)
 
         if User.query.filter_by(username=username).first():
             flash('Tên đăng nhập đã tồn tại.', 'danger')
-            return render_template('drivers/create.html', trucks=available_trucks, is_admin=is_admin)
+            return _user_form('drivers/create.html', trucks=available_trucks, is_admin=is_admin)
 
         if password != confirm_password:
             flash('Mật khẩu xác nhận không khớp.', 'danger')
-            return render_template('drivers/create.html', trucks=available_trucks, is_admin=is_admin)
+            return _user_form('drivers/create.html', trucks=available_trucks, is_admin=is_admin)
 
         driver = User(
             username=username,
             full_name=full_name,
             phone=phone,
             role=role,
-            manager_id=current_user.id if current_user.role == 'manager' else None,
+            manager_id=_accountant_manager_id() if role == 'accountant' else manager_id(),
         )
         if role == 'driver' and truck_id:
             truck = trucks_query().filter_by(id=int(truck_id), is_active=True).first_or_404()
@@ -95,13 +129,13 @@ def create():
         except IntegrityError:
             db.session.rollback()
             flash('Xe này đã được gán cho tài xế khác. Vui lòng chọn xe khác.', 'danger')
-            return render_template('drivers/create.html', trucks=available_trucks, is_admin=is_admin)
+            return _user_form('drivers/create.html', trucks=available_trucks, is_admin=is_admin)
 
-        role_label = 'quản lý' if role == 'manager' else 'tài xế'
+        role_label = _role_label(role)
         flash(f'Đã thêm {role_label} {full_name}.', 'success')
         return redirect(url_for('drivers.index'))
 
-    return render_template('drivers/create.html', trucks=available_trucks, is_admin=is_admin)
+    return _user_form('drivers/create.html', trucks=available_trucks, is_admin=is_admin)
 
 @bp.route('/drivers/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -112,11 +146,7 @@ def edit(id):
 
     is_admin = current_user.is_admin()
 
-    user = (User.query if is_admin else drivers_query()).filter_by(id=id).first_or_404()
-
-    if not is_admin and user.role != 'driver':
-        flash('Không thể sửa người dùng này.', 'danger')
-        return redirect(url_for('drivers.index'))
+    user = _manageable_users_query().filter_by(id=id).first_or_404()
 
     # Không cho phép sửa admin (chính mình hoặc admin khác) qua page này
     if user.role == 'admin':
@@ -138,17 +168,19 @@ def edit(id):
     if request.method == 'POST':
         if request.form.get('password', '').strip() != request.form.get('confirm_password', '').strip():
             flash('Mật khẩu xác nhận không khớp.', 'danger')
-            return render_template('drivers/edit.html', driver=user, trucks=available_trucks, is_admin=is_admin)
+            return _user_form('drivers/edit.html', driver=user, trucks=available_trucks, is_admin=is_admin)
         user.full_name = request.form.get('full_name', '').strip()
         user.phone = request.form.get('phone', '').strip()
 
         # Admin có thể đổi role
         if is_admin:
             new_role = request.form.get('role', user.role)
-            if new_role in ('driver', 'manager'):
+            if new_role in ('driver', 'accountant', 'manager'):
                 if user.role == 'manager' and new_role != 'manager' and has_assignments(user):
                     abort(400, description='Hãy chuyển hết quyền quản lý trước khi đổi vai trò.')
                 user.role = new_role
+                if new_role == 'accountant':
+                    user.manager_id = _accountant_manager_id()
                 if new_role == 'manager':
                     user.manager_id = None
                 # Nếu đổi thành manager, clear xe mặc định
@@ -172,7 +204,7 @@ def edit(id):
             confirm_password = request.form.get('confirm_password', '').strip()
             if new_password != confirm_password:
                 flash('Mật khẩu xác nhận không khớp.', 'danger')
-                return render_template('drivers/edit.html', driver=user, trucks=available_trucks, is_admin=is_admin)
+                return _user_form('drivers/edit.html', driver=user, trucks=available_trucks, is_admin=is_admin)
             user.set_password(new_password)
 
         try:
@@ -180,13 +212,13 @@ def edit(id):
         except IntegrityError:
             db.session.rollback()
             flash('Xe này đã được gán cho tài xế khác. Vui lòng chọn xe khác.', 'danger')
-            return render_template('drivers/edit.html', driver=user, trucks=available_trucks, is_admin=is_admin)
+            return _user_form('drivers/edit.html', driver=user, trucks=available_trucks, is_admin=is_admin)
 
-        role_label = 'quản lý' if user.role == 'manager' else 'tài xế'
+        role_label = _role_label(user.role)
         flash(f'Đã cập nhật {role_label} {user.full_name}.', 'success')
         return redirect(url_for('drivers.index'))
 
-    return render_template('drivers/edit.html', driver=user, trucks=available_trucks, is_admin=is_admin)
+    return _user_form('drivers/edit.html', driver=user, trucks=available_trucks, is_admin=is_admin)
 
 @bp.route('/drivers/<int:id>/delete', methods=['POST'])
 @login_required
@@ -195,13 +227,7 @@ def delete(id):
         flash('Bạn không có quyền truy cập.', 'danger')
         return redirect(url_for('phoi.index'))
 
-    is_admin = current_user.is_admin()
-    user = (User.query if is_admin else drivers_query()).filter_by(id=id).first_or_404()
-
-    # Manager chỉ xóa được driver
-    if not is_admin and user.role != 'driver':
-        flash('Không thể xóa người dùng này.', 'danger')
-        return redirect(url_for('drivers.index'))
+    user = _manageable_users_query().filter_by(id=id).first_or_404()
 
     # Không cho xóa admin
     if user.role == 'admin':
@@ -216,6 +242,6 @@ def delete(id):
     user.is_active = False
     db.session.commit()
 
-    role_label = 'quản lý' if user.role == 'manager' else 'tài xế'
+    role_label = _role_label(user.role)
     flash(f'Đã xóa {role_label} {user.full_name}.', 'success')
     return redirect(url_for('drivers.index'))

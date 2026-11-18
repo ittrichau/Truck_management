@@ -29,7 +29,7 @@
                 <small><i class="bi bi-geo-alt"></i> {{ c.default_origin }} → {{ c.default_destination }}</small>
             </div>
             {% endif %}
-            {% if c.contact_phone %}
+            {% if current_user.can_view_customer_phone() and c.contact_phone %}
             <div><small><i class="bi bi-telephone"></i> {{ c.contact_phone }}</small></div>
             {% endif %}
         </div>

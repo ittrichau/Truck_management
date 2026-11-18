@@ -964,7 +964,7 @@ def submit(id):
 @bp.route('/phoi/<int:id>/confirm', methods=['GET', 'POST'])
 @login_required
 def confirm(id):
-    if not current_user.is_manager_or_admin():
+    if not current_user.can_confirm_phoi():
         flash('Bạn không có quyền xác nhận phơi.', 'danger')
         return redirect(url_for('phoi.index'))
 

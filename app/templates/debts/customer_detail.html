@@ -26,7 +26,7 @@
         <div style="font-size: 2.2rem; font-weight: 700; letter-spacing: -1px;">
             {{ "{:,.0f}".format(total_outstanding) }} đ
         </div>
-        {% if customer.contact_phone %}
+        {% if current_user.can_view_customer_phone() and customer.contact_phone %}
         <div class="mt-1" style="opacity: 0.8; font-size: 0.85rem;">
             <i class="bi bi-telephone"></i> {{ customer.contact_phone }}
         </div>

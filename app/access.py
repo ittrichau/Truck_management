@@ -16,7 +16,7 @@ def manager_id(actor=None):
         return None
     if actor.role == 'manager':
         return actor.id
-    if actor.is_driver() and actor.manager_id:
+    if (actor.is_driver() or actor.is_accountant()) and actor.manager_id:
         manager = actor.manager
         if manager and manager.role == 'manager' and manager.is_active:
             return manager.id
@@ -82,7 +82,8 @@ def can_access_phoi(actor, phoi):
     return actor.is_admin() or (
         actor.is_driver() and phoi.driver_id == actor.id
     ) or (
-        actor.role == 'manager' and manager_id(actor) == phoi.truck.manager_id
+        actor.role in ('manager', 'accountant') and manager_id(actor) is not None
+        and manager_id(actor) == phoi.truck.manager_id
     )
 
 

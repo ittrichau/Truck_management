@@ -1,9 +1,9 @@
 from flask import abort, Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required, current_user
 from app import db
-from app.models import Customer, Phoi, PhoiReturnTrip
+from app.models import Customer, Phoi, PhoiReturnTrip, User
 
-from app.access import customers_query, phois_query
+from app.access import customers_query, phois_query, manager_id
 
 bp = Blueprint('customers', __name__)
 
@@ -30,12 +30,14 @@ def create():
             cargo_type=request.form.get('cargo_type', '').strip(),
             default_origin=request.form.get('default_origin', '').strip(),
             default_destination=request.form.get('default_destination', '').strip(),
-            contact_phone=request.form.get('contact_phone', '').strip(),
+            contact_phone=(request.form.get('contact_phone', '').strip()
+                           if current_user.can_view_customer_phone() else ''),
             notes=request.form.get('notes', '').strip(),
             created_by_id=current_user.id
         )
-        if current_user.role == 'manager':
-            customer.managers.append(current_user._get_current_object())
+        owner = manager_id()
+        if owner is not None:
+            customer.managers.append(db.session.get(User, owner))
         db.session.add(customer)
         db.session.commit()
         flash(f'Đã thêm hàng: {customer.name}.', 'success')
@@ -57,7 +59,8 @@ def edit(id):
         customer.cargo_type = request.form.get('cargo_type', '').strip()
         customer.default_origin = request.form.get('default_origin', '').strip()
         customer.default_destination = request.form.get('default_destination', '').strip()
-        customer.contact_phone = request.form.get('contact_phone', '').strip()
+        if current_user.can_view_customer_phone():
+            customer.contact_phone = request.form.get('contact_phone', '').strip()
         customer.notes = request.form.get('notes', '').strip()
         db.session.commit()
         flash(f'Đã cập nhật hàng: {customer.name}.', 'success')
@@ -78,7 +81,7 @@ def delete(id):
         used_elsewhere = (Phoi.query.filter(Phoi.customer_id == customer.id, ~Phoi.id.in_(own_ids)).first()
             or PhoiReturnTrip.query.filter(PhoiReturnTrip.customer_id == customer.id,
                                           ~PhoiReturnTrip.phoi_id.in_(own_ids)).first())
-        if used_elsewhere or any(manager.id != current_user.id for manager in customer.managers):
+        if used_elsewhere or any(manager.id != manager_id() for manager in customer.managers):
             abort(403, description='Chỉ admin được xóa khách hàng đang dùng chung.')
     customer.is_active = False
     db.session.commit()

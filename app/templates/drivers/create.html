@@ -6,15 +6,17 @@ block content %}
     <div class="card-body">
       <form method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        {% if is_admin %}
+        {% if is_admin or current_user.role == 'manager' %}
         <div class="mb-3">
           <label class="form-label">Vai trò *</label>
           <select name="role" class="form-select" id="role-select">
-            <option value="driver" selected>Tài xế</option>
-            <option value="manager">Quản lý</option>
+            <option value="driver" {% if request.form.get('role', 'driver') not in ('accountant', 'manager') %}selected{% endif %}>Tài xế</option>
+            <option value="accountant" {% if request.form.get('role') == 'accountant' %}selected{% endif %}>Kế toán</option>
+            {% if is_admin %}<option value="manager" {% if request.form.get('role') == 'manager' %}selected{% endif %}>Quản lý</option>{% endif %}
           </select>
         </div>
         {% endif %}
+        {% include 'drivers/_accountant_manager.html' %}
         <div class="mb-3">
           <label class="form-label">Tên đăng nhập *</label>
           <input
@@ -89,16 +91,22 @@ block content %}
     </div>
   </div>
 </div>
-{% if is_admin %}
+{% if is_admin or current_user.role == 'manager' %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const roleSelect = document.getElementById('role-select');
     const truckSection = document.getElementById('truck-section');
     function toggleTruckSection() {
-        if (roleSelect.value === 'manager') {
+        if (roleSelect.value !== 'driver') {
             truckSection.style.display = 'none';
         } else {
             truckSection.style.display = 'block';
+        }
+        const managerSection = document.getElementById('accountant-manager-section');
+        if (managerSection) {
+            const isAccountant = roleSelect.value === 'accountant';
+            managerSection.hidden = !isAccountant;
+            managerSection.querySelector('select').required = isAccountant;
         }
     }
     toggleTruckSection();

@@ -1,0 +1,12 @@
+{% if is_admin %}
+{% set selected_owner = request.form.get('manager_id', driver.manager_id|string if driver is defined and driver.manager_id else '') %}
+<div class="mb-3" id="accountant-manager-section" {% if request.form.get('role', driver.role if driver is defined else 'driver') != 'accountant' %}hidden{% endif %}>
+    <label class="form-label" for="accountant-manager">Quản lý cấp trên của kế toán *</label>
+    <select name="manager_id" id="accountant-manager" class="form-select">
+        <option value="">-- Chọn quản lý --</option>
+        {% for manager in managers %}
+        <option value="{{ manager.id }}" {% if selected_owner == manager.id|string %}selected{% endif %}>{{ manager.full_name }} ({{ manager.username }})</option>
+        {% endfor %}
+    </select>
+</div>
+{% endif %}

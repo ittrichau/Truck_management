@@ -14,7 +14,7 @@ content %}
   >
     <thead class="table-light">
       <tr>
-        {% if is_admin %}
+        {% if is_admin or current_user.role == 'manager' %}
         <th>Vai trò</th>
         {% endif %}
         <th>Họ tên</th>
@@ -28,16 +28,18 @@ content %}
     <tbody>
       {% for d in drivers %}
       <tr>
-        {% if is_admin %}
+        {% if is_admin or current_user.role == 'manager' %}
         <td>
           {% if d.role == 'manager' %}
           <span class="badge bg-warning text-dark">Quản lý</span>
+          {% elif d.role == 'accountant' %}
+          <span class="badge bg-secondary">Kế toán</span>
           {% else %}
           <span class="badge bg-info">Tài xế</span>
           {% endif %}
         </td>
         {% endif %}
-        <td><strong>{{ d.full_name }}</strong></td>
+        <td><strong>{{ d.full_name }}</strong>{% if d.role == 'accountant' %}<small class="d-block text-muted">Quản lý: {{ d.manager.full_name if d.manager else 'Chưa gán' }}</small>{% endif %}</td>
         <td><code>{{ d.username }}</code></td>
         <td>
           {% if d.role == 'driver' and d.current_truck %} {{ d.current_truck.license_plate }} {% else

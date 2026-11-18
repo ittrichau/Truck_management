@@ -5,7 +5,7 @@ from datetime import datetime
 from app import db
 from app.models import Truck, User, Phoi
 
-from app.access import trucks_query, drivers_query, require_driver_truck
+from app.access import trucks_query, drivers_query, require_driver_truck, manager_id
 
 bp = Blueprint('trucks', __name__)
 
@@ -74,7 +74,7 @@ def create():
             return render_template('trucks/create.html')
 
         truck = Truck(
-            manager_id=current_user.id if current_user.role == 'manager' else None,
+            manager_id=manager_id(),
             license_plate=license_plate,
             brand=request.form.get('brand', '').strip(),
             capacity_ton=float(request.form.get('capacity_ton', 0) or 0),

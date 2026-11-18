@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 from app import db
 from app.models import ActivityLog, User, Customer
-from app.access import truck_ids, customers_query, drivers_query
+from app.access import truck_ids, customers_query, drivers_query, manager_id
 from sqlalchemy import and_, or_, cast, String
 from datetime import datetime
 
@@ -34,7 +34,7 @@ def index():
         query = query.filter(or_(
             ActivityLog.scope_truck_id.in_(truck_ids()),
             and_(ActivityLog.scope_truck_id.is_(None),
-                 ActivityLog.scope_manager_id == current_user.id,
+                 ActivityLog.scope_manager_id == manager_id(),
                  or_(
                      ActivityLog.resource_type == 'auth',
                      and_(ActivityLog.resource_type == 'customers',

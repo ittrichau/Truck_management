@@ -95,7 +95,7 @@
                         <a href="{{ url_for('debts.customer_detail', customer_id=debt.customer.id, truck_id=filter_truck_id or '', start_date=start_date, end_date=end_date, payment_status=payment_status) }}" class="text-decoration-none">
                             <strong>{{ debt.customer.name }}</strong>
                         </a>
-                        {% if debt.customer.contact_phone %}
+                        {% if current_user.can_view_customer_phone() and debt.customer.contact_phone %}
                         <small class="d-block text-muted">{{ debt.customer.contact_phone }}</small>
                         {% endif %}
                     </td>

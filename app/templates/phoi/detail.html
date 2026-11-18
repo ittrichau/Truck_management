@@ -25,7 +25,9 @@
             {% if current_user.is_admin() %}
             <a href="{{ url_for('fuel.create', phoi_id=phoi.id, truck_id=phoi.truck_id) }}" class="btn btn-outline-warning btn-sm"><i class="bi bi-fuel-pump"></i> Thêm lần đổ dầu</a>
             {% endif %}
+            {% if current_user.can_confirm_phoi() %}
             <a href="{{ url_for('phoi.confirm', id=phoi.id) }}" class="btn btn-success btn-sm"><i class="bi bi-check-circle"></i> Xác nhận nhanh</a>
+            {% endif %}
             {% endif %}
             {% if current_user.is_admin() and phoi.status == 'confirmed' %}
             <a href="{{ url_for('phoi.edit', id=phoi.id) }}" class="btn btn-primary btn-sm"><i class="bi bi-pencil"></i> Sửa phơi đã xác nhận</a>
@@ -74,7 +76,7 @@
         </div>
     </div>
     {% elif phoi.status == 'submitted' %}
-    <div class="alert alert-warning">📬 Phơi đã chốt và đang chờ chủ xe đối soát. Sửa phơi khi cần điều chỉnh dữ liệu; sau đó dùng <strong>Xác nhận nhanh</strong> để chọn tiền chủ hàng đã thu hoặc đưa vào công nợ.</div>
+    <div class="alert alert-warning">📬 Phơi đã chốt và đang chờ chủ xe đối soát. Sửa phơi khi cần điều chỉnh dữ liệu; {% if current_user.is_accountant() %}sau đó chờ quản lý xác nhận.{% else %}sau đó dùng <strong>Xác nhận nhanh</strong> để chọn tiền chủ hàng đã thu hoặc đưa vào công nợ.{% endif %}</div>
     {% endif %}
 
     <!-- Thông tin chính -->
