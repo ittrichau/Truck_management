@@ -152,6 +152,8 @@
                 <tr>
                     <th>Số xe</th>
                     <th>Ngày</th>
+                    <th class="text-end text-nowrap">Giá chở/tấn</th>
+                    <th>Ảnh phiếu cân</th>
                     <th class="text-end">Phải thu</th>
                     <th class="text-end">Đã thu</th>
                     <th class="text-end amount-negative">Còn nợ</th>
@@ -160,6 +162,7 @@
             </thead>
             <tbody>
                 {% for row in rows %}
+                {% set target = row.return_trip or row.phoi %}
                 <tr>
                     <td>
                         <strong>{{ row.truck_number }}</strong>
@@ -175,8 +178,23 @@
                             —
                         {% endif %}
                     </td>
+                    <td class="text-end text-nowrap">{% if target.payment_method == 'per_ton' and target.price_per_ton is not none %}{{ "{:,.0f}".format(target.price_per_ton) }} đ{% endif %}</td>
+                    <td>
+                        <div class="d-flex flex-wrap gap-1" style="min-width: 80px;">
+                            {% for attachment in row.phoi.attachments.filter_by(attachment_type='weigh_ticket', return_trip_id=row.return_trip.id if row.return_trip else none).all() %}
+                            <a href="{{ url_for('phoi.view_attachment', id=row.phoi.id, attachment_id=attachment.id) }}"
+                               target="_blank" rel="noopener noreferrer" title="Mở ảnh phiếu cân {{ loop.index }}">
+                                <img src="{{ url_for('phoi.view_attachment', id=row.phoi.id, attachment_id=attachment.id) }}"
+                                     alt="Phiếu cân {{ row.phoi.phoi_number }}{% if row.return_trip %} chuyến về #{{ row.return_trip.trip_order }}{% endif %} - ảnh {{ loop.index }}"
+                                     class="img-thumbnail" width="72" height="72" loading="lazy"
+                                     style="width: 72px; height: 72px; object-fit: contain;">
+                            </a>
+                            {% else %}
+                            <small class="text-muted">Chưa có ảnh</small>
+                            {% endfor %}
+                        </div>
+                    </td>
                     <td class="text-end">{{ "{:,.0f}".format(row.revenue_full) }} đ</td>
-                    {% set target = row.return_trip or row.phoi %}
                     <td class="text-end amount-positive">
                         {{ "{:,.0f}".format(row.revenue_collected) }} đ
                         <small class="d-block text-muted">Tài xế: {{ "{:,.0f}".format(target.revenue_collected or 0) }} đ</small>
