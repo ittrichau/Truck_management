@@ -21,6 +21,7 @@ class FormFields(HTMLParser):
     def __init__(self, html):
         super().__init__()
         self.inputs = {}
+        self.inputs_by_id = {}
         self.phoi_options = set()
         self.in_phoi_select = False
         self.feed(html)
@@ -29,6 +30,8 @@ class FormFields(HTMLParser):
         attrs = dict(attrs)
         if tag == 'input' and attrs.get('name'):
             self.inputs[attrs['name']] = attrs
+            if attrs.get('id'):
+                self.inputs_by_id[attrs['id']] = attrs
         if tag == 'select' and attrs.get('name') == 'phoi_id':
             self.in_phoi_select = True
         if tag == 'option' and self.in_phoi_select and attrs.get('value'):
@@ -114,6 +117,137 @@ class ConfirmedAdminFuelTests(unittest.TestCase):
         db.session.expire_all()
         self.assertEqual(self.log.price_per_liter, Decimal('24500.25'))
         self.assertEqual(self.log.total_cost, Decimal('2474525.25'))
+
+    def test_payer_choices_default_to_saved_value_and_form_resubmits_it(self):
+        for status in ('draft', 'submitted', 'confirmed'):
+            for payer in ('owner', 'driver'):
+                with self.subTest(status=status, payer=payer):
+                    self.phoi.status = status
+                    self.log.paid_by = payer
+                    db.session.commit()
+                    page = self.client.get(f'/fuel/{self.log.id}/edit')
+                    self.assertEqual(page.status_code, 200)
+                    fields = FormFields(page.text)
+                    owner = fields.inputs_by_id['paid_by_owner']
+                    driver = fields.inputs_by_id['paid_by_driver']
+                    self.assertEqual('checked' in owner, payer == 'owner')
+                    self.assertEqual('checked' in driver, payer == 'driver')
+                    data = {name: fields.inputs[name]['value']
+                            for name in ('liters', 'price_per_liter', 'refuel_date')}
+                    data['paid_by'] = next(field['value'] for field in (owner, driver)
+                                           if 'checked' in field)
+                    self.assertEqual(self.client.post(f'/fuel/{self.log.id}/edit', data=data).status_code, 302)
+                    db.session.expire_all()
+                    self.assertEqual(self.log.paid_by, payer)
+                    self.assertEqual(self.log.total_cost, Decimal('2500000'))
+
+    def test_admin_switches_payer_both_ways_without_changing_cost_or_profit(self):
+        for payer, driver_fuel in (('owner', '0'), ('driver', '2500000'), ('owner', '0')):
+            with self.subTest(payer=payer):
+                response = self.edit(liters='100', price_per_liter='25000', paid_by=payer)
+                self.assertEqual(response.status_code, 302)
+                db.session.expire_all()
+                self.assertEqual(self.log.paid_by, payer)
+                self.assertEqual(self.log.total_cost, Decimal('2500000'))
+                self.assertEqual(self.phoi.fuel_expenses(), Decimal('2500000'))
+                self.assertEqual(self.phoi.driver_fuel_expenses(), Decimal(driver_fuel))
+                self.assertEqual(self.phoi.balance(), Decimal(driver_fuel) - Decimal('50000'))
+                self.assertEqual(self.phoi.settlement_balance(), Decimal(driver_fuel) - Decimal('250000'))
+                self.assertEqual(self.phoi.owner_profit(), Decimal('7050000'))
+                self.assertEqual(self.phoi.total_revenue_full(), Decimal('10000000'))
+                self.assertEqual(self.phoi.total_revenue_collected(), Decimal('500000'))
+                self.assertEqual(self.phoi.driver_advance, Decimal('200000'))
+                self.assertEqual(self.phoi.status, 'confirmed')
+                self.assertEqual(self.log.phois.one().id, self.phoi.id)
+
+    def test_old_form_without_payer_keeps_both_saved_payer_values(self):
+        for payer in ('owner', 'driver'):
+            with self.subTest(payer=payer):
+                self.log.paid_by = payer
+                db.session.commit()
+                response = self.client.post(f'/fuel/{self.log.id}/edit', data={
+                    'liters': '100', 'refuel_date': '2026-11-09',
+                })
+                self.assertEqual(response.status_code, 302)
+                db.session.expire_all()
+                self.assertEqual(self.log.paid_by, payer)
+                self.assertEqual(self.log.price_per_liter, Decimal('25000'))
+
+    def test_invalid_payer_and_other_validation_failures_do_not_change_payer(self):
+        for payer in ('', 'cash', 'OWNER', 'Driver', ' owner '):
+            with self.subTest(payer=payer):
+                self.assertEqual(self.edit(paid_by=payer).status_code, 200)
+                self.assert_original()
+                self.assertEqual(self.log.paid_by, 'driver')
+        for overrides in ({'liters': '-1'}, {'price_per_liter': '0'},
+                          {'refuel_date': 'invalid'}, {'refuel_date': ''}):
+            with self.subTest(overrides=overrides):
+                response = self.edit(paid_by='owner', **overrides)
+                self.assertEqual(response.status_code, 200)
+                self.assert_original()
+                self.assertEqual(self.log.paid_by, 'driver')
+                fields = FormFields(response.text).inputs_by_id
+                self.assertIn('checked', fields['paid_by_owner'])
+                self.assertNotIn('checked', fields['paid_by_driver'])
+
+    def test_payer_change_requires_receipt_and_rolls_back_on_upload_failure(self):
+        with patch('app.routes.fuel.save_phoi_attachment', side_effect=ValueError('Ảnh không hợp lệ.')):
+            response = self.edit(paid_by='owner', receipts=self.photo(), is_home_station='1')
+        self.assertEqual(response.status_code, 200)
+        self.assert_original()
+        self.assertEqual(self.log.paid_by, 'driver')
+        self.log.receipts.delete()
+        db.session.commit()
+        self.assertEqual(self.edit(paid_by='owner').status_code, 200)
+        db.session.expire_all()
+        self.assertEqual(self.log.paid_by, 'driver')
+        self.assertEqual(self.edit(paid_by='owner', receipts=self.photo()).status_code, 302)
+        db.session.expire_all()
+        self.assertEqual(self.log.paid_by, 'owner')
+        self.assertEqual(self.log.receipts.count(), 1)
+
+    def test_non_admin_and_shared_or_unlinked_fuel_cannot_change_payer(self):
+        for status in ('draft', 'submitted', 'confirmed'):
+            self.phoi.status = status
+            db.session.commit()
+            for actor in (self.manager, self.driver):
+                with self.subTest(status=status, role=actor.role):
+                    self.login(actor)
+                    if status != 'confirmed':
+                        page = self.client.get(f'/fuel/{self.log.id}/edit')
+                        self.assertEqual(page.status_code, 200)
+                        self.assertNotIn('paid_by', FormFields(page.text).inputs)
+                    response = self.client.post(f'/fuel/{self.log.id}/edit', data={
+                        'liters': '137.335', 'paid_by': 'owner', 'refuel_date': '2026-11-18',
+                    })
+                    self.assertEqual(response.status_code, 302 if status == 'confirmed' else 200)
+                    db.session.expire_all()
+                    self.assertEqual(self.log.paid_by, 'driver')
+                    self.assertEqual(self.log.liters, Decimal('100'))
+        self.login(self.admin)
+        second = Phoi(phoi_number='PAYER-SHARED', driver_id=self.driver.id,
+                      truck_id=self.truck.id, departure_date=date(2026, 11, 9),
+                      origin='B', destination='C', status='draft')
+        self.log.phois.append(second)
+        db.session.commit()
+        self.assertEqual(self.edit(paid_by='owner').status_code, 302)
+        self.phoi.status = 'draft'
+        db.session.commit()
+        for linked in (True, False):
+            if not linked:
+                self.log.phois.remove(self.phoi)
+                self.log.phois.remove(second)
+                db.session.commit()
+            page = self.client.get(f'/fuel/{self.log.id}/edit')
+            self.assertEqual(page.status_code, 200)
+            self.assertNotIn('paid_by', FormFields(page.text).inputs)
+            response = self.client.post(f'/fuel/{self.log.id}/edit', data={
+                'liters': '137.335', 'paid_by': 'owner', 'refuel_date': '2026-11-18',
+            })
+            self.assertEqual(response.status_code, 200)
+            db.session.expire_all()
+            self.assertEqual(self.log.paid_by, 'driver')
+            self.assertEqual(self.log.liters, Decimal('100'))
 
     def test_admin_edit_and_detail_pages_expose_fuel_actions(self):
         for status in ('submitted', 'confirmed'):
@@ -255,7 +389,7 @@ class ConfirmedAdminFuelTests(unittest.TestCase):
 
     @unittest.skipUnless(Path('C:/Program Files/Google/Chrome/Application/chrome.exe').exists(),
                          'Chrome required for decimal price checks')
-    def test_edit_price_survives_browser_initialization_focus_and_submit(self):
+    def test_edit_price_and_payer_survive_browser_initialization_focus_and_submit(self):
         self.log.price_per_liter = Decimal('24500.25')
         self.log.total_cost = Decimal('2450025')
         db.session.commit()
@@ -270,6 +404,13 @@ class ConfirmedAdminFuelTests(unittest.TestCase):
             try {
                 const price = document.getElementById('price_per_liter');
                 const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
+                const owner = document.getElementById('paid_by_owner');
+                const driver = document.getElementById('paid_by_driver');
+                assert(driver.checked && !owner.checked, 'Saved payer not selected');
+                owner.click();
+                assert(new FormData(price.form).get('paid_by') === 'owner', 'Owner selection lost');
+                driver.click();
+                assert(driver.checked && !owner.checked, 'Payer choices are not exclusive');
                 assert(price.type === 'number' && price.value === '24500.25', 'Initial price changed');
                 price.focus();
                 assert(price.value === '24500.25', 'Focus changed price');
@@ -277,6 +418,7 @@ class ConfirmedAdminFuelTests(unittest.TestCase):
                 price.dispatchEvent(new Event('input', {bubbles: true}));
                 price.form.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
                 assert(new FormData(price.form).get('price_per_liter') === '24000.75', 'Submit changed price');
+                assert(new FormData(price.form).get('paid_by') === 'driver', 'Submit changed payer');
                 document.body.dataset.priceChecks = 'passed';
             } catch (error) { document.body.dataset.priceChecks = 'failed: ' + error.message; }
         });

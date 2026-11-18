@@ -223,6 +223,13 @@ def edit(id):
                 if not current_user.is_admin() or len(linked_phois) != 1:
                     raise ValueError('Chỉ admin được sửa đơn giá của lần đổ xăng gắn riêng một phơi.')
                 price = _parse_fuel_price(request.form['price_per_liter'])
+            paid_by = log.paid_by
+            if 'paid_by' in request.form:
+                if not current_user.is_admin() or len(linked_phois) != 1:
+                    raise ValueError('Chỉ admin được sửa người trả tiền của lần đổ xăng gắn riêng một phơi.')
+                paid_by = request.form['paid_by']
+                if paid_by not in ('owner', 'driver'):
+                    raise ValueError('Người trả tiền xăng không hợp lệ.')
             if liters * price > Decimal('9999999999.99'):
                 raise ValueError('Tổng tiền xăng vượt quá giới hạn cho phép.')
             is_home_station = request.form.get('is_home_station') == '1'
@@ -237,6 +244,7 @@ def edit(id):
                 raise ValueError('Vui lòng chọn ngày đổ xăng.')
             log.liters = liters
             log.price_per_liter = price
+            log.paid_by = paid_by
             log.is_home_station = is_home_station
             log.refuel_date = datetime.strptime(refuel_date_str, '%Y-%m-%d').date()
             log.total_cost = liters * price

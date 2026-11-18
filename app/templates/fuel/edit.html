@@ -25,6 +25,19 @@
             <input type="number" data-decimal-money name="price_per_liter" id="price_per_liter" class="form-control" required min="0.01" max="9999999999.99" step="0.01" inputmode="decimal" value="{{ request.form.get('price_per_liter', '{:.2f}'.format(log.price_per_liter)) }}">
             <small class="text-muted">Tổng tiền được tính lại theo số lít và đơn giá này.</small>
         </div>
+        <fieldset class="mb-3">
+            <legend class="form-label mb-2">Ai trả tiền xăng? *</legend>
+            {% set selected_paid_by = request.form.get('paid_by', log.paid_by) %}
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="radio" name="paid_by" id="paid_by_owner" value="owner" required {% if selected_paid_by == 'owner' %}checked{% endif %}>
+                <label class="form-check-label" for="paid_by_owner"><strong>Chủ xe trả</strong></label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="paid_by" id="paid_by_driver" value="driver" required {% if selected_paid_by == 'driver' %}checked{% endif %}>
+                <label class="form-check-label" for="paid_by_driver"><strong>Tài xế tự trả</strong></label>
+            </div>
+            <small class="text-muted">Tiền dầu tài xế tự trả được tính vào khoản tài xế đã chi để quyết toán.</small>
+        </fieldset>
         {% endif %}
         <div class="form-check mb-3">
             <input class="form-check-input" type="checkbox" name="is_home_station" id="is_home_station" value="1" {% if log.is_home_station %}checked{% endif %}>
