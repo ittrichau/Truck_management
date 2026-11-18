@@ -49,12 +49,25 @@
 <h5 class="mb-3"><i class="bi bi-bar-chart"></i> Báo cáo doanh thu và chi phí theo xe</h5>
 <form method="GET" action="{{ url_for('reports.index') }}" class="card card-body mb-3" id="report-filters">
     <div class="row g-3 align-items-end">
+        {% if current_user.is_admin() %}
+        <div class="col-12 col-md-3">
+            <label for="manager_id" class="form-label">Quản lý</label>
+            <select id="manager_id" name="manager_id" class="form-select" aria-describedby="manager-filter-help">
+                <option value="">Tất cả quản lý</option>
+                <option value="unassigned" {% if filter_manager_id == 'unassigned' %}selected{% endif %}>Xe chưa phân công</option>
+                {% for manager in managers %}
+                <option value="{{ manager.id }}" {% if filter_manager_id == manager.id|string %}selected{% endif %}>{{ manager.full_name }} ({{ manager.username }}){% if not manager.is_active %} — đã khóa{% endif %}</option>
+                {% endfor %}
+            </select>
+            <small id="manager-filter-help" class="text-muted">Theo quản lý đang được gán cho xe.</small>
+        </div>
+        {% endif %}
         <div class="col-12 col-md-3">
             <label for="truck_id" class="form-label">Xe</label>
             <select id="truck_id" name="truck_id" class="form-select">
                 <option value="">Tất cả xe</option>
-                {% for truck in trucks %}
-                <option value="{{ truck.id }}" {% if filter_truck_id == truck.id %}selected{% endif %}>{{ truck.license_plate }}{% if not truck.is_active %} (ngừng hoạt động){% endif %}</option>
+                {% for truck in truck_choices %}
+                <option value="{{ truck.id }}" data-manager-id="{{ truck.manager_id if truck.manager_id is not none else 'unassigned' }}" {% if filter_truck_id == truck.id %}selected{% endif %} {% if truck not in trucks %}hidden disabled{% endif %}>{{ truck.license_plate }}{% if not truck.is_active %} (ngừng hoạt động){% endif %}</option>
                 {% endfor %}
             </select>
         </div>
@@ -65,11 +78,11 @@
                 <option value="range" {% if mode == 'range' %}selected{% endif %}>Khoảng thời gian</option>
             </select>
         </div>
-        <fieldset id="report-month-fields" class="col-12 col-md-4" {% if mode == 'range' %}hidden disabled{% endif %}>
+        <fieldset id="report-month-fields" class="col-12 col-md-{{ 3 if current_user.is_admin() else 4 }}" {% if mode == 'range' %}hidden disabled{% endif %}>
             <label for="report-month" class="form-label">Tháng báo cáo</label>
             <input type="month" id="report-month" name="month" class="form-control" value="{{ month }}" required min="0001-01" max="9999-12">
         </fieldset>
-        <fieldset id="report-range-fields" class="col-12 col-md-4" {% if mode != 'range' %}hidden disabled{% endif %}>
+        <fieldset id="report-range-fields" class="col-12 col-md-{{ 6 if current_user.is_admin() else 4 }}" {% if mode != 'range' %}hidden disabled{% endif %}>
             <div class="row g-2">
                 <div class="col-6">
                     <label for="start_date" class="form-label">Từ ngày</label>
@@ -98,7 +111,7 @@
 </p>
 
 {% if report %}
-<p class="mb-3"><strong>{{ period_label }}</strong> · {{ report.totals.phoi_count }} phơi đã xác nhận{% if not filter_truck_id %} · Tất cả xe trong phạm vi được xem{% endif %}</p>
+<p class="mb-3"><strong>{{ period_label }}</strong> · {{ report.totals.phoi_count }} phơi đã xác nhận{% if selected_manager %} · Quản lý: {{ selected_manager.full_name }}{% elif filter_manager_id == 'unassigned' %} · Xe chưa phân công quản lý{% endif %}{% if not filter_truck_id %} · Tất cả xe trong phạm vi được xem{% endif %}</p>
 <div class="row g-2 mb-3">
     {% for key, label, color in [('revenue', 'Doanh thu', 'text-primary'), ('expenses', 'Tổng chi phí (gồm công)', 'text-danger'), ('fuel', 'Xăng dầu (trong chi phí)', 'report-fuel-text'), ('profit', 'Lợi nhuận', 'text-success' if report.totals.profit >= 0 else 'text-danger')] %}
     <div class="col-6 col-lg-3">

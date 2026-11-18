@@ -18,6 +18,7 @@ class TruckReportBrowserTests(unittest.TestCase):
     def test_filters_and_chart_geometry_on_mobile_and_desktop(self):
         fixture = reports.TruckReportTests()
         fixture.setUp()
+        fixture.login(fixture.admin)
         folder = ROOT / f'.report-browser-{uuid4().hex}'
         folder.mkdir()
         try:
@@ -46,6 +47,28 @@ class TruckReportBrowserTests(unittest.TestCase):
                         check(!form.checkValidity(), 'required end date');
                         setMode('month');
                         check(form.checkValidity(), 'disabled dates do not block month');
+                        const manager = document.getElementById('manager_id');
+                        const truck = document.getElementById('truck_id');
+                        const monthBefore = document.getElementById('report-month').value;
+                        const visibleTrucks = () => Array.from(truck.options)
+                            .filter(option => option.value && !option.hidden && !option.disabled);
+                        const setManager = value => { manager.value = value; manager.dispatchEvent(new Event('change')); };
+                        check(manager && manager.value === 'INITIAL_MANAGER', 'initial manager selection');
+                        check(truck.value === 'INITIAL_TRUCK', 'initial truck selection');
+                        setManager('MANAGER_A');
+                        check(visibleTrucks().length === 3 && visibleTrucks().every(option => option.dataset.managerId === 'MANAGER_A'), 'manager A vehicles');
+                        truck.value = 'TRUCK_A';
+                        setManager('MANAGER_B');
+                        check(truck.value === '', 'clear incompatible vehicle');
+                        check(visibleTrucks().length === 1 && visibleTrucks()[0].value === 'TRUCK_B', 'manager B vehicles');
+                        truck.value = 'TRUCK_B';
+                        data = new FormData(form);
+                        check(data.get('manager_id') === 'MANAGER_B' && data.get('truck_id') === 'TRUCK_B', 'combined filter values');
+                        setManager('');
+                        check(visibleTrucks().length === 5 && truck.value === 'TRUCK_B', 'all managers restore options');
+                        setManager('unassigned');
+                        check(truck.value === '' && visibleTrucks().length === 1 && visibleTrucks()[0].dataset.managerId === 'unassigned', 'unassigned vehicles');
+                        check(document.getElementById('report-month').value === monthBefore && mode.value === 'month', 'manager preserves period');
                         check(document.querySelectorAll('svg.report-chart').length === 2, 'two charts');
                         for (const bar of document.querySelectorAll('svg rect')) {
                             for (const attr of ['x', 'y', 'width', 'height']) {
@@ -65,9 +88,13 @@ class TruckReportBrowserTests(unittest.TestCase):
                     }
                 });
             """
-            for mode in ('month', 'range'):
-                query = ('month=2026-10' if mode == 'month' else
-                         'mode=range&start_date=2026-10-01&end_date=2026-12-31')
+            scenarios = [
+                ('month', 'month=2026-10', 1, '', ''),
+                ('range', 'mode=range&start_date=2026-10-01&end_date=2026-12-31', 5, '', ''),
+                ('filtered', f'month=2026-11&manager_id={fixture.a.id}&truck_id={fixture.retired.id}',
+                 1, str(fixture.a.id), str(fixture.retired.id)),
+            ]
+            for mode, query, expected_rows, initial_manager, initial_truck in scenarios:
                 html = fixture.client.get('/reports?' + query).get_data(as_text=True)
                 # Browser verification is offline and does not run a Flask server.
                 html = re.sub(r'<link\b[^>]*href="https?://[^>]*>', '', html)
@@ -77,9 +104,12 @@ class TruckReportBrowserTests(unittest.TestCase):
                 html = re.sub(r'<script src="/static/([^"?]+)"></script>',
                               lambda m: '<script>' + (ROOT / 'app/static' / m[1]).read_text(encoding='utf-8') + '</script>', html)
                 html = html.replace('<head>', '<head><script>window.htmx={config:{}};</script>')
-                # Number of active vehicle/month rows differs between the two views.
-                expected_rows = 1 if mode == 'month' else 3
-                html = html.replace('</body>', '<script>' + checks.replace('rows.length === 3', f'rows.length === {expected_rows}') + '</script></body>')
+                scenario_checks = checks.replace('rows.length === 3', f'rows.length === {expected_rows}')
+                for key, value in {'MANAGER_A': fixture.a.id, 'MANAGER_B': fixture.b.id,
+                                   'TRUCK_A': fixture.ta.id, 'TRUCK_B': fixture.tb.id,
+                                   'INITIAL_MANAGER': initial_manager, 'INITIAL_TRUCK': initial_truck}.items():
+                    scenario_checks = scenario_checks.replace(key, str(value))
+                html = html.replace('</body>', '<script>' + scenario_checks + '</script></body>')
                 sample = folder / f'{mode}.html'
                 sample.write_text(html, encoding='utf-8')
                 for width, height in ((390, 844), (1440, 1000)):

@@ -7,7 +7,7 @@ from flask import Blueprint, abort, render_template, request
 from flask_login import current_user, login_required
 
 from app.access import trucks_query
-from app.models import Truck
+from app.models import Truck, User
 from app.truck_reports import build_truck_report
 
 
@@ -25,8 +25,34 @@ def index():
     month = request.args.get('month', today.strftime('%Y-%m')).strip()
     start_date = request.args.get('start_date', today.replace(day=1).isoformat()).strip()
     end_date = request.args.get('end_date', today.isoformat()).strip()
+    filter_manager_id = request.args.get('manager_id', '').strip()
+    managers = User.query.filter_by(role='manager').order_by(User.full_name, User.id).all() if current_user.is_admin() else []
+    selected_manager = None
+    if filter_manager_id:
+        if filter_manager_id == 'unassigned':
+            if not current_user.is_admin():
+                abort(403)
+        else:
+            if not filter_manager_id.isascii() or not filter_manager_id.isdigit() or len(filter_manager_id) > 10:
+                abort(400, description='Quản lý không hợp lệ.')
+            identity = int(filter_manager_id)
+            filter_manager_id = str(identity)
+            if not current_user.is_admin():
+                if identity != current_user.id:
+                    abort(403)
+                selected_manager = current_user
+            else:
+                selected_manager = next((manager for manager in managers if manager.id == identity), None)
+                if selected_manager is None:
+                    abort(404)
+
     raw_truck = request.args.get('truck_id', '').strip()
-    trucks = trucks_query().order_by(Truck.license_plate).all()
+    truck_choices = trucks_query().order_by(Truck.license_plate).all()
+    trucks = truck_choices
+    if filter_manager_id == 'unassigned':
+        trucks = [truck for truck in trucks if truck.manager_id is None]
+    elif selected_manager is not None:
+        trucks = [truck for truck in trucks if truck.manager_id == selected_manager.id]
     truck_id = None
     if raw_truck:
         if not raw_truck.isascii() or not raw_truck.isdigit() or len(raw_truck) > 10:
@@ -68,6 +94,8 @@ def index():
 
     return render_template(
         'reports/index.html', report=report, error=error, trucks=trucks,
+        truck_choices=truck_choices, managers=managers,
+        filter_manager_id=filter_manager_id, selected_manager=selected_manager,
         filter_truck_id=truck_id, mode=mode, month=month,
         start_date=start_date, end_date=end_date,
         period_label=(f'{start_day:%d/%m/%Y} – {end_day:%d/%m/%Y}' if report else ''),

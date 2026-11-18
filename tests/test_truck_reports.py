@@ -255,6 +255,99 @@ class TruckReportTests(unittest.TestCase):
         self.assertNotIn(b'NaN', response.data)
         self.assertNotIn(b'Infinity', response.data)
 
+    def test_admin_manager_filter_limits_all_report_groups(self):
+        self.login(self.admin)
+        ctx, response = self.render(f'month=2026-11&manager_id={self.a.id}')
+        report = ctx['report']
+        self.assertEqual(ctx['selected_manager'].id, self.a.id)
+        self.assertEqual({truck.id for truck in ctx['trucks']}, {self.ta.id, self.retired.id, self.empty.id})
+        self.assertEqual(report['totals']['revenue'], Decimal('3000000'))
+        self.assertEqual(report['totals']['phoi_count'], 2)
+        self.assertEqual(report['totals']['profit'], self.november.owner_profit() + self.retired_phoi.owner_profit())
+        self.assertEqual({row['truck'].id for row in report['truck_rows']}, {self.ta.id, self.retired.id, self.empty.id})
+        self.assertEqual({row['truck'].id for row in report['detail_rows']}, {self.ta.id, self.retired.id})
+        for metric in ('revenue', 'expenses', 'fuel', 'profit'):
+            for group in ('truck_rows', 'monthly_rows', 'detail_rows'):
+                self.assertEqual(sum(row[metric] for row in report[group]), report['totals'][metric])
+        self.assertIn('Quản lý: manager-a'.encode(), response.data)
+
+    def test_manager_filter_combines_with_truck_and_custom_period(self):
+        self.login(self.admin)
+        query = (f'manager_id={self.a.id}&truck_id={self.ta.id}'
+                 '&mode=range&start_date=2026-10-31&end_date=2026-11-01')
+        ctx, response = self.render(query)
+        self.assertEqual(ctx['report']['totals']['phoi_count'], 2)
+        self.assertEqual(ctx['report']['totals']['revenue'], Decimal('15000001'))
+        self.assertEqual(ctx['filter_manager_id'], str(self.a.id))
+        self.assertEqual(ctx['filter_truck_id'], self.ta.id)
+        self.assertIn(f'value="{self.a.id}" selected'.encode(), response.data)
+        self.assertEqual(ctx['start_date'], '2026-10-31')
+        self.assertEqual(ctx['end_date'], '2026-11-01')
+        for manager, truck in ((self.a.id, self.tb.id), (self.b.id, self.ta.id), ('unassigned', self.ta.id)):
+            with self.subTest(manager=manager, truck=truck):
+                self.assertEqual(self.client.get(f'/reports?manager_id={manager}&truck_id={truck}').status_code, 404)
+
+    def test_admin_can_filter_unassigned_trucks(self):
+        self.login(self.admin)
+        ctx, response = self.render('month=2026-11&manager_id=unassigned')
+        self.assertEqual([truck.id for truck in ctx['trucks']], [self.unassigned.id])
+        self.assertEqual(ctx['report']['totals']['revenue'], Decimal('88000000'))
+        self.assertEqual(ctx['report']['totals']['phoi_count'], 1)
+        self.assertIn('Xe chưa phân công quản lý'.encode(), response.data)
+
+    def test_admin_keeps_inactive_managers_and_historical_trucks_filterable(self):
+        self.a.is_active = False
+        db.session.commit()
+        self.login(self.admin)
+        ctx, response = self.render(f'month=2026-11&manager_id={self.a.id}&truck_id={self.retired.id}')
+        self.assertIn(self.a, ctx['managers'])
+        self.assertEqual(ctx['report']['totals']['revenue'], Decimal('1000000'))
+        self.assertIn('— đã khóa'.encode(), response.data)
+
+    def test_manager_cannot_expand_scope_with_manager_filter(self):
+        ctx, response = self.render(f'month=2026-11&manager_id={self.a.id}')
+        self.assertEqual(ctx['report']['totals']['revenue'], Decimal('3000000'))
+        self.assertNotIn(b'name="manager_id"', response.data)
+        self.assertEqual(ctx['managers'], [])
+        for identity in (self.b.id, self.admin.id, 'unassigned', '999999'):
+            with self.subTest(manager=identity):
+                self.assertEqual(self.client.get(f'/reports?manager_id={identity}').status_code, 403)
+        _, response = self.render('month=2026-11&manager_id=')
+        self.assertNotIn(b'FOREIGN-B', response.data)
+
+    def test_invalid_manager_ids_do_not_remove_filter(self):
+        self.login(self.admin)
+        for identity in ('abc', '-1', '1.5', '999999999999999', '%EF%BC%91'):
+            with self.subTest(manager=identity):
+                self.assertEqual(self.client.get('/reports?manager_id=' + identity).status_code, 400)
+        for identity in (0, 999999, self.admin.id, self.driver.id):
+            with self.subTest(manager=identity):
+                self.assertEqual(self.client.get(f'/reports?manager_id={identity}').status_code, 404)
+
+    def test_manager_filter_empty_and_date_error_keep_selection(self):
+        empty_manager = self.user('no-trucks', 'manager')
+        db.session.commit()
+        self.login(self.admin)
+        ctx, response = self.render(f'month=2026-11&manager_id={empty_manager.id}')
+        self.assertEqual(ctx['trucks'], [])
+        self.assertEqual(ctx['report']['totals']['phoi_count'], 0)
+        self.assertIn('Chưa có phơi đã xác nhận'.encode(), response.data)
+        ctx, _ = self.render(f'month=invalid&manager_id={self.a.id}', status=400)
+        self.assertEqual(ctx['selected_manager'].id, self.a.id)
+        self.assertIsNone(ctx['report'])
+
+    def test_manager_filter_follows_current_assignment_without_rewriting_history(self):
+        before = self.october.owner_profit(), self.october.balance()
+        self.ta.manager_id = self.b.id
+        db.session.commit()
+        self.login(self.admin)
+        ctx, _ = self.render(f'month=2026-10&manager_id={self.a.id}')
+        self.assertEqual(ctx['report']['totals']['phoi_count'], 0)
+        ctx, _ = self.render(f'month=2026-10&manager_id={self.b.id}')
+        self.assertEqual(ctx['report']['totals']['revenue'], self.october.total_revenue_full())
+        self.assertEqual(before, (self.october.owner_profit(), self.october.balance()))
+        self.assertEqual(self.ta.manager_id, self.b.id)
+
 
 if __name__ == '__main__':
     unittest.main()
