@@ -22,10 +22,14 @@
             {% endif %}
             {% if current_user.is_manager_or_admin() and phoi.status == 'submitted' %}
             <a href="{{ url_for('phoi.edit', id=phoi.id) }}" class="btn btn-primary btn-sm"><i class="bi bi-clipboard-check"></i> Đối soát / Sửa phơi</a>
+            {% if current_user.is_admin() %}
+            <a href="{{ url_for('fuel.create', phoi_id=phoi.id, truck_id=phoi.truck_id) }}" class="btn btn-outline-warning btn-sm"><i class="bi bi-fuel-pump"></i> Thêm lần đổ dầu</a>
+            {% endif %}
             <a href="{{ url_for('phoi.confirm', id=phoi.id) }}" class="btn btn-success btn-sm"><i class="bi bi-check-circle"></i> Xác nhận nhanh</a>
             {% endif %}
             {% if current_user.is_admin() and phoi.status == 'confirmed' %}
             <a href="{{ url_for('phoi.edit', id=phoi.id) }}" class="btn btn-primary btn-sm"><i class="bi bi-pencil"></i> Sửa phơi đã xác nhận</a>
+            <a href="{{ url_for('fuel.create', phoi_id=phoi.id, truck_id=phoi.truck_id) }}" class="btn btn-outline-warning btn-sm"><i class="bi bi-fuel-pump"></i> Thêm lần đổ dầu</a>
             <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#cancelPhoiModal"><i class="bi bi-x-circle"></i> Hủy phơi</button>
             {% endif %}
         </div>
@@ -163,7 +167,7 @@
                 {% endif %}
                 {% if (phoi.status != 'confirmed' and (current_user.is_manager_or_admin() or (current_user.is_driver() and fuel.created_by_id == current_user.id))) or (phoi.status == 'confirmed' and current_user.is_admin() and fuel.attached_phoi_count() == 1) %}
                 <div class="mt-2">
-                    <a href="{{ url_for('fuel.edit', id=fuel.id) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i> Sửa số lít / ngày đổ</a>
+                    <a href="{{ url_for('fuel.edit', id=fuel.id) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i> {{ 'Sửa số lít / đơn giá / ngày đổ' if current_user.is_admin() and fuel.attached_phoi_count() == 1 else 'Sửa số lít / ngày đổ' }}</a>
                     <form action="{{ url_for('fuel.delete', id=fuel.id) }}" method="POST" class="d-inline">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Xóa lần đổ xăng này và ảnh hóa đơn?')"><i class="bi bi-trash"></i> Xóa</button>

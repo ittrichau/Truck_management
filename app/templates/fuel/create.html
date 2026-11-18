@@ -42,11 +42,11 @@
                 <option value="">-- Chọn xe trước --</option>
                 {% for p in phois %}
                 <option value="{{ p.id }}" data-truck-id="{{ p.truck_id }}" {% if selected_phoi_id == p.id %}selected{% endif %}>
-                    {{ p.phoi_number }} — {{ p.origin }}→{{ p.destination }}
+                    {{ p.phoi_number }} — {{ p.origin }}→{{ p.destination }}{% if p.status == 'confirmed' %} (Đã xác nhận){% endif %}
                 </option>
                 {% endfor %}
             </select>
-            <small class="text-warning">⚠️ Mỗi lần đổ xăng chỉ được gắn với đúng một phơi đang thực hiện của cùng xe.</small>
+            <small class="text-warning">⚠️ Mỗi lần đổ xăng chỉ được gắn với đúng một phơi của cùng xe.{% if current_user.is_admin() %} Admin có thể bổ sung dầu cho phơi đã xác nhận; chi phí và quyết toán liên quan sẽ được cập nhật.{% else %} Chỉ chọn phơi đang thực hiện.{% endif %}</small>
         </div>
         <fieldset class="mb-3">
             <legend class="form-label mb-2">Ai trả tiền xăng? *</legend>
@@ -195,7 +195,7 @@ function filterPhoiByTruck() {
         phoiSelect.value = '';
     }
     hint.style.display = truckId ? '' : 'none';
-    hint.textContent = count ? `Có ${count} phơi đang tiến hành cho xe này` : 'Không có phơi đang tiến hành cho xe này';
+    hint.textContent = count ? `Có ${count} phơi có thể ghi nhận đổ xăng cho xe này` : 'Không có phơi được phép ghi nhận đổ xăng cho xe này';
 }
 
 // Hiển thị ghi chú khi chọn xe khác xe mặc định (chạy giùm)

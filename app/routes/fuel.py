@@ -76,7 +76,10 @@ def _parse_fuel_price(value):
 @login_required
 def create():
     trucks = trucks_query().filter_by(is_active=True).all()
-    phoi_query = phois_query().filter(Phoi.status.in_(['draft', 'submitted']))
+    allowed_statuses = ['draft', 'submitted']
+    if current_user.is_admin():
+        allowed_statuses.append('confirmed')
+    phoi_query = phois_query().filter(Phoi.status.in_(allowed_statuses))
     if current_user.is_driver():
         phoi_query = phoi_query.filter_by(driver_id=current_user.id)
     phois = phoi_query.order_by(Phoi.created_at.desc()).all()
@@ -85,7 +88,7 @@ def create():
     selected_truck_id = request.args.get('truck_id', type=int)
     selected_phoi = phois_query().filter_by(id=selected_phoi_id).first() if selected_phoi_id else None
     if selected_phoi:
-        if selected_phoi.status == 'confirmed' or (current_user.is_driver() and selected_phoi.driver_id != current_user.id):
+        if selected_phoi.status not in allowed_statuses or (current_user.is_driver() and selected_phoi.driver_id != current_user.id):
             flash('Bạn không có quyền ghi nhận đổ xăng cho phơi này.', 'danger')
             return redirect(url_for('phoi.index'))
         selected_truck_id = selected_phoi.truck_id
@@ -137,11 +140,11 @@ def create():
                 created_by_id=current_user.id
             )
 
-            # Mỗi lần đổ xăng chỉ được tính cho một phơi đang thực hiện cùng xe.
+            # Admin được bổ sung dầu cho phơi đã xác nhận; vẫn chỉ gắn một phơi cùng xe.
             selected_phoi_id = request.form.get('phoi_id', type=int)
             selected_phoi_record = phois_query().filter_by(id=selected_phoi_id).first() if selected_phoi_id else None
-            if not selected_phoi_record or selected_phoi_record.status not in ['draft', 'submitted']:
-                flash('Phải chọn đúng một phơi đang thực hiện để ghi nhận lần đổ xăng.', 'danger')
+            if not selected_phoi_record or selected_phoi_record.status not in allowed_statuses:
+                flash('Phải chọn đúng một phơi được phép ghi nhận đổ xăng.', 'danger')
                 return render_template('fuel/create.html', trucks=trucks, phois=phois,
                                        current_price=_get_active_price_or_none(),
                                        selected_truck_id=truck_id, selected_phoi_id=selected_phoi_id,
@@ -215,6 +218,13 @@ def edit(id):
     if request.method == 'POST':
         try:
             liters = _parse_liters(request.form.get('liters', '0'))
+            price = log.price_per_liter
+            if 'price_per_liter' in request.form:
+                if not current_user.is_admin() or len(linked_phois) != 1:
+                    raise ValueError('Chỉ admin được sửa đơn giá của lần đổ xăng gắn riêng một phơi.')
+                price = _parse_fuel_price(request.form['price_per_liter'])
+            if liters * price > Decimal('9999999999.99'):
+                raise ValueError('Tổng tiền xăng vượt quá giới hạn cho phép.')
             is_home_station = request.form.get('is_home_station') == '1'
             existing_receipts = log.receipts.all()
             receipt_files = [file for file in request.files.getlist('receipts') if file and file.filename]
@@ -226,9 +236,10 @@ def edit(id):
             if not refuel_date_str:
                 raise ValueError('Vui lòng chọn ngày đổ xăng.')
             log.liters = liters
+            log.price_per_liter = price
             log.is_home_station = is_home_station
             log.refuel_date = datetime.strptime(refuel_date_str, '%Y-%m-%d').date()
-            log.total_cost = liters * log.price_per_liter
+            log.total_cost = liters * price
             saved_keys = []
             try:
                 image_type = 'liters' if is_home_station else 'receipt'
@@ -247,7 +258,7 @@ def edit(id):
                 for storage_key in saved_keys:
                     delete_attachment_file(storage_key)
                 raise
-            flash('Đã cập nhật số lít và ngày đổ xăng.', 'success')
+            flash('Đã cập nhật lần đổ xăng.', 'success')
             if len(linked_phois) == 1:
                 return redirect(url_for('phoi.detail', id=linked_phois[0].id))
             return redirect(url_for('fuel.index'))

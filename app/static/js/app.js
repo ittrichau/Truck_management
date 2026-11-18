@@ -170,7 +170,7 @@ const currencyInputNames = new Set([
 ]);
 
 function isCurrencyInput(input) {
-    return input instanceof HTMLInputElement && (
+    return input instanceof HTMLInputElement && !input.hasAttribute('data-decimal-money') && (
         input.classList.contains('currency-input') || currencyInputNames.has(input.name)
     );
 }

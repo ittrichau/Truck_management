@@ -41,13 +41,17 @@ async function onCustomerChange(select) {
                     · <span class="badge bg-secondary">Chủ xe trả</span>
                     {% endif %}
                 </small>
-                {% if phoi.status != 'confirmed' and (current_user.is_manager_or_admin() or (current_user.is_driver() and fuel.created_by_id == current_user.id)) %}
+                {% if (phoi.status != 'confirmed' and (current_user.is_manager_or_admin() or (current_user.is_driver() and fuel.created_by_id == current_user.id))) or (phoi.status == 'confirmed' and current_user.is_admin() and fuel.attached_phoi_count() == 1) %}
                 <a href="{{ url_for('fuel.edit', id=fuel.id) }}" class="btn btn-outline-primary btn-sm">Sửa</a>
                 {% endif %}
             </div>
             {% else %}
             <small class="text-muted">Chưa có lần đổ xăng nào. Hãy lưu phơi rồi ghi nhận đổ xăng.</small>
             {% endfor %}
+            {% if current_user.is_admin() %}
+            <a href="{{ url_for('fuel.create', phoi_id=phoi.id, truck_id=phoi.truck_id) }}" class="btn btn-outline-warning btn-sm mt-2"><i class="bi bi-plus-lg"></i> Thêm lần đổ dầu</a>
+            <small class="d-block text-muted mt-1">Lưu các thay đổi của phơi trước khi chuyển sang sửa hoặc thêm dầu.</small>
+            {% endif %}
         </div></div>
 
         {% if current_user.is_manager_or_admin() and unallocated_fuel_logs %}
