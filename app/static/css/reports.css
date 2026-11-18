@@ -1,0 +1,13 @@
+.report-legend { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; }
+.report-dot { display: inline-block; width: .75rem; height: .75rem; border-radius: 2px; margin-right: .25rem; }
+.report-revenue { background: #0d6efd; }
+.report-expenses { background: #dc3545; }
+.report-fuel { background: #b77900; }
+.report-fuel-text { color: #956400; }
+.report-chart-scroll, .report-table-scroll { overflow-x: auto; }
+.report-chart { display: block; width: 100%; height: auto; }
+.report-axis { font: 12px Arial, sans-serif; fill: #495057; }
+.report-grid { stroke: #dee2e6; stroke-width: 1; }
+.report-chart rect:hover { opacity: .75; }
+.report-table { white-space: nowrap; font-size: .875rem; }
+.report-table th, .report-table td { padding: .75rem; }

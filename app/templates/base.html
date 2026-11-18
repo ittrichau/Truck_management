@@ -214,6 +214,10 @@
               >
             </li>
             <li class="nav-item">
+              <a class="nav-link{% if request.blueprint == 'reports' %} active{% endif %}" href="{{ url_for('reports.index') }}"
+                ><i class="bi bi-bar-chart"></i> Báo cáo</a>
+            </li>
+            <li class="nav-item">
               <a class="nav-link" href="{{ url_for('drivers.index') }}"
                 ><i class="bi bi-person-badge"></i> Người dùng</a
               >
@@ -331,7 +335,7 @@
       <a
         href="#moreMenu"
         data-bs-toggle="offcanvas"
-        class="{% if request.endpoint and ('debts' in request.endpoint or 'drivers' in request.endpoint or 'activity_logs' in request.endpoint) %}active{% endif %}"
+        class="{% if request.endpoint and ('debts' in request.endpoint or 'drivers' in request.endpoint or 'activity_logs' in request.endpoint or 'reports' in request.endpoint) %}active{% endif %}"
       >
         <i class="bi bi-grid"></i> Thêm
       </a>
@@ -351,6 +355,9 @@
           {% endif %}
           <a href="{{ url_for('debts.index') }}" class="list-group-item list-group-item-action py-3">
             <i class="bi bi-cash-stack me-2 text-primary"></i> Công nợ
+          </a>
+          <a href="{{ url_for('reports.index') }}" class="list-group-item list-group-item-action py-3">
+            <i class="bi bi-bar-chart me-2 text-primary"></i> Báo cáo theo xe
           </a>
           <a href="{{ url_for('drivers.index') }}" class="list-group-item list-group-item-action py-3">
             <i class="bi bi-person-badge me-2 text-primary"></i> Người dùng

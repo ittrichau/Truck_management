@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Báo cáo theo xe{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/reports.css') }}">
+{% endblock %}
+
+{% macro chart(rows, chart_id, heading) %}
+{% set scale = namespace(maximum=1) %}
+{% for row in rows %}
+    {% set scale.maximum = [scale.maximum, row.revenue, row.expenses, row.fuel]|max %}
+{% endfor %}
+{% set width = [640, rows|length * 140 + 130]|max %}
+{% set group_width = (width - 130) / (rows|length or 1) %}
+<section class="card mb-3" aria-labelledby="{{ chart_id }}-heading">
+    <div class="card-body">
+        <h6 id="{{ chart_id }}-heading">{{ heading }}</h6>
+        <div class="report-legend small mb-2">
+            <span><i class="report-dot report-revenue"></i> Doanh thu</span>
+            <span><i class="report-dot report-expenses"></i> Tổng chi phí (gồm công)</span>
+            <span><i class="report-dot report-fuel"></i> Xăng dầu (trong chi phí)</span>
+        </div>
+        <div class="report-chart-scroll" tabindex="0" role="region" aria-label="{{ heading }}; cuộn ngang để xem thêm">
+            <svg class="report-chart" viewBox="0 0 {{ width }} 280" style="min-width: {{ width }}px" role="img" aria-labelledby="{{ chart_id }}-title {{ chart_id }}-description">
+                <title id="{{ chart_id }}-title">{{ heading }}</title>
+                <desc id="{{ chart_id }}-description">Đơn vị VNĐ. Di chuột vào cột để xem số tiền. Bảng chi tiết theo xe và tháng ở bên dưới.</desc>
+                <text x="105" y="18" text-anchor="end" class="report-axis">VNĐ</text>
+                {% for tick in range(5) %}
+                {% set y = 230 - tick * 47.5 %}
+                <line x1="110" x2="{{ width - 20 }}" y1="{{ y }}" y2="{{ y }}" class="report-grid" />
+                <text x="102" y="{{ y + 4 }}" text-anchor="end" class="report-axis">{{ '{:,.0f}'.format(scale.maximum * tick / 4) }}</text>
+                {% endfor %}
+                {% for row in rows %}
+                {% set group_x = 110 + loop.index0 * group_width + group_width / 2 %}
+                {% for key, label, color in [('revenue', 'Doanh thu', '#0d6efd'), ('expenses', 'Tổng chi phí (gồm công)', '#dc3545'), ('fuel', 'Xăng dầu (trong chi phí)', '#b77900')] %}
+                {% set bar_height = row[key] / scale.maximum * 190 %}
+                <rect x="{{ group_x - 36 + loop.index0 * 25 }}" y="{{ '{:.2f}'.format(230 - bar_height) }}" width="21" height="{{ '{:.2f}'.format(bar_height) }}" rx="2" fill="{{ color }}">
+                    <title>{{ row.label }} · {{ label }}: {{ '{:,.0f}'.format(row[key]) }} VNĐ</title>
+                </rect>
+                {% endfor %}
+                <text x="{{ group_x }}" y="252" text-anchor="middle" class="report-axis">{{ row.label }}</text>
+                {% endfor %}
+            </svg>
+        </div>
+    </div>
+</section>
+{% endmacro %}
+
+{% block content %}
+<h5 class="mb-3"><i class="bi bi-bar-chart"></i> Báo cáo doanh thu và chi phí theo xe</h5>
+<form method="GET" action="{{ url_for('reports.index') }}" class="card card-body mb-3" id="report-filters">
+    <div class="row g-3 align-items-end">
+        <div class="col-12 col-md-3">
+            <label for="truck_id" class="form-label">Xe</label>
+            <select id="truck_id" name="truck_id" class="form-select">
+                <option value="">Tất cả xe</option>
+                {% for truck in trucks %}
+                <option value="{{ truck.id }}" {% if filter_truck_id == truck.id %}selected{% endif %}>{{ truck.license_plate }}{% if not truck.is_active %} (ngừng hoạt động){% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12 col-md-3">
+            <label for="report-mode" class="form-label">Thời gian</label>
+            <select id="report-mode" name="mode" class="form-select">
+                <option value="month" {% if mode == 'month' %}selected{% endif %}>Theo tháng</option>
+                <option value="range" {% if mode == 'range' %}selected{% endif %}>Khoảng thời gian</option>
+            </select>
+        </div>
+        <fieldset id="report-month-fields" class="col-12 col-md-4" {% if mode == 'range' %}hidden disabled{% endif %}>
+            <label for="report-month" class="form-label">Tháng báo cáo</label>
+            <input type="month" id="report-month" name="month" class="form-control" value="{{ month }}" required min="0001-01" max="9999-12">
+        </fieldset>
+        <fieldset id="report-range-fields" class="col-12 col-md-4" {% if mode != 'range' %}hidden disabled{% endif %}>
+            <div class="row g-2">
+                <div class="col-6">
+                    <label for="start_date" class="form-label">Từ ngày</label>
+                    <input type="date" id="start_date" name="start_date" class="form-control" value="{{ start_date }}" required>
+                </div>
+                <div class="col-6">
+                    <label for="end_date" class="form-label">Đến ngày</label>
+                    <input type="date" id="end_date" name="end_date" class="form-control" value="{{ end_date }}" required>
+                </div>
+            </div>
+        </fieldset>
+        <div class="col-12 col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-primary flex-grow-1">Xem báo cáo</button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary" aria-label="Đặt lại bộ lọc"><i class="bi bi-arrow-counterclockwise"></i></a>
+        </div>
+    </div>
+</form>
+
+{% if error %}
+<div class="alert alert-danger alert-permanent" role="alert">{{ error }}</div>
+{% endif %}
+<p class="small text-muted">
+    Chỉ tính phơi đã xác nhận. Toàn bộ doanh thu chuyến đi/về và chi phí được tính theo ngày khởi hành phơi.
+    Doanh thu là tổng tiền vận chuyển, bao gồm phần khách chưa thanh toán.
+    Tổng chi phí đã gồm xăng dầu, chi phí khác và công tài xế; tiền ứng cho tài xế không tính thêm vào chi phí.
+</p>
+
+{% if report %}
+<p class="mb-3"><strong>{{ period_label }}</strong> · {{ report.totals.phoi_count }} phơi đã xác nhận{% if not filter_truck_id %} · Tất cả xe trong phạm vi được xem{% endif %}</p>
+<div class="row g-2 mb-3">
+    {% for key, label, color in [('revenue', 'Doanh thu', 'text-primary'), ('expenses', 'Tổng chi phí (gồm công)', 'text-danger'), ('fuel', 'Xăng dầu (trong chi phí)', 'report-fuel-text'), ('profit', 'Lợi nhuận', 'text-success' if report.totals.profit >= 0 else 'text-danger')] %}
+    <div class="col-6 col-lg-3">
+        <div class="card h-100 p-3">
+            <small class="text-muted">{{ label }}</small>
+            <strong class="fs-5 {{ color }}">{{ '{:,.0f}'.format(report.totals[key]) }} đ</strong>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% if report.totals.phoi_count %}
+{{ chart(report.truck_rows, 'trucks-chart', 'So sánh doanh thu, chi phí và xăng dầu theo xe') }}
+{{ chart(report.monthly_rows, 'months-chart', 'Biến động theo tháng của các xe đang chọn') }}
+<section class="card" aria-labelledby="report-detail-heading">
+    <div class="card-body pb-0">
+        <h6 id="report-detail-heading">Chi tiết theo xe và tháng</h6>
+        <p class="small text-muted">Lợi nhuận = doanh thu − tổng chi phí (đã gồm công tài xế). Cuộn ngang để xem đủ cột.</p>
+    </div>
+    <div class="report-table-scroll" tabindex="0" role="region" aria-label="Bảng số liệu theo xe và tháng">
+        <table class="table table-hover align-middle mb-0 report-table">
+            <caption class="visually-hidden">Số liệu tài chính từng xe, từng tháng trong thời gian đã chọn; đơn vị VNĐ.</caption>
+            <thead class="table-light">
+                <tr>
+                    <th scope="col">Tháng</th><th scope="col">Xe</th><th scope="col" class="text-end">Số phơi</th>
+                    <th scope="col" class="text-end">Doanh thu</th><th scope="col" class="text-end">Xăng dầu</th>
+                    <th scope="col" class="text-end">Chi phí khác</th><th scope="col" class="text-end">Công tài xế</th>
+                    <th scope="col" class="text-end">Tổng chi phí</th><th scope="col" class="text-end">Lợi nhuận</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in report.detail_rows %}
+                <tr>
+                    <th scope="row">{{ row.label }}</th>
+                    <td>{{ row.truck.license_plate }}{% if not row.truck.is_active %}<small class="d-block text-muted">Ngừng hoạt động</small>{% endif %}</td>
+                    <td class="text-end">{{ row.phoi_count }}</td>
+                    {% for key in ['revenue', 'fuel', 'other_expenses', 'wages', 'expenses', 'profit'] %}
+                    <td class="text-end{% if key == 'profit' %} {{ 'text-success' if row.profit >= 0 else 'text-danger' }}{% endif %}">{{ '{:,.0f}'.format(row[key]) }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot class="table-light fw-bold">
+                <tr>
+                    <th scope="row" colspan="2">Tổng cộng</th><td class="text-end">{{ report.totals.phoi_count }}</td>
+                    {% for key in ['revenue', 'fuel', 'other_expenses', 'wages', 'expenses', 'profit'] %}
+                    <td class="text-end">{{ '{:,.0f}'.format(report.totals[key]) }}</td>
+                    {% endfor %}
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</section>
+{% else %}
+<div class="card card-body text-center text-muted py-5" role="status">
+    <i class="bi bi-bar-chart display-5 mb-2"></i>
+    Chưa có phơi đã xác nhận cho xe và thời gian đã chọn.
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/reports.js') }}"></script>
+{% endblock %}

@@ -78,6 +78,7 @@ def create_app(config_name=None):
     from app.routes.drivers import bp as drivers_bp
     from app.routes.debts import bp as debts_bp
     from app.routes.activity_logs import bp as activity_logs_bp
+    from app.routes.reports import bp as reports_bp
 
     app.register_blueprint(management_bp)
     app.register_blueprint(auth_bp)
@@ -88,6 +89,7 @@ def create_app(config_name=None):
     app.register_blueprint(drivers_bp)
     app.register_blueprint(debts_bp)
     app.register_blueprint(activity_logs_bp)
+    app.register_blueprint(reports_bp)
 
     # Register CLI commands
     from app.cli import register_cli_commands
