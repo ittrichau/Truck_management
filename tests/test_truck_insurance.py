@@ -37,6 +37,7 @@ class TruckInsuranceTests(unittest.TestCase):
             license_plate='INS-001', insurance_expiry_date=date(2027, 3, 20),
             inspection_date=date(2026, 10, 1), inspection_expiry_months=6,
             permit_date=date(2026, 10, 2), permit_expiry_months=12,
+            inspection_expires_on=date(2027, 4, 1), permit_expires_on=date(2027, 10, 2),
         )
         db.session.add_all([self.manager, self.driver, self.truck])
         db.session.flush()
@@ -59,8 +60,8 @@ class TruckInsuranceTests(unittest.TestCase):
     def edit_form(self):
         return {
             'license_plate': self.truck.license_plate,
-            'inspection_date': '2026-10-01', 'inspection_expiry_months': '6',
-            'permit_date': '2026-10-02', 'permit_expiry_months': '12',
+            'inspection_expiry_date': '2027-04-01',
+            'permit_expiry_date': '2027-10-02',
             'current_driver_id': str(self.driver.id),
             'insurance_expiry_date': '2028-02-29',
         }
@@ -177,7 +178,7 @@ class TruckInsuranceTests(unittest.TestCase):
         upgrade(directory=MIGRATIONS)
         config = Config()
         config.set_main_option('script_location', MIGRATIONS)
-        self.assertEqual(ScriptDirectory.from_config(config).get_heads(), ['b8d2c4f6a091'])
+        self.assertEqual(ScriptDirectory.from_config(config).get_heads(), ['c7e8f901a2b3'])
 
 
 if __name__ == '__main__':

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Xe tải{% endblock %}
+{% from 'trucks/_expiry_badge.html' import expiry_badge %}
 {% block content %}
 <div class="mb-2">
     <h5 class="mb-0"><i class="bi bi-truck"></i> Danh sách xe</h5>
@@ -17,8 +18,8 @@
             <tr>
                 <th>Biển số</th>
                 <th>Tài xế</th>
-                <th class="text-center" style="width:70px">Đăng kiểm</th>
-                <th class="text-center" style="width:70px">Phù hiệu</th>
+                <th class="text-center">Hết hạn đăng kiểm</th>
+                <th class="text-center">Hết hạn phù hiệu</th>
                 <th class="text-center">Hết hạn bảo hiểm</th>
                 <th style="width:90px"></th>
             </tr>
@@ -40,45 +41,16 @@
                     <span class="text-muted">Chưa gán</span>
                     {% endif %}
                 </td>
+                {% for expiry in (truck.inspection_expiry_date(), truck.permit_expiry_date(), truck.insurance_expiry_date) %}
                 <td class="text-center">
-                    {% if truck.inspection_date %}
-                        {% set days = truck.inspection_days_until_expiry() %}
-                        {% if days is not none and days <= 15 %}
-                            <span class="badge bg-danger">{{ days }} ngày</span>
-                        {% else %}
-                            <small class="text-muted">{{ truck.inspection_expiry_date().strftime('%d/%m/%Y') if truck.inspection_expiry_date() else '' }}</small>
-                        {% endif %}
-                    {% else %}
-                        <span class="text-muted small">--</span>
-                    {% endif %}
-                </td>
-                <td class="text-center">
-                    {% if truck.permit_date %}
-                        {% set days = truck.permit_days_until_expiry() %}
-                        {% if days is not none and days <= 15 %}
-                            <span class="badge bg-danger">{{ days }} ngày</span>
-                        {% else %}
-                            <small class="text-muted">{{ truck.permit_expiry_date().strftime('%d/%m/%Y') if truck.permit_expiry_date() else '' }}</small>
-                        {% endif %}
-                    {% else %}
-                        <span class="text-muted small">--</span>
-                    {% endif %}
-                </td>
-                <td class="text-center">
-                    {% if truck.insurance_expiry_date %}
-                        <small class="text-nowrap">{{ truck.insurance_expiry_date.strftime('%d/%m/%Y') }}</small>
-                        {% set days = truck.insurance_days_until_expiry() %}
-                        {% if days < 0 %}
-                            <br><span class="badge bg-danger">Quá hạn {{ -days }} ngày</span>
-                        {% elif days == 0 %}
-                            <br><span class="badge bg-danger">Hết hạn hôm nay</span>
-                        {% elif days <= 15 %}
-                            <br><span class="badge bg-warning text-dark">Còn {{ days }} ngày</span>
-                        {% endif %}
+                    {% if expiry %}
+                        <small class="text-nowrap">{{ expiry.strftime('%d/%m/%Y') }}</small>
+                        {{ expiry_badge((expiry - today).days) }}
                     {% else %}
                         <span class="text-muted small">Chưa nhập</span>
                     {% endif %}
                 </td>
+                {% endfor %}
                 <td>
                     <div class="d-flex gap-1">
                         <a href="{{ url_for('trucks.edit', id=truck.id) }}" class="btn btn-outline-primary btn-sm py-0 px-1"><i class="bi bi-pencil"></i></a>

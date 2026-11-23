@@ -172,12 +172,14 @@ class Truck(db.Model):
     fuel_rate = db.Column(db.Float, comment='Liters per 100km')
     current_km = db.Column(db.Integer, default=0)
     
-    # Ngày đăng kiểm & hạn (tháng)
+    # Legacy issue dates/terms retained for migration and guarded rollback.
     inspection_date = db.Column(db.Date, nullable=True, comment='Ngày đăng kiểm gần nhất')
     inspection_expiry_months = db.Column(db.Integer, nullable=True, default=6, comment='Hạn đăng kiểm (tháng)')
     # Ngày cấp phù hiệu & hạn (tháng)
     permit_date = db.Column(db.Date, nullable=True, comment='Ngày cấp phù hiệu gần nhất')
     permit_expiry_months = db.Column(db.Integer, nullable=True, default=12, comment='Hạn phù hiệu (tháng)')
+    inspection_expires_on = db.Column(db.Date, nullable=True, comment='Ngày hết hạn đăng kiểm nhập trực tiếp')
+    permit_expires_on = db.Column(db.Date, nullable=True, comment='Ngày hết hạn phù hiệu nhập trực tiếp')
     insurance_expiry_date = db.Column(db.Date, nullable=True, comment='Ngày hết hạn bảo hiểm')
     
     # Notification tracking (cách 2 ngày nhắc lại)
@@ -197,16 +199,8 @@ class Truck(db.Model):
         return self.phois.filter(Phoi.status == 'confirmed').count()
     
     def inspection_expiry_date(self):
-        """Calculate the expiry date of inspection (date + months)."""
-        if not self.inspection_date or not self.inspection_expiry_months:
-            return None
-        month = self.inspection_date.month + self.inspection_expiry_months
-        year = self.inspection_date.year + (month - 1) // 12
-        month = ((month - 1) % 12) + 1
-        from calendar import monthrange
-        last_day = monthrange(year, month)[1]
-        day = min(self.inspection_date.day, last_day)
-        return date(year, month, day)
+        """The entered expiry date; legacy values are backfilled by migration."""
+        return self.inspection_expires_on
 
     def inspection_days_until_expiry(self):
         """Days until inspection expires. Returns None if no data."""
@@ -216,16 +210,8 @@ class Truck(db.Model):
         return (expiry - date.today()).days
 
     def permit_expiry_date(self):
-        """Calculate the expiry date of permit (date + months)."""
-        if not self.permit_date or not self.permit_expiry_months:
-            return None
-        month = self.permit_date.month + self.permit_expiry_months
-        year = self.permit_date.year + (month - 1) // 12
-        month = ((month - 1) % 12) + 1
-        from calendar import monthrange
-        last_day = monthrange(year, month)[1]
-        day = min(self.permit_date.day, last_day)
-        return date(year, month, day)
+        """The entered expiry date; never add a default term to this date."""
+        return self.permit_expires_on
 
     def permit_days_until_expiry(self):
         """Days until permit expires. Returns None if no data."""

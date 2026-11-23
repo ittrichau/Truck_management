@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 from sqlalchemy.exc import IntegrityError
-from datetime import datetime
+from datetime import datetime, date
 from app import db
 from app.models import Truck, User, Phoi
 
@@ -18,6 +18,26 @@ def _parse_date(val):
         except ValueError:
             pass
     return None
+
+
+def _document_expiries():
+    legacy_fields = ('inspection_date', 'inspection_expiry_months', 'permit_date', 'permit_expiry_months')
+    if any(field in request.form for field in legacy_fields):
+        raise ValueError('Biểu mẫu đã thay đổi. Vui lòng tải lại trang và nhập ngày hết hạn theo giấy tờ.')
+    values = {}
+    for field, column, label in (
+        ('inspection_expiry_date', 'inspection_expires_on', 'đăng kiểm'),
+        ('permit_expiry_date', 'permit_expires_on', 'phù hiệu'),
+        ('insurance_expiry_date', 'insurance_expiry_date', 'bảo hiểm'),
+    ):
+        if field not in request.form:
+            continue  # Omitted edit fields preserve their current value.
+        raw = request.form[field].strip()
+        value = _parse_date(raw)
+        if raw and (value is None or value.isoformat() != raw):
+            raise ValueError(f'Ngày hết hạn {label} không hợp lệ.')
+        values[column] = value
+    return values
 
 
 @bp.route('/trucks')
@@ -51,7 +71,7 @@ def index():
             'has_active_phoi': active_phoi is not None
         })
 
-    return render_template('trucks/index.html', truck_data=truck_data)
+    return render_template('trucks/index.html', truck_data=truck_data, today=date.today())
 
 
 @bp.route('/trucks/create', methods=['GET', 'POST'])
@@ -62,10 +82,10 @@ def create():
         return redirect(url_for('phoi.index'))
 
     if request.method == 'POST':
-        insurance_value = request.form.get('insurance_expiry_date', '').strip()
-        insurance_expiry_date = _parse_date(insurance_value)
-        if insurance_value and insurance_expiry_date is None:
-            flash('Ngày hết hạn bảo hiểm không hợp lệ.', 'danger')
+        try:
+            expiry_values = _document_expiries()
+        except ValueError as exc:
+            flash(str(exc), 'danger')
             return render_template('trucks/create.html')
 
         license_plate = request.form.get('license_plate').strip()
@@ -81,11 +101,7 @@ def create():
             year=int(request.form.get('year', 0) or 0),
             fuel_rate=float(request.form.get('fuel_rate', 0) or 0),
             current_km=int(request.form.get('current_km', 0) or 0),
-            inspection_date=_parse_date(request.form.get('inspection_date')),
-            inspection_expiry_months=int(request.form.get('inspection_expiry_months', 6) or 6),
-            permit_date=_parse_date(request.form.get('permit_date')),
-            permit_expiry_months=int(request.form.get('permit_expiry_months', 12) or 12),
-            insurance_expiry_date=insurance_expiry_date,
+            **expiry_values,
             status=request.form.get('status', 'available'),
             notes=request.form.get('notes', '').strip()
         )
@@ -127,10 +143,10 @@ def edit(id):
     ).first()
 
     if request.method == 'POST':
-        insurance_value = request.form.get('insurance_expiry_date', '').strip()
-        insurance_expiry_date = _parse_date(insurance_value)
-        if insurance_value and insurance_expiry_date is None:
-            flash('Ngày hết hạn bảo hiểm không hợp lệ.', 'danger')
+        try:
+            expiry_values = _document_expiries()
+        except ValueError as exc:
+            flash(str(exc), 'danger')
             return render_template(
                 'trucks/edit.html',
                 truck=truck,
@@ -144,12 +160,13 @@ def edit(id):
         truck.year = int(request.form.get('year', 0) or 0)
         truck.fuel_rate = float(request.form.get('fuel_rate', 0) or 0)
         truck.current_km = int(request.form.get('current_km', 0) or 0)
-        truck.inspection_date = _parse_date(request.form.get('inspection_date'))
-        truck.inspection_expiry_months = int(request.form.get('inspection_expiry_months', 6) or 6)
-        truck.permit_date = _parse_date(request.form.get('permit_date'))
-        truck.permit_expiry_months = int(request.form.get('permit_expiry_months', 12) or 12)
-        if 'insurance_expiry_date' in request.form:
-            truck.insurance_expiry_date = insurance_expiry_date
+        for column, value in expiry_values.items():
+            if getattr(truck, column) != value:
+                setattr(truck, column, value)
+                if column == 'inspection_expires_on':
+                    truck.last_inspection_notified_at = None
+                elif column == 'permit_expires_on':
+                    truck.last_permit_notified_at = None
         truck.status = request.form.get('status', 'available')
         truck.notes = request.form.get('notes', '').strip()
 

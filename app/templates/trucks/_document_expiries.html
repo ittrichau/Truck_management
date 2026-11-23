@@ -1,0 +1,16 @@
+{% from 'trucks/_expiry_badge.html' import expiry_badge %}
+{% for field, column, label, days_method in (
+    ('inspection_expiry_date', 'inspection_expires_on', 'đăng kiểm', 'inspection_days_until_expiry'),
+    ('permit_expiry_date', 'permit_expires_on', 'phù hiệu', 'permit_days_until_expiry'),
+    ('insurance_expiry_date', 'insurance_expiry_date', 'bảo hiểm', 'insurance_days_until_expiry')
+) %}
+{% set expiry = truck|attr(column) if truck is defined else none %}
+<div class="mb-3">
+    <label class="form-label" for="{{ field }}">Ngày hết hạn {{ label }}</label>
+    <input type="date" id="{{ field }}" name="{{ field }}" class="form-control" value="{{ request.form.get(field, expiry.isoformat() if expiry else '') }}">
+    {% if truck is defined and expiry %}
+        {{ expiry_badge((truck|attr(days_method))(), 30) }}
+    {% endif %}
+</div>
+{% endfor %}
+<p class="small text-muted">Nhập đúng ngày hết hạn trên giấy tờ. Để trống nếu chưa có thông tin.</p>

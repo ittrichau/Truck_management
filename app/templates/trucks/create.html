@@ -24,30 +24,7 @@
         </div>
         <hr>
         <h6 class="text-primary"><i class="bi bi-shield-check"></i> Đăng kiểm, Phù hiệu & Bảo hiểm</h6>
-        <div class="row g-2 mb-3">
-            <div class="col-6">
-                <label class="form-label">Ngày đăng kiểm</label>
-                <input type="date" name="inspection_date" class="form-control">
-            </div>
-            <div class="col-6">
-                <label class="form-label">Hạn đăng kiểm (tháng)</label>
-                <input type="number" name="inspection_expiry_months" class="form-control" value="6" min="1">
-            </div>
-        </div>
-        <div class="row g-2 mb-3">
-            <div class="col-6">
-                <label class="form-label">Ngày cấp phù hiệu</label>
-                <input type="date" name="permit_date" class="form-control">
-            </div>
-            <div class="col-6">
-                <label class="form-label">Hạn phù hiệu (tháng)</label>
-                <input type="number" name="permit_expiry_months" class="form-control" value="12" min="1">
-            </div>
-        </div>
-        <div class="mb-3">
-            <label class="form-label" for="insurance_expiry_date">Ngày hết hạn bảo hiểm</label>
-            <input type="date" id="insurance_expiry_date" name="insurance_expiry_date" class="form-control" value="{{ request.form.get('insurance_expiry_date', '') }}">
-        </div>
+        {% include 'trucks/_document_expiries.html' %}
         <hr>
         <div class="mb-3">
             <label class="form-label">Trạng thái</label>

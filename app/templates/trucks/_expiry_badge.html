@@ -1,0 +1,9 @@
+{% macro expiry_badge(days, warning_days=15) -%}
+{% if days < 0 %}
+<br><span class="badge bg-danger">Quá hạn {{ -days }} ngày</span>
+{% elif days == 0 %}
+<br><span class="badge bg-danger">Hết hạn hôm nay</span>
+{% elif days <= warning_days %}
+<br><span class="badge bg-warning text-dark">Còn {{ days }} ngày</span>
+{% endif %}
+{%- endmacro %}
