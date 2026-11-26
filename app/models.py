@@ -465,6 +465,13 @@ class Phoi(db.Model):
     def settlement_balance(self):
         """Tiền còn quyết toán sau khi trừ tiền quản lý đã ứng, không đổi chi phí/lợi nhuận."""
         return self.balance() - (self.driver_advance or Decimal('0'))
+
+    def record_driver_advance(self, raw_amount, received):
+        """Record the declared advance; an unchecked declaration explicitly clears it."""
+        amount = collection_amount(raw_amount) if received else Decimal('0')
+        if received and amount <= 0:
+            raise ValueError('Vui lòng nhập tiền ứng lớn hơn 0 khi chọn có nhận tiền ứng.')
+        self.driver_advance = amount
     
     def owner_profit(self):
         """Lợi nhuận chủ xe của toàn bộ phơi."""

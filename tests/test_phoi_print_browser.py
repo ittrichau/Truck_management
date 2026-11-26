@@ -1,5 +1,6 @@
 """Optional real-Chrome PDF and dynamic-form checks; no development server."""
 from datetime import date
+from decimal import Decimal
 from contextlib import contextmanager
 import json
 import os
@@ -178,7 +179,8 @@ class PrintBrowserTests(unittest.TestCase):
                     # Dynamic edit fields are tested on a phơi with no return rows.
                     login(driver)
                     empty = Phoi(phoi_number='EMPTY-EDIT', driver_id=driver.id, truck_id=truck.id,
-                                 departure_date=date(2026, 11, 9), origin='A', destination='B')
+                                 departure_date=date(2026, 11, 9), origin='A', destination='B',
+                                 driver_advance=Decimal('200000.25'))
                     db.session.add(empty)
                     db.session.commit()
                     manifest['forms'].append(save(client.get(f'/phoi/{empty.id}/edit').get_data(as_text=True), 'edit-form'))

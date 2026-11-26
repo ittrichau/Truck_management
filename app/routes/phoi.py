@@ -75,6 +75,16 @@ def _sync_confirmation_toll_fee(phoi):
             amount=amount,
         ))
 
+
+def _sync_driver_advance(phoi):
+    # Older forms have no declaration flag and must preserve the saved advance.
+    if 'has_driver_advance' in request.form:
+        phoi.record_driver_advance(
+            request.form.get('driver_advance', '').strip(),
+            received='1' in request.form.getlist('has_driver_advance'),
+        )
+
+
 def update_truck_status(truck):
     if not truck:
         return
@@ -523,6 +533,8 @@ def create():
                 raise ValueError('Tiền công tài xế không thể âm.')
             phoi.driver_wage = driver_wage
 
+            _sync_driver_advance(phoi)
+
             # Phơi mới đang thực hiện; chuyến về và đổ xăng sẽ được thêm sau.
             phoi.status = 'draft'
             phoi.notes = request.form.get('notes', '').strip()
@@ -771,6 +783,9 @@ def edit(id):
             if driver_wage < 0:
                 raise ValueError('Tiền công tài xế không thể âm.')
             phoi.driver_wage = driver_wage
+
+            if phoi.status in ('draft', 'submitted'):
+                _sync_driver_advance(phoi)
 
             synced_return_trips = _sync_return_trips(phoi)
             db.session.flush()

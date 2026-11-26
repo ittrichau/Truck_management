@@ -75,9 +75,9 @@
         <div class="card mb-3" id="driver-advance-card">
             <div class="card-body">
                 <h6 class="card-title mb-2"><i class="bi bi-cash-stack"></i> Tiền quản lý đã ứng cho tài xế</h6>
-                <p class="small text-muted mb-3">Nhập tổng tiền quản lý/chủ xe đã đưa trước cho tài xế để chi trên đường, cho toàn phơi. Khoản này được trừ khi quyết toán với tài xế. Không ứng thì nhập 0.</p>
+                <p class="small text-muted mb-3">Kiểm tra lại tiền ứng đã khai trên phơi. Quản lý có thể chỉnh sửa số tiền trước khi xác nhận. Nhập tổng tiền quản lý/chủ xe đã đưa trước cho tài xế để chi trên đường, cho toàn phơi. Khoản này được trừ khi quyết toán với tài xế. Không ứng thì nhập 0.</p>
                 <label class="form-label small mb-1" for="driver-advance">Tiền đã ứng trước (VNĐ)</label>
-                <input type="text" class="form-control currency-input" id="driver-advance" name="driver_advance" value="{{ '{:,.0f}'.format(phoi.driver_advance or 0) }}" inputmode="numeric" placeholder="0">
+                <input type="text" class="form-control currency-input" id="driver-advance" name="driver_advance" value="{{ '{:,.2f}'.format(phoi.driver_advance or 0).rstrip('0').rstrip('.') }}" data-decimal-money inputmode="decimal" placeholder="0">
                 <div class="invalid-feedback">Tiền ứng phải là số không âm và trong giới hạn cho phép.</div>
             </div>
         </div>
@@ -90,6 +90,7 @@
 </div>
 {% endblock %}
 {% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/phoi_driver_advance.js') }}"></script>
 <script>
 function updatePartialField(card) {
     const status = card.querySelector('.collection-status:checked').value;

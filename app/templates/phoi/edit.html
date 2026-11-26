@@ -160,6 +160,10 @@ async function onCustomerChange(select) {
             <small class="text-muted">Tài xế có thể tự nhập; khi chốt phơi quản lý có thể xác nhận hoặc chỉnh sửa lại.</small>
         </div></div>
 
+        {% if phoi.status in ('draft', 'submitted') %}
+        {% include 'phoi/_driver_advance_fields.html' %}
+        {% endif %}
+
         <span class="section-title"><i class="bi bi-arrow-return-left"></i> Các chuyến về</span>
         <div class="card mb-3"><div class="card-body">
             <p class="small text-muted">Mỗi chuyến về có thể chọn khách hàng để tự điền tuyến đường và hàng hóa, giống khi tạo phơi.</p>
@@ -201,6 +205,7 @@ async function onCustomerChange(select) {
 </div>
 {% endblock %}
 {% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/phoi_driver_advance.js') }}"></script>
 <script src="{{ url_for('static', filename='js/phoi_other_expenses.js') }}"></script>
 <script>
 const defaultDriverByTruck = {

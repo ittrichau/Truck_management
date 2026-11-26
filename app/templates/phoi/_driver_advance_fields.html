@@ -1,0 +1,17 @@
+{% set saved_advance = (phoi.driver_advance or 0) if phoi is defined else 0 %}
+{% set advance_received = '1' in request.form.getlist('has_driver_advance') if request.method == 'POST' and 'has_driver_advance' in request.form else saved_advance > 0 %}
+{% set advance_value = request.form.get('driver_advance', '') if request.method == 'POST' and 'has_driver_advance' in request.form else ('{:,.2f}'.format(saved_advance).rstrip('0').rstrip('.') if saved_advance else '') %}
+<span class="section-title"><i class="bi bi-cash-stack"></i> Tiền ứng cho tài xế</span>
+<div class="card mb-3" data-driver-advance-section><div class="card-body">
+    <input type="hidden" name="has_driver_advance" value="0">
+    <div class="form-check mb-2">
+        <input type="checkbox" class="form-check-input" id="has-driver-advance" name="has_driver_advance" value="1" aria-controls="driver-advance-details" {% if advance_received %}checked{% endif %}>
+        <label class="form-check-label" for="has-driver-advance">Có nhận tiền ứng</label>
+    </div>
+    <div id="driver-advance-details" {% if not advance_received %}class="d-none"{% endif %}>
+        <label class="form-label" for="driver-advance">Tiền đã nhận ứng trước (VNĐ) *</label>
+        <input type="text" id="driver-advance" name="driver_advance" class="form-control currency-input" data-decimal-money inputmode="decimal" value="{{ advance_value }}" placeholder="Nhập tiền quản lý/chủ xe đã ứng" {% if advance_received %}required{% endif %}>
+        <div class="invalid-feedback">Nhập tiền ứng lớn hơn 0 và trong giới hạn cho phép.</div>
+    </div>
+    <small class="text-muted d-block mt-2">Tiền quản lý/chủ xe đã đưa trước cho tài xế, cho toàn phơi. Quản lý sẽ kiểm tra và có thể chỉnh lại khi xác nhận. Khoản này được trừ khi quyết toán với tài xế.</small>
+</div></div>

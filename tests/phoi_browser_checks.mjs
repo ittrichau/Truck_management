@@ -116,6 +116,33 @@ try {
         await open(form);
         const checked = await evaluate(`(async () => {
             const assert = (condition, label) => {if (!condition) throw new Error(label);};
+            const advanceToggle = document.querySelector('#has-driver-advance');
+            const advance = document.querySelector('#driver-advance');
+            const details = document.querySelector('#driver-advance-details');
+            if (advanceToggle.checked) {
+                assert(advance.value === '200,000.25', 'Saved fractional advance survives initialization');
+                advanceToggle.click();
+            }
+            assert(details.classList.contains('d-none') && !advance.required, 'Advance initially optional');
+            advanceToggle.click();
+            assert(!details.classList.contains('d-none') && advance.required, 'Checked advance visible and required');
+            advance.value = '';
+            advance.dispatchEvent(new Event('input', {bubbles: true}));
+            assert(!advance.checkValidity(), 'Checked advance cannot be empty');
+            for (const value of ['0', '-1', 'NaN', 'Infinity', '1e6', '1.001', '10000000000']) {
+                advance.value = value;
+                advance.dispatchEvent(new Event('input', {bubbles: true}));
+                assert(!advance.checkValidity(), 'Invalid declaration: ' + value);
+            }
+            for (const [value, formatted] of [['1200000', '1,200,000'], ['1200000.25', '1,200,000.25']]) {
+                advance.value = value;
+                advance.dispatchEvent(new Event('input', {bubbles: true}));
+                assert(advance.value === formatted && advance.checkValidity(), 'Valid formatted advance: ' + value);
+            }
+            assert(new FormData(document.querySelector('#phoi-form')).getAll('has_driver_advance').join(',') === '0,1', 'Checked declaration posted');
+            advanceToggle.click();
+            assert(details.classList.contains('d-none') && !advance.required && advance.checkValidity(), 'Unchecked advance optional');
+            assert(new FormData(document.querySelector('#phoi-form')).getAll('has_driver_advance').join(',') === '0', 'Unchecked declaration posted');
             const scope = document.querySelector('[data-other-expense]');
             scope.querySelector('[data-other-toggle]').click();
             assert(scope.querySelector('[data-other-enabled]').value === '1', 'Checked flag');
@@ -158,6 +185,9 @@ try {
             advance.value = '1000000';
             advance.dispatchEvent(new Event('input', {bubbles: true}));
             assert(advance.value === '1,000,000', 'Advance uses existing currency formatter');
+            advance.value = '200000.25';
+            advance.dispatchEvent(new Event('input', {bubbles: true}));
+            assert(advance.value === '200,000.25', 'Confirmation preserves decimal money');
             let submitted = false;
             form.addEventListener('submit', event => {
                 submitted = true;
