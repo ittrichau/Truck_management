@@ -10,7 +10,7 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from app import db
 from app.access import customers_query, drivers_query, phois_query, trucks_query
-from app.models import Customer, Phoi, Truck
+from app.models import Customer, Phoi, Truck, User
 from app.planning_view import ScheduleView, calendar_data, live_data as plan_live_data, matches
 from app.trip_planning import (
     TripPlan, actual_from_phoi, form_values, parse_day, parse_id,

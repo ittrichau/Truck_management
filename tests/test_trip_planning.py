@@ -143,6 +143,16 @@ class TripPlanningTests(unittest.TestCase):
         self.assertEqual(self.client.get(f'/planning/{plan.id}').status_code, 200)
         self.assertEqual(self.client.get(f'/planning/{plan.id}/edit').status_code, 200)
 
+    def test_default_index_renders_before_any_plan_exists_for_manager_and_admin(self):
+        for actor in (self.manager, self.admin):
+            with self.subTest(role=actor.role):
+                self.login(actor)
+                response, context = self.render('')
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(context['rows'], [])
+                self.assertEqual(context['outside'], [])
+                self.assertIn('Chưa có kế hoạch phù hợp', response.get_data(as_text=True))
+
     def test_submit_auto_links_and_records_differences_without_changing_finances(self):
         plan = self.plan()
         phoi = self.phoi()
