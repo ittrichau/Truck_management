@@ -187,6 +187,11 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav me-auto">
+            {% if current_user.role in ('manager', 'admin') %}
+            <li class="nav-item">
+              <a class="nav-link{% if request.blueprint == 'planning' %} active{% endif %}" href="{{ url_for('planning.index') }}"><i class="bi bi-calendar3"></i> Kế hoạch</a>
+            </li>
+            {% endif %}
             <li class="nav-item">
               <a class="nav-link" href="{{ url_for('phoi.index') }}"
                 ><i class="bi bi-journal-text"></i> Phơi</a
@@ -335,7 +340,7 @@
       <a
         href="#moreMenu"
         data-bs-toggle="offcanvas"
-        class="{% if request.endpoint and ('debts' in request.endpoint or 'drivers' in request.endpoint or 'activity_logs' in request.endpoint or 'reports' in request.endpoint) %}active{% endif %}"
+        class="{% if request.endpoint and ('debts' in request.endpoint or 'drivers' in request.endpoint or 'activity_logs' in request.endpoint or 'reports' in request.endpoint or 'planning' in request.endpoint) %}active{% endif %}"
       >
         <i class="bi bi-grid"></i> Thêm
       </a>
@@ -350,6 +355,9 @@
       </div>
       <div class="offcanvas-body pt-0">
         <div class="list-group list-group-flush">
+          {% if current_user.role in ('manager', 'admin') %}
+          <a href="{{ url_for('planning.index') }}" class="list-group-item list-group-item-action py-3"><i class="bi bi-calendar3 me-2 text-primary"></i> Kế hoạch chuyến hàng</a>
+          {% endif %}
           {% if current_user.is_admin() %}
           <a href="{{ url_for('management.index') }}" class="list-group-item list-group-item-action py-3"><i class="bi bi-shield-lock me-2 text-primary"></i> Phân quyền quản lý</a>
           {% endif %}

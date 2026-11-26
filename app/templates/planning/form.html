@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Sửa' if plan else 'Lập' }} kế hoạch chuyến hàng{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/planning.css') }}">{% endblock %}
+{% block content %}
+{% macro value(name, default='') -%}{{ form.get(name, (plan|attr(name)) if plan and (plan|attr(name)) is not none else default) }}{%- endmacro %}
+{% macro return_row(row) %}
+<div class="border rounded p-3 mb-2 return-plan-row">
+  <div class="d-flex justify-content-between align-items-center mb-2"><strong>Chặng về <span class="return-number"></span></strong><button type="button" class="btn btn-sm btn-outline-danger remove-return">Bỏ chặng</button></div>
+  <div class="row g-2">
+    <div class="col-12 col-md-6"><label class="form-label">Khách hàng<select name="return_customer_id[]" class="form-select"><option value="">Chưa chọn khách</option>{% for customer in customers %}<option value="{{ customer.id }}" {% if row.get('customer_id')|string == customer.id|string %}selected{% endif %}>{{ customer.name }}</option>{% endfor %}</select></label></div>
+    <div class="col-12 col-md-6"><label class="form-label">Ngày chạy chặng về<input class="form-control" type="date" name="return_return_date[]" value="{{ row.get('return_date') or '' }}"></label></div>
+    <div class="col-12 col-md-6"><label class="form-label">Điểm đi<input class="form-control" name="return_origin[]" maxlength="200" value="{{ row.get('origin', '') }}"></label></div>
+    <div class="col-12 col-md-6"><label class="form-label">Điểm đến<input class="form-control" name="return_destination[]" maxlength="200" value="{{ row.get('destination', '') }}"></label></div>
+    <div class="col-12"><label class="form-label">Hàng hóa<input class="form-control" name="return_cargo_description[]" maxlength="300" value="{{ row.get('cargo_description', '') }}"></label></div>
+  </div>
+</div>
+{% endmacro %}
+<div class="planning-page" style="max-width: 1000px">
+<a class="small" href="{{ url_for('planning.detail', id=plan.id) if plan else url_for('planning.index') }}">← {{ 'Chi tiết kế hoạch' if plan else 'Danh sách kế hoạch' }}</a>
+<h4 class="my-3">{{ 'Sửa kế hoạch #' ~ plan.id if plan else 'Lập kế hoạch chuyến hàng' }}</h4>
+<p class="text-muted">Nhập ngày dự kiến. Thông tin thực tế từ phơi được hiển thị riêng để đối chiếu.</p>
+{% if error %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endif %}
+<form method="post" id="planning-form" class="card card-body">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+{% if plan %}<input type="hidden" name="version" value="{{ form.get('version', plan.version) }}">{% endif %}
+<div class="row g-3">
+  <div class="col-12 col-md-6"><label for="truck_id" class="form-label">Xe *</label><select class="form-select" id="truck_id" name="truck_id" required><option value="">Chọn xe</option>{% for truck in trucks %}{% if (truck.is_active or (plan and plan.truck_id == truck.id)) and (not plan or truck.manager_id == plan.manager_id) %}<option value="{{ truck.id }}" data-manager-id="{{ truck.manager_id or '' }}" {% if value('truck_id')|string == truck.id|string %}selected{% endif %}>{{ truck.license_plate }}</option>{% endif %}{% endfor %}</select></div>
+  <div class="col-12 col-md-6"><label for="driver_id" class="form-label">Tài xế dự kiến</label><select class="form-select" id="driver_id" name="driver_id"><option value="">Chưa phân công</option>{% for driver in drivers %}{% if driver.is_active or (plan and plan.driver_id == driver.id) %}<option value="{{ driver.id }}" data-manager-id="{{ driver.manager_id or '' }}" {% if value('driver_id')|string == driver.id|string %}selected{% endif %}>{{ driver.full_name }}</option>{% endif %}{% endfor %}</select></div>
+  <div class="col-12 col-md-6"><label for="customer_id" class="form-label">Khách hàng chuyến đi</label><select class="form-select" id="customer_id" name="customer_id"><option value="">Chưa chọn khách</option>{% for customer in customers %}<option value="{{ customer.id }}" {% if value('customer_id')|string == customer.id|string %}selected{% endif %}>{{ customer.name }}</option>{% endfor %}</select></div>
+  <div class="col-12 col-md-6"><label for="cargo_description" class="form-label">Hàng chuyến đi</label><input class="form-control" name="cargo_description" id="cargo_description" maxlength="300" value="{{ value('cargo_description') }}"></div>
+  <div class="col-12 col-md-6"><label for="departure_date" class="form-label">Ngày đi dự kiến *</label><input class="form-control" name="departure_date" id="departure_date" type="date" required value="{{ value('departure_date') }}"></div>
+  <div class="col-12 col-md-6"><label for="return_date" class="form-label">Ngày về bãi dự kiến</label><input class="form-control" name="return_date" id="return_date" type="date" value="{{ value('return_date') }}"></div>
+  <div class="col-12 col-md-6"><label for="origin" class="form-label">Điểm đi *</label><input class="form-control" name="origin" id="origin" maxlength="200" required value="{{ value('origin') }}"></div>
+  <div class="col-12 col-md-6"><label for="destination" class="form-label">Điểm đến *</label><input class="form-control" name="destination" id="destination" maxlength="200" required value="{{ value('destination') }}"></div>
+  <div class="col-12"><label for="return_load_status" class="form-label">Hàng chuyến về</label><select class="form-select" name="return_load_status" id="return_load_status">{% for key, label in [('unknown', 'Chưa có thông tin hàng về'), ('loaded', 'Đã có hàng về'), ('empty', 'Dự kiến về rỗng')] %}<option value="{{ key }}" {% if value('return_load_status', 'unknown') == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  <div class="col-12" id="return-plans-section">
+    <p class="small text-muted">Có thể nhập nhiều chặng về theo thứ tự xe chạy. Tối đa 20 chặng.</p>
+    <div id="return-plans">
+    {% if form %}
+      {% for origin in form.getlist('return_origin[]') %}
+        {{ return_row({'origin': origin, 'destination': form.getlist('return_destination[]')[loop.index0]|default(''), 'customer_id': form.getlist('return_customer_id[]')[loop.index0]|default(''), 'return_date': form.getlist('return_return_date[]')[loop.index0]|default(''), 'cargo_description': form.getlist('return_cargo_description[]')[loop.index0]|default('')}) }}
+      {% endfor %}
+    {% elif plan %}{% for row in plan.return_trips %}{{ return_row(row) }}{% endfor %}{% endif %}
+    </div>
+    <button type="button" id="add-return-plan" class="btn btn-outline-primary btn-sm">+ Thêm chặng về</button>
+  </div>
+  <div class="col-12"><label for="notes" class="form-label">Ghi chú</label><textarea class="form-control" id="notes" name="notes" rows="3" maxlength="2000">{{ value('notes') }}</textarea></div>
+  {% if plan %}<div class="col-12"><label for="reason" class="form-label">Lý do sửa kế hoạch *</label><input class="form-control" id="reason" name="reason" maxlength="500" required value="{{ form.get('reason', '') }}"></div>{% endif %}
+  <div class="col-12 d-flex gap-2"><button class="btn btn-primary">Lưu kế hoạch</button><a class="btn btn-outline-secondary" href="{{ url_for('planning.detail', id=plan.id) if plan else url_for('planning.index') }}">Quay lại</a></div>
+</div>
+</form>
+<template id="return-plan-template">{{ return_row({}) }}</template>
+</div>
+{% endblock %}
+{% block extra_scripts %}<script src="{{ url_for('static', filename='js/planning.js') }}"></script>{% endblock %}

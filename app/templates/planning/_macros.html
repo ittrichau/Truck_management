@@ -1,0 +1,17 @@
+{% macro day(value) -%}{{ value[8:10] ~ '/' ~ value[5:7] ~ '/' ~ value[:4] if value else 'Chưa ghi nhận' }}{%- endmacro %}
+{% macro status_badge(status, label) -%}
+<span class="badge text-wrap {{ 'bg-danger' if status == 'review' else 'bg-success' if status == 'matched' else 'bg-info text-dark' if status == 'reviewed' else 'bg-secondary' }}">{{ label }}</span>
+{%- endmacro %}
+{% macro trip(data) %}
+<strong>{{ data.truck_name }}</strong> · {{ data.driver_name or 'Chưa phân tài xế' }}<br>
+{{ data.customer_name or 'Chưa chọn khách' }} · {{ data.origin }} → {{ data.destination }}<br>
+<span class="text-muted">{{ data.cargo_description or 'Chưa ghi hàng' }}</span><br>
+<span>Đi {{ day(data.departure_date) }} · Về {{ day(data.return_date) }}</span>
+{% if data.return_trips %}
+<div class="small mt-1">{% for leg in data.return_trips %}
+<div>Về {{ loop.index }}: {{ leg.customer_name or 'Chưa chọn khách' }} · {{ leg.origin }} → {{ leg.destination }} · {{ day(leg.return_date) }}{% if leg.cargo_description %} · {{ leg.cargo_description }}{% endif %}</div>
+{% endfor %}</div>
+{% else %}
+<div class="small text-muted">{{ 'Về rỗng (dự kiến)' if data.return_load_status == 'empty' else 'Chưa khai báo hàng về' }}</div>
+{% endif %}
+{% endmacro %}

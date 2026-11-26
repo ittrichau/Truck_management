@@ -6,6 +6,7 @@ from app.models import ActivityLog, Phoi, PhoiAttachment, PhoiExpense, PhoiRetur
 from app.phoi_attachments import attachment_path, delete_attachment_file, save_phoi_attachment
 from app.phoi_repair_expenses import _sync_standard_expenses, _sync_repair_expenses, _save_repair_receipts
 from app.phoi_other_expenses import sync_other_expense
+from app.trip_planning import sync_after_phoi_commit
 from datetime import datetime, date
 from decimal import Decimal, InvalidOperation
 
@@ -846,6 +847,7 @@ def edit(id):
             update_truck_status(old_truck)
             update_truck_status(truck)
             db.session.commit()
+            sync_after_phoi_commit(phoi.id, current_user.id)
             flash(f'Đã cập nhật phơi {phoi.phoi_number}.', 'success')
             return redirect(url_for('phoi.detail', id=id))
 
@@ -934,6 +936,7 @@ def cancel(id):
         flash('Không thể hủy phơi. Vui lòng thử lại.', 'danger')
         return redirect(url_for('phoi.detail', id=id))
 
+    sync_after_phoi_commit(phoi.id, current_user.id)
     if was_confirmed:
         _delete_phoi_attachment_files(deleted_receipt_keys)
     if was_confirmed:
@@ -972,6 +975,7 @@ def submit(id):
     phoi.status = 'submitted'
     update_truck_status(phoi.truck)
     db.session.commit()
+    sync_after_phoi_commit(phoi.id, current_user.id)
     flash(f'Đã chốt phơi {phoi.phoi_number}; đang chờ quản lý xác nhận.', 'success')
     return redirect(url_for('phoi.detail', id=id))
 

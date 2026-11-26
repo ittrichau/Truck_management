@@ -1,0 +1,27 @@
+.planning-page { max-width: 1500px; margin: auto; }
+.planning-page .planning-table-wrap { overflow-x: auto; }
+.planning-table { min-width: 900px; }
+.planning-table td, .planning-table th { padding: 1rem; vertical-align: top; }
+.planning-table td { max-width: 360px; overflow-wrap: anywhere; }
+.planning-table thead th { background: #f1f5fb; font-size: .85rem; }
+.planning-compare { min-width: 580px; }
+.planning-compare td { white-space: pre-line; overflow-wrap: anywhere; max-width: 420px; }
+.planning-page .form-control, .planning-page .form-select { min-width: 0; }
+.planning-history pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; }
+.planning-reason { max-width: 650px; }
+.return-plan-row .form-label { display: block; }
+.planning-calendar-scroll { overflow-x: auto; padding-bottom: .5rem; }
+.planning-calendar { min-width: var(--calendar-width); }
+.planning-calendar-line { display: grid; grid-template-columns: 190px 1fr; border-top: 1px solid #e9edf2; }
+.planning-calendar-label { padding: .65rem; position: sticky; left: 0; z-index: 2; background: #fff; border-right: 1px solid #e9edf2; overflow-wrap: anywhere; }
+.planning-calendar-days, .planning-calendar-tracks { display: grid; grid-template-columns: repeat(var(--days), minmax(38px, 1fr)); }
+.planning-calendar-day { font-size: .72rem; text-align: center; padding: .65rem 0; border-right: 1px solid #e9edf2; background: #f1f5fb; }
+.planning-calendar-tracks { grid-template-rows: 27px 27px; gap: 3px 0; padding: 5px 0; background-image: repeating-linear-gradient(to right, transparent, transparent calc(100% / var(--days) - 1px), #eef1f5 calc(100% / var(--days) - 1px), #eef1f5 calc(100% / var(--days))); }
+.planning-calendar-bar { border-radius: 4px; padding: 3px 6px; margin: 0 1px; font-size: .75rem; white-space: nowrap; overflow: hidden; text-decoration: none; border: 1px solid #96b7e7; }
+.planning-calendar-bar.planned { background: #dce9fb; color: #164577; }
+.planning-calendar-bar.actual { background: #185abc; color: white; border-color: #185abc; }
+.planning-calendar-bar.unknown { border: 2px dashed #8f6910; }
+@media (max-width: 767px) {
+  .planning-page h4 { font-size: 1.2rem; }
+  .planning-table td, .planning-table th { padding: .75rem; }
+}

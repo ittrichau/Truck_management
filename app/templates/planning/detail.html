@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% from 'planning/_macros.html' import day, trip, status_badge %}
+{% block title %}Kế hoạch #{{ plan.id }}{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/planning.css') }}">{% endblock %}
+{% block content %}
+{% macro action_fields(operation) %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="version" value="{{ plan.version }}">{% if operation %}<input type="hidden" name="action" value="{{ operation }}">{% endif %}{% endmacro %}
+<div class="planning-page">
+<a class="small" href="{{ url_for('planning.index') }}">← Kế hoạch chuyến hàng</a>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 my-3"><div><h4 class="mb-2">Kế hoạch #{{ plan.id }} · {{ planned.truck_name }}</h4>{{ status_badge(status, label) }}</div>{% if not plan.is_cancelled %}<a class="btn btn-outline-primary" href="{{ url_for('planning.edit', id=plan.id) }}">Sửa kế hoạch</a>{% endif %}</div>
+{% if phoi and not plan.phoi_id %}<div class="alert alert-info">Phơi gợi ý chưa được liên kết. Chọn “Liên kết phơi” để xác nhận, hoặc “Đồng bộ lại” nếu phơi đã chốt và khớp duy nhất.</div>{% endif %}
+{% if phoi and phoi.status == 'draft' %}<div class="alert alert-warning">Phơi chưa chốt. Thông tin thực tế đang là tạm thời và chưa thể xác nhận đối soát.</div>{% endif %}
+{% if plan.phoi_id and phoi and phoi.truck.manager_id != plan.manager_id %}<div class="alert alert-danger">Phơi đã chuyển quản lý. Cần kiểm tra lại liên kết.</div>{% endif %}
+<div class="row g-3 mb-3">
+<div class="col-12 col-lg-6"><div class="card h-100"><div class="card-header">Kế hoạch hiện tại</div><div class="card-body">{{ trip(planned) }}{% if plan.notes %}<div class="mt-3 text-muted">{{ plan.notes }}</div>{% endif %}</div></div></div>
+<div class="col-12 col-lg-6"><div class="card h-100"><div class="card-header">Thực tế từ phơi</div><div class="card-body">{% if actual %}{{ trip(actual) }}<div class="mt-3"><a href="{{ url_for('phoi.detail', id=phoi.id) }}">Mở phơi {{ phoi.phoi_number }}</a>{% if actual.cancelled %}<span class="badge bg-danger ms-2">Phơi đã hủy</span>{% endif %}</div>{% if not actual.return_trips %}<p class="small text-muted mt-2 mb-0">Phơi chưa có chặng hàng về; thông tin này chưa đủ để xác nhận xe về rỗng.</p>{% endif %}{% else %}<p class="text-muted mb-0">Chưa có phơi liên kết hoặc chưa xác định được một phơi phù hợp duy nhất.</p>{% endif %}</div></div></div>
+</div>
+{% if differences %}
+<div class="card mb-3"><div class="card-header">Các thông tin khác biệt</div><div class="table-responsive planning-table-wrap"><table class="table mb-0 planning-compare"><thead><tr><th>Thông tin</th><th>Kế hoạch</th><th>Thực tế</th></tr></thead><tbody>{% for item in differences %}<tr><th>{{ item.label }}</th><td>{{ item.planned }}</td><td class="text-danger">{{ item.actual }}</td></tr>{% endfor %}</tbody></table></div></div>
+{% endif %}
+{% if not plan.is_cancelled %}
+<div class="card card-body mb-3">
+<h5>Xử lý đối soát</h5>
+{% if plan.phoi_id and phoi and phoi.status in ('submitted', 'confirmed') and not actual.cancelled %}
+<form method="post" action="{{ url_for('planning.action', id=plan.id) }}" class="mb-3">
+{{ action_fields('') }}
+<input type="hidden" name="actual_signature" value="{{ actual_signature }}">
+<label class="form-label" for="review-reason">Lý do / ghi chú kiểm tra *</label><input class="form-control planning-reason mb-2" id="review-reason" name="reason" required maxlength="500" placeholder="Ví dụ: Khách lùi lịch lấy hàng một ngày">
+<div class="d-flex flex-wrap gap-2"><button type="submit" class="btn btn-primary" name="action" value="accept">Cập nhật kế hoạch theo thực tế</button><button type="submit" class="btn btn-outline-secondary" name="action" value="review">Đã kiểm tra, giữ kế hoạch</button></div>
+<p class="small text-muted mt-2 mb-0">Lịch ban đầu vẫn được giữ trong lịch sử. Thao tác chỉ cập nhật kế hoạch quản lý.</p>
+</form>
+{% endif %}
+<form method="post" action="{{ url_for('planning.action', id=plan.id) }}">{{ action_fields('sync') }}<button class="btn btn-outline-primary btn-sm">Đồng bộ lại từ phơi</button></form>
+</div>
+<details class="card mb-3"><summary class="card-header">{{ 'Thay đổi liên kết phơi' if plan.phoi_id else 'Liên kết phơi' }}</summary><div class="card-body">
+<p class="small text-muted">Gợi ý tự ghép: cùng xe, cùng khách, ngày đi lệch tối đa 7 ngày và khớp duy nhất ở cả hai phía. Có nhiều khả năng thì quản lý chọn bên dưới.</p>
+{% if suggestions %}<p class="small">Phơi gợi ý: {% for item in suggestions %}{{ item.phoi_number }} ({{ item.departure_date.strftime('%d/%m/%Y') }}){{ ', ' if not loop.last else '' }}{% endfor %}</p>{% endif %}
+<form method="post" action="{{ url_for('planning.action', id=plan.id) }}">{{ action_fields('link') }}
+<label class="form-label" for="phoi_id">Chọn phơi cùng quản lý</label><select class="form-select mb-2" id="phoi_id" name="phoi_id" required><option value="">Chọn phơi</option>{% for item in available %}<option value="{{ item.id }}" {% if plan.phoi_id == item.id %}selected{% endif %}>{{ item.phoi_number }} · {{ item.truck.license_plate }} · {{ item.customer.name if item.customer else 'Chưa có khách' }} · {{ item.departure_date.strftime('%d/%m/%Y') }}</option>{% endfor %}</select>
+<label class="form-label" for="link-reason">Lý do liên kết *</label><input class="form-control mb-2 planning-reason" id="link-reason" name="reason" required maxlength="500"><button class="btn btn-outline-primary btn-sm">Liên kết phơi</button>
+</form>
+{% if plan.phoi_id %}<form method="post" action="{{ url_for('planning.action', id=plan.id) }}" class="mt-3">{{ action_fields('unlink') }}<label class="form-label" for="unlink-reason">Lý do gỡ liên kết *</label><input class="form-control mb-2 planning-reason" id="unlink-reason" name="reason" required maxlength="500"><button class="btn btn-outline-danger btn-sm">Gỡ liên kết</button></form>{% endif %}
+</div></details>
+<details class="card mb-3"><summary class="card-header">Hủy kế hoạch</summary><div class="card-body"><form method="post" action="{{ url_for('planning.action', id=plan.id) }}">{{ action_fields('cancel') }}<label class="form-label" for="cancel-reason">Lý do hủy *</label><input class="form-control planning-reason mb-2" id="cancel-reason" name="reason" required maxlength="500"><button class="btn btn-outline-danger btn-sm">Hủy kế hoạch</button><p class="small text-muted mt-2 mb-0">Hủy kế hoạch không hủy phơi tài xế.</p></form></div></details>
+{% endif %}
+<details class="card mb-3"><summary class="card-header">Kế hoạch ban đầu</summary><div class="card-body">{{ trip(plan.original_data) }}</div></details>
+<div class="card planning-history"><div class="card-header">Lịch sử thay đổi</div><div class="card-body">
+{% for entry in plan.history %}<details class="border-bottom mb-2 pb-2"><summary><strong>{{ {'create': 'Lập kế hoạch', 'edit': 'Sửa kế hoạch', 'link': 'Liên kết phơi', 'unlink': 'Gỡ liên kết', 'sync': 'Đồng bộ thực tế', 'accept': 'Cập nhật theo thực tế', 'review': 'Đã kiểm tra', 'cancel': 'Hủy kế hoạch'}.get(entry.action, entry.action) }}</strong> · {{ entry.actor.full_name if entry.actor else 'Hệ thống' }}<span class="small text-muted"> · {{ entry.created_at.strftime('%d/%m/%Y') }}</span></summary><p class="my-2">{{ entry.reason }}</p><div class="row g-2">{% if entry.before_data %}<div class="col-12 col-lg-6"><div class="small text-muted">Trước</div>{{ trip(entry.before_data) }}<div class="small mt-1">Liên kết phơi: {{ entry.before_data.phoi_id or 'Chưa có' }}</div>{% if entry.before_data.actual_data %}<details class="small mt-1"><summary>Thực tế trước</summary>{{ trip(entry.before_data.actual_data) }}</details>{% endif %}</div>{% endif %}<div class="col-12 col-lg-6"><div class="small text-muted">Sau</div>{{ trip(entry.after_data) }}<div class="small mt-1">Liên kết phơi: {{ entry.after_data.phoi_id or 'Chưa có' }}</div>{% if entry.after_data.actual_data %}<details class="small mt-1"><summary>Thực tế sau</summary>{{ trip(entry.after_data.actual_data) }}</details>{% endif %}</div></div></details>{% endfor %}
+</div></div>
+</div>
+{% endblock %}

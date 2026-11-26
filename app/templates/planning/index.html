@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% from 'planning/_macros.html' import day, trip, status_badge %}
+{% block title %}Kế hoạch chuyến hàng{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/planning.css') }}">{% endblock %}
+{% block content %}
+<div class="planning-page">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div><h4 class="mb-1">Kế hoạch chuyến hàng</h4><p class="text-muted mb-0">Theo dõi lịch xe và đối chiếu với phơi thực tế.</p></div>
+  <a class="btn btn-primary" href="{{ url_for('planning.create') }}"><i class="bi bi-plus-lg"></i> Lập kế hoạch</a>
+</div>
+<form method="get" class="card card-body mb-3" id="planning-filters">
+<div class="row g-2">
+  <div class="col-6 col-lg-2"><label class="form-label" for="start_date">Từ ngày</label><input class="form-control" id="start_date" name="start_date" type="date" required value="{{ filters.get('start_date', '') }}"></div>
+  <div class="col-6 col-lg-2"><label class="form-label" for="end_date">Đến ngày</label><input class="form-control" id="end_date" name="end_date" type="date" required value="{{ filters.get('end_date', '') }}"></div>
+  <div class="col-6 col-lg-2"><label class="form-label" for="truck_id">Xe</label><select class="form-select" name="truck_id" id="truck_id"><option value="">Tất cả xe</option>{% for truck in trucks %}<option value="{{ truck.id }}" {% if filters.get('truck_id')|string == truck.id|string %}selected{% endif %}>{{ truck.license_plate }}{{ ' · Ngừng hoạt động' if not truck.is_active else '' }}</option>{% endfor %}</select></div>
+  <div class="col-6 col-lg-2"><label class="form-label" for="driver_id">Tài xế</label><select class="form-select" name="driver_id" id="driver_id"><option value="">Tất cả tài xế</option>{% for driver in drivers %}<option value="{{ driver.id }}" {% if filters.get('driver_id')|string == driver.id|string %}selected{% endif %}>{{ driver.full_name }}</option>{% endfor %}</select></div>
+  <div class="col-6 col-lg-2"><label class="form-label" for="customer_id">Khách đi / về</label><select class="form-select" name="customer_id" id="customer_id"><option value="">Tất cả khách</option>{% for customer in customers %}<option value="{{ customer.id }}" {% if filters.get('customer_id')|string == customer.id|string %}selected{% endif %}>{{ customer.name }}</option>{% endfor %}</select></div>
+  <div class="col-6 col-lg-2"><label class="form-label" for="status">Đối soát</label><select class="form-select" name="status" id="status">{% for value, label in [('', 'Tất cả'), ('planned', 'Đã lập kế hoạch'), ('running', 'Phơi chưa chốt'), ('matched', 'Khớp thực tế'), ('review', 'Cần kiểm tra'), ('reviewed', 'Đã kiểm tra'), ('cancelled', 'Đã hủy kế hoạch'), ('outside', 'Phơi chưa liên kết')] %}<option value="{{ value }}" {% if filters.get('status') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  <div class="col-12 col-lg-8"><label class="form-label" for="q">Tìm kiếm</label><input class="form-control" id="q" name="q" maxlength="200" value="{{ filters.get('q', '') }}" placeholder="Xe, khách hàng, tuyến, hàng hóa…"></div>
+  <div class="col-12 col-lg-4 d-flex align-items-end justify-content-end gap-2"><a class="btn btn-outline-secondary" href="{{ url_for('planning.index') }}">Xóa lọc</a><button class="btn btn-primary">Lọc</button></div>
+</div>
+</form>
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% else %}
+<div class="d-flex justify-content-between align-items-center mb-2"><strong>{{ total }} kế hoạch</strong><span class="small text-muted">Ngày về trống: chưa rõ ngày về</span></div>
+{% if rows %}
+<details class="card mb-3" open>
+<summary class="card-header">Lịch theo ngày · Kế hoạch và thực tế</summary>
+<div class="card-body pb-2"><p class="small text-muted mb-2">Mỗi dòng là một vòng xe. Thanh nhạt là kế hoạch, thanh đậm là thực tế từ phơi. Viền nét đứt: chưa rõ ngày về. Cuộn ngang để xem các ngày.</p></div>
+<div class="planning-calendar-scroll" tabindex="0" aria-label="Lịch xe theo ngày, cuộn ngang">
+<div class="planning-calendar" style="--days: {{ days|length }}; --calendar-width: {{ 190 + days|length * 38 }}px">
+<div class="planning-calendar-line"><div class="planning-calendar-label fw-bold">Xe / vòng xe</div><div class="planning-calendar-days">{% for date in days %}<div class="planning-calendar-day">{{ date.strftime('%d/%m') }}</div>{% endfor %}</div></div>
+{% for row in rows %}
+<div class="planning-calendar-line">
+<div class="planning-calendar-label"><a href="{{ url_for('planning.detail', id=row.plan.id) }}">{{ row.planned.truck_name }} · #{{ row.plan.id }}</a><div class="small text-muted">{{ row.planned.customer_name or 'Chưa chọn khách' }}</div></div>
+<div class="planning-calendar-tracks">
+{% for bar in row.bars %}<a class="planning-calendar-bar {{ bar.kind }} {{ 'unknown' if bar.unknown else '' }}" style="grid-column: {{ bar.start }} / {{ bar.end }}; grid-row: {{ 1 if bar.kind == 'planned' else 2 }}" href="{{ url_for('planning.detail', id=row.plan.id) }}" title="{{ bar.label }}: {{ day(row[bar.kind].departure_date) }} → {{ day(row[bar.kind].return_date) }}">{{ bar.label }}</a>{% endfor %}
+</div></div>
+{% endfor %}
+</div></div>
+</details>
+<div class="table-responsive planning-table-wrap card mb-3">
+<table class="table align-middle mb-0 planning-table"><thead><tr><th>Kế hoạch quản lý</th><th>Thực tế từ phơi</th><th>Đối soát & lịch tiếp</th><th></th></tr></thead><tbody>
+{% for row in rows %}<tr>
+<td><div class="small text-muted mb-1">Kế hoạch #{{ row.plan.id }}</div>{{ trip(row.planned) }}</td>
+<td>{% if row.actual %}{{ trip(row.actual) }}<div class="mt-1"><a href="{{ url_for('phoi.detail', id=row.phoi.id) }}">{{ row.phoi.phoi_number }}</a>{% if not row.plan.phoi_id %}<span class="small text-muted"> · Gợi ý, chưa liên kết</span>{% endif %}</div>{% else %}<span class="text-muted">Chưa liên kết phơi</span>{% if row.planned.departure_date <= today and not row.plan.is_cancelled %}<div class="text-warning-emphasis small">Đã đến ngày đi · Cần cập nhật tình hình</div>{% endif %}{% endif %}</td>
+<td>{{ status_badge(row.status, row.label) }}
+{% if row.differences %}<div class="small mt-2">Khác: {{ row.differences|map(attribute='label')|join(', ') }}</div>{% endif %}
+{% if row.gap is not none %}<div class="small mt-2">{% if row.gap < 0 %}<span class="text-danger">Chuyến tiếp bắt đầu trước ngày về {{ -row.gap }} ngày</span>{% elif row.gap == 0 %}Về và đi tiếp cùng ngày{% else %}Cách chuyến tiếp {{ row.gap }} ngày{% endif %}</div>{% endif %}
+{% for warning in row.warnings %}<div class="small text-danger mt-1">{{ warning }}</div>{% endfor %}
+{% if row.actual and not row.actual.return_date and row.planned.return_date and row.planned.return_date < today and not row.plan.is_cancelled %}<div class="small text-warning-emphasis mt-1">Quá ngày về dự kiến · Cần cập nhật tình hình</div>{% endif %}
+</td><td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('planning.detail', id=row.plan.id) }}">Kiểm tra</a></td>
+</tr>{% endfor %}</tbody></table></div>
+{% else %}<div class="card card-body text-center text-muted py-4 mb-3">Chưa có kế hoạch phù hợp với bộ lọc.</div>{% endif %}
+{% if pages > 1 %}<nav aria-label="Trang kế hoạch" class="d-flex gap-2 align-items-center mb-3">{% if page > 1 %}<a class="btn btn-outline-secondary btn-sm" href="{{ url_for('planning.index', **dict(pagination, page=page-1)) }}">Trước</a>{% endif %}<span>Trang {{ page }} / {{ pages }}</span>{% if page < pages %}<a class="btn btn-outline-secondary btn-sm" href="{{ url_for('planning.index', **dict(pagination, page=page+1)) }}">Sau</a>{% endif %}</nav>{% endif %}
+{% if outside %}
+<div class="card"><div class="card-header">{{ outside|length }} phơi chưa liên kết kế hoạch</div><div class="card-body">
+<p class="small text-muted">Có thể là chuyến phát sinh, chưa lập kế hoạch hoặc chưa xác định được liên kết. Mở kế hoạch để chọn đúng phơi.</p>
+<div class="row g-3">{% for item in outside %}<div class="col-12 col-lg-6"><div class="border rounded p-3 h-100"><a class="fw-bold" href="{{ url_for('phoi.detail', id=item.phoi.id) }}">{{ item.phoi.phoi_number }}</a> <span class="badge bg-warning text-dark">{{ 'Phơi chưa chốt' if item.phoi.status == 'draft' else 'Phơi đã chốt' }}</span><div class="small mt-2">{{ trip(item.actual) }}</div></div></div>{% endfor %}</div>
+</div></div>
+{% endif %}
+{% endif %}
+</div>
+{% endblock %}
