@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from 'phoi/_other_expense_fields.html' import other_expense_fields %}
+{% from 'phoi/_cargo_items.html' import cargo_editor with context %}
 {% block title %}Tạo Phơi Mới{% endblock %}
 {% block extra_head %}
 <script>
@@ -31,7 +32,7 @@ async function onCustomerChange(select) {
     <h5 class="mb-1"><i class="bi bi-plus-circle"></i> Tạo Phơi Đang Thực Hiện</h5>
     <p class="text-muted small mb-3">Chuyến về không bắt buộc. Cần ghi nhận ít nhất một lần đổ dầu và nhập KM cuối trước khi chốt phơi.</p>
     
-    <form method="POST" id="phoi-form" enctype="multipart/form-data" class="warn-unsaved-changes">
+    <form method="POST" id="phoi-form" enctype="multipart/form-data" class="warn-unsaved-changes" data-cargo-manager="{{ current_user.is_manager_or_admin()|tojson }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <!-- 📋 CHỌN HÀNG -->
@@ -43,7 +44,7 @@ async function onCustomerChange(select) {
                     <select class="form-select" name="customer_id" onchange="onCustomerChange(this)">
                         <option value="">-- Chọn (nếu có) --</option>
                         {% for c in customers %}
-                        <option value="{{ c.id }}">{{ c.name }} ({{ c.cargo_type or '...' }})</option>
+                        <option value="{{ c.id }}" data-cargo="{{ c.cargo_type or '' }}">{{ c.name }} ({{ c.cargo_type or '...' }})</option>
                         {% endfor %}
                     </select>
                     <small class="text-muted">Chọn hàng sẽ tự điền điểm đi/đến</small>
@@ -182,6 +183,8 @@ async function onCustomerChange(select) {
         </div>
         {% endif %}
 
+        {{ cargo_editor() }}
+
         <!-- 💸 CHI PHÍ -->
         <span class="section-title collapsible-section-title" data-collapse-target="trip-expenses-section" role="button" tabindex="0" aria-controls="trip-expenses-section" aria-expanded="true"><i class="bi bi-receipt"></i> Chi phí chuyến <i class="bi bi-chevron-up section-toggle-icon" aria-hidden="true"></i></span>
         <div class="card mb-3" id="trip-expenses-section">
@@ -240,6 +243,7 @@ async function onCustomerChange(select) {
             <a href="{{ url_for('phoi.index') }}" class="btn btn-outline-secondary" style="border-radius:12px;">Hủy</a>
         </div>
     </form>
+    <template id="cargo-editor-template">{{ cargo_editor(returning=true) }}</template>
 </div>
 
 {% endif %}
@@ -247,6 +251,7 @@ async function onCustomerChange(select) {
 {% block extra_scripts %}
 <script src="{{ url_for('static', filename='js/phoi_driver_advance.js') }}"></script>
 <script src="{{ url_for('static', filename='js/phoi_other_expenses.js') }}"></script>
+<script src="{{ url_for('static', filename='js/phoi_cargo.js') }}"></script>
 <script>
 // Set default date to today
 document.addEventListener('DOMContentLoaded', function() {
@@ -356,6 +361,7 @@ function addReturnTrip(values = {}) {
                 <div class="col-12"><label class="form-label">Ảnh phiếu cân</label><input type="file" data-return-ticket-upload class="form-control form-control-sm" name="return_trip_weigh_ticket_images_${number - 1}" accept="image/jpeg,image/png,image/webp" multiple><small class="text-muted">Tối đa 5 ảnh.</small></div>
                 <div class="col-12" data-payment-calculator><label class="form-label">Cách tính tiền *</label><select name="return_trip_payment_method[]" class="form-select form-select-sm payment-method"><option value="fixed" ${values.paymentMethod === 'per_ton' ? '' : 'selected'}>Bao chuyến — tiền cố định</option><option value="per_ton" ${values.paymentMethod === 'per_ton' ? 'selected' : ''}>Theo tấn — số tấn × giá/tấn</option></select><div class="row g-2 mt-1"><div class="col-6 fixed-revenue-field"><label class="form-label">Tiền bao chuyến (VNĐ)</label><input type="text" name="return_trip_revenue_full[]" class="form-control form-control-sm currency-input calculated-revenue" inputmode="numeric" value="${values.revenueFull || ''}"></div><div class="col-6 per-ton-field d-none"><label class="form-label">Số tấn</label><input type="text" name="return_trip_cargo_weight_tons[]" class="form-control form-control-sm cargo-weight" inputmode="numeric" autocomplete="off" placeholder="Ví dụ: 18.500" value="${values.cargoWeightTons || ''}"><div class="invalid-feedback">Số tấn phải từ 1.000 đến 99.999 tấn (1.000 - 99.999 kg).</div></div><div class="col-6 per-ton-field d-none"><label class="form-label">Giá 1 tấn (VNĐ)</label><input type="text" name="return_trip_price_per_ton[]" class="form-control form-control-sm currency-input price-per-ton" inputmode="numeric" value="${values.pricePerTon || ''}"></div></div></div>
                 <div class="col-6"><label class="form-label">Đã thu tạm (VNĐ)</label><input type="text" name="return_trip_revenue_collected[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="${values.revenueCollected || ''}"></div>
+                {{ cargo_editor(returning=true) }}
                 <div class="col-12"><label class="form-label">Tiền bốc vác <small class="text-muted">(tài xế ứng trước)</small></label><input type="text" name="return_trip_porter_fee[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="${values.porterFee || '0'}"></div>
                 {{ other_expense_fields(true) }}
                 <div class="col-12"><label class="form-label">Ghi chú</label><input type="text" name="return_trip_notes[]" class="form-control form-control-sm" value="${values.notes || ''}"></div>

@@ -222,12 +222,12 @@ def actual_from_phoi(phoi):
         'customer_id': phoi.customer_id, 'customer_name': phoi.customer.name if phoi.customer else '',
         'departure_date': iso(phoi.departure_date), 'return_date': iso(phoi.return_date),
         'origin': phoi.origin, 'destination': phoi.destination,
-        'cargo_description': phoi.cargo_description or '',
+        'cargo_description': phoi.cargo_summary(),
         'return_load_status': 'loaded' if phoi.return_trips.count() else 'unknown',
         'return_trips': [{
             'customer_id': trip.customer_id, 'customer_name': trip.customer.name if trip.customer else '',
             'return_date': iso(trip.return_date), 'origin': trip.origin,
-            'destination': trip.destination, 'cargo_description': trip.cargo_description or '',
+            'destination': trip.destination, 'cargo_description': trip.cargo_summary(),
         } for trip in phoi.return_trips.all()],
         'cancelled': phoi.status == 'cancelled',
     }

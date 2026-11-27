@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'phoi/_cargo_items.html' import cargo_details %}
 {% block title %}{{ phoi.phoi_number }} - Chi tiết Phơi{% endblock %}
 {% block content %}
 
@@ -90,14 +91,17 @@
                 <div class="col-6"><small class="text-muted">Ngày về</small><br><strong>{{ phoi.return_date.strftime('%d/%m/%Y') if phoi.return_date else '--' }}</strong></div>
                 <div class="col-6"><small class="text-muted">Điểm đi</small><br><strong>{{ phoi.origin }}</strong></div>
                 <div class="col-6"><small class="text-muted">Điểm đến</small><br><strong>{{ phoi.destination }}</strong></div>
+                {% if not phoi.additional_cargo() %}
                 <div class="col-12"><small class="text-muted">Hàng hóa</small><br><strong>{{ phoi.cargo_description or '--' }}</strong></div>
                 {% if phoi.customer %}
                 <div class="col-12"><small class="text-muted">Khách hàng</small><br><strong>{{ phoi.customer.name }}</strong></div>
+                {% endif %}
                 {% endif %}
                 {% for expense in phoi.expenses.filter_by(category='other', return_trip_id=none).all() %}
                 <div class="col-12"><strong>Chi phí khác chuyến đi (tài xế ứng): {{ '{:,.0f}'.format(expense.amount) }} VNĐ</strong><br>{{ expense.description }}</div>
                 {% endfor %}
             </div>
+            {{ cargo_details(phoi, current_user.is_manager_or_admin()) }}
             <hr>
             <div class="row g-2">
                 <div class="col-6"><small class="text-muted">KM cuối (sau khi về)</small><br><strong>{{ phoi.km_end or '--' }}</strong></div>
@@ -114,8 +118,11 @@
             <div class="p-3 {% if not loop.last %}border-bottom{% endif %}">
                 <div class="d-flex justify-content-between"><strong>Chuyến về #{{ trip.trip_order }}</strong><small class="text-muted">{{ trip.return_date.strftime('%d/%m/%Y') if trip.return_date else 'Chưa có ngày' }}</small></div>
                 <div><i class="bi bi-geo-alt"></i> {{ trip.origin }} → {{ trip.destination }}</div>
+                {% if not trip.additional_cargo() %}
                 <div class="small text-muted">Hàng: {{ trip.cargo_description or '--' }}{% if current_user.is_manager_or_admin() %} · Full: {{ '{:,.0f}'.format(trip.revenue_full) }} VNĐ{% if trip.payment_method == 'per_ton' %} · {{ trip.cargo_weight_tons }} tấn × {{ '{:,.0f}'.format(trip.price_per_ton or 0) }} VNĐ/tấn{% else %} · Bao chuyến{% endif %}{% endif %}</div>
                 <div class="small mt-1"><strong>Khối lượng:</strong> {{ trip.cargo_weight_tons or '--' }} tấn</div>
+                {% endif %}
+                {{ cargo_details(trip, current_user.is_manager_or_admin()) }}
                 {% if trip.porter_fee %}
                 <div class="small mt-1 text-warning"><strong>Bồi dưỡng bốc vác (tài xế đã ứng):</strong> {{ '{:,.0f}'.format(trip.porter_fee) }} VNĐ</div>
                 {% endif %}
@@ -212,11 +219,11 @@
         <div class="card-header">💰 Tài chính chuyến đi</div>
         <div class="card-body">
             <table class="table table-sm table-borderless mb-0">
-                <tr><td>Doanh thu chuyến đi{% if phoi.payment_method == 'per_ton' %}<br><small class="text-muted">{{ phoi.cargo_weight_tons }} tấn × {{ '{:,.0f}'.format(phoi.price_per_ton or 0) }} VNĐ/tấn</small>{% else %}<br><small class="text-muted">Bao chuyến</small>{% endif %}</td><td class="text-end fw-bold">{{ '{:,.0f}'.format(phoi.revenue_full) }} VNĐ</td></tr>
-                <tr><td>Doanh thu các chuyến về</td><td class="text-end">{{ '{:,.0f}'.format(phoi.total_revenue_full() - phoi.revenue_full) }} VNĐ</td></tr>
+                <tr><td>Doanh thu chuyến đi{% if phoi.additional_cargo() %}<br><small class="text-muted">Tổng cước các khách</small>{% elif phoi.payment_method == 'per_ton' %}<br><small class="text-muted">{{ phoi.cargo_weight_tons }} tấn × {{ '{:,.0f}'.format(phoi.price_per_ton or 0) }} VNĐ/tấn</small>{% else %}<br><small class="text-muted">Bao chuyến</small>{% endif %}</td><td class="text-end fw-bold">{{ '{:,.0f}'.format(phoi.trip_revenue_full()) }} VNĐ</td></tr>
+                <tr><td>Doanh thu các chuyến về</td><td class="text-end">{{ '{:,.0f}'.format(phoi.total_revenue_full() - phoi.trip_revenue_full()) }} VNĐ</td></tr>
                 <tr><td><strong>Tổng doanh thu phơi</strong></td><td class="text-end fw-bold">{{ '{:,.0f}'.format(phoi.total_revenue_full()) }} VNĐ</td></tr>
                 <tr><td>Tiền tài xế đã giữ</td><td class="text-end">{{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ</td></tr>
-                <tr><td>Tiền quản lý/chủ xe đã nhận</td><td class="text-end">{{ '{:,.0f}'.format(phoi.manager_revenue_collected + phoi.return_trips|sum(attribute='manager_revenue_collected')) }} VNĐ</td></tr>
+                <tr><td>Tiền quản lý/chủ xe đã nhận</td><td class="text-end">{{ '{:,.0f}'.format(phoi.total_manager_revenue_collected()) }} VNĐ</td></tr>
                 <tr><td colspan="2"><hr class="my-1"></td></tr>
                 <tr class="text-muted"><td colspan="2"><strong>Chi phí chuyến:</strong></td></tr>
                 {% for exp in phoi.expenses.all() %}

@@ -248,7 +248,7 @@ document.addEventListener('input', function(event) {
     }
 }, true);
 
-// Định dạng trường số tấn (1.000 -> 99.999 tấn, tương ứng 1.000 - 99.999 kg).
+// Định dạng số tấn, gồm các lô hàng ghép dưới một tấn (0.001 -> 99.999).
 // Khi nhập 12000 -> 12.000, 7000 -> 7.000. Giới hạn 1000 -> 99999.
 const weightInputNames = new Set([
     'cargo_weight_tons', 'return_trip_cargo_weight_tons[]'
@@ -275,6 +275,11 @@ function formatWeightDigits(digits) {
 }
 
 function formatWeightInput(input) {
+    // Small shared loads may be typed naturally as 0.5/0,5, then finalized as 0.500.
+    if (/^0[.,]\d{0,3}$/.test(input.value)) {
+        input.value = input.value.replace(',', '.');
+        return;
+    }
     const digits = weightDigits(input.value);
     input.value = formatWeightDigits(digits);
 }
@@ -293,7 +298,7 @@ function finalizeWeightInput(input) {
         const intPart = parts[0].replace(/\D/g, '');
         const decPart = (parts[1] || '').replace(/\D/g, '');
         const intNum = parseInt(intPart, 10) || 0;
-        if (intNum >= 1 && intNum <= 99) {
+        if (intNum >= 0 && intNum <= 99) {
             const paddedDec = (decPart + '000').slice(0, 3);
             input.value = `${intNum}.${paddedDec}`;
             validateWeightRange(input);
@@ -330,8 +335,8 @@ function validateWeightRange(input) {
     if (val >= 1000 && val <= 99999) {
         val = val / 1000;
     }
-    if (isNaN(val) || val < 1.0 || val > 99.999) {
-        input.setCustomValidity('Số tấn phải từ 1.000 đến 99.999 tấn (1.000 - 99.999 kg).');
+    if (isNaN(val) || val < 0.001 || val > 99.999) {
+        input.setCustomValidity('Số tấn phải từ 0.001 đến 99.999 tấn.');
         input.classList.add('is-invalid');
         return false;
     } else {
@@ -466,7 +471,9 @@ function syncPaymentCalculator(container) {
     const weight = container.querySelector('.cargo-weight') || document.querySelector('[name="cargo_weight_tons"]');
     if (isPerTon && revenue && price && weight) {
         const total = numericInputValue(weight) * numericInputValue(price);
-        revenue.value = total ? Math.round(total).toLocaleString('en-US') : '';
+        revenue.value = total ? (revenue.hasAttribute('data-decimal-money')
+            ? total.toLocaleString('en-US', { maximumFractionDigits: 2 })
+            : Math.round(total).toLocaleString('en-US')) : '';
     }
 }
 

@@ -81,8 +81,10 @@ def adjust_manager_collection(target, amount, expected_amount, reason, actor, ip
             'customer_name': target.customer.name if target.customer else '',
             'phoi_id': phoi.id,
             'phoi_number': phoi.phoi_number,
-            'return_trip_id': target.id if isinstance(target, PhoiReturnTrip) else None,
-            'trip_order': target.trip_order if isinstance(target, PhoiReturnTrip) else None,
+            'return_trip_id': target.id if isinstance(target, PhoiReturnTrip) else getattr(target, 'return_trip_id', None),
+            'trip_order': target.trip_order if isinstance(target, PhoiReturnTrip) else (
+                target.return_trip.trip_order if isinstance(target, PhoiCargoItem) and target.return_trip else None),
+            'cargo_item_id': target.id if isinstance(target, PhoiCargoItem) else None,
             'old_amount': str(old_amount),
             'new_amount': str(new_amount),
             'reason': reason,
@@ -317,7 +319,42 @@ class Customer(db.Model):
     def __repr__(self):
         return f'<Customer {self.name} - {self.cargo_type}>'
 
-class Phoi(db.Model):
+class CargoTripMixin:
+    """The existing trip fields remain customer #1; only customers #2/#3 are children."""
+
+    def additional_cargo(self):
+        query = self.cargo_items
+        if isinstance(self, Phoi):
+            query = query.filter_by(return_trip_id=None)
+        return query.all()
+
+    def cargo_rows(self):
+        return [self, *self.additional_cargo()]
+
+    def trip_revenue_full(self):
+        return sum((row.revenue_full or Decimal('0') for row in self.cargo_rows()), Decimal('0'))
+
+    def cargo_summary(self):
+        rows = self.cargo_rows()
+        if len(rows) == 1:
+            return self.cargo_description or ''
+        # Planning may adopt this into its existing String(300); full cargo stays on the phơi.
+        limit = (300 - 2 * (len(rows) - 1)) // len(rows)
+        parts = []
+        for row in rows:
+            part = f'{row.customer.name if row.customer else "Chưa chọn khách"}: {row.cargo_description or "Chưa ghi hàng"}'
+            parts.append(part if len(part) <= limit else part[:limit - 1] + '…')
+        return '; '.join(parts)
+
+    def cargo_form_data(self, include_manager=True):
+        rows = [row.form_data() for row in self.additional_cargo()]
+        if not include_manager:
+            for row in rows:
+                row.pop('manager_revenue_collected', None)
+        return rows
+
+
+class Phoi(CargoTripMixin, db.Model):
     __tablename__ = 'phoi'
     id = db.Column(db.Integer, primary_key=True)
     phoi_number = db.Column(db.String(20), unique=True, nullable=False)
@@ -393,6 +430,11 @@ class Phoi(db.Model):
         cascade='all, delete-orphan',
         order_by='PhoiAttachment.created_at'
     )
+    cargo_items = db.relationship(
+        'PhoiCargoItem', backref='phoi', lazy='dynamic',
+        cascade='all, delete-orphan', foreign_keys='PhoiCargoItem.phoi_id',
+        order_by='PhoiCargoItem.item_order',
+    )
     
     def attachment_count(self, attachment_type):
         return self.attachments.filter_by(attachment_type=attachment_type).count()
@@ -445,11 +487,17 @@ class Phoi(db.Model):
 
     def total_revenue_full(self):
         """Tổng doanh thu của chuyến đi và tất cả chuyến về."""
-        return self.revenue_full + sum(trip.revenue_full for trip in self.return_trips.all())
+        return sum((row.revenue_full or Decimal('0') for row in self.all_cargo_rows()), Decimal('0'))
 
     def total_revenue_collected(self):
         """Tổng tiền tài xế đã thu của chuyến đi và tất cả chuyến về."""
-        return self.revenue_collected + sum(trip.revenue_collected for trip in self.return_trips.all())
+        return sum((row.revenue_collected or Decimal('0') for row in self.all_cargo_rows()), Decimal('0'))
+
+    def all_cargo_rows(self):
+        return [self, *self.return_trips.all(), *self.cargo_items.all()]
+
+    def total_manager_revenue_collected(self):
+        return sum((row.manager_revenue_collected or Decimal('0') for row in self.all_cargo_rows()), Decimal('0'))
     
     def balance(self):
         """
@@ -480,7 +528,7 @@ class Phoi(db.Model):
     def __repr__(self):
         return f'<Phoi {self.phoi_number} [{self.status}]>'
 
-class PhoiReturnTrip(db.Model):
+class PhoiReturnTrip(CargoTripMixin, db.Model):
     """Một chuyến về thuộc một phơi; mỗi phơi có thể có nhiều chuyến về."""
     __tablename__ = 'phoi_return_trips'
     id = db.Column(db.Integer, primary_key=True)
@@ -506,6 +554,11 @@ class PhoiReturnTrip(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     customer = db.relationship('Customer', backref=db.backref('return_trips', lazy='dynamic'))
+    cargo_items = db.relationship(
+        'PhoiCargoItem', backref='return_trip', lazy='dynamic',
+        cascade='all, delete-orphan', foreign_keys='PhoiCargoItem.return_trip_id',
+        order_by='PhoiCargoItem.item_order',
+    )
     expenses = db.relationship(
         'PhoiExpense', backref='return_trip', lazy='dynamic',
         cascade='all, delete-orphan', foreign_keys='PhoiExpense.return_trip_id'
@@ -528,6 +581,34 @@ class PhoiReturnTrip(db.Model):
 
     def __repr__(self):
         return f'<PhoiReturnTrip #{self.trip_order} of phoi {self.phoi_id}>'
+
+class PhoiCargoItem(db.Model):
+    """An additional customer on an outbound or return trip (the first stays on the trip)."""
+    __tablename__ = 'phoi_cargo_items'
+    id = db.Column(db.Integer, primary_key=True)
+    phoi_id = db.Column(db.Integer, db.ForeignKey('phoi.id', ondelete='CASCADE'), nullable=False, index=True)
+    return_trip_id = db.Column(db.Integer, db.ForeignKey('phoi_return_trips.id', ondelete='CASCADE'), index=True)
+    item_order = db.Column(db.Integer, nullable=False)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False, index=True)
+    cargo_description = db.Column(db.String(300), nullable=False)
+    cargo_weight_tons = db.Column(db.Numeric(10, 3))
+    payment_method = db.Column(db.String(20), nullable=False, default='fixed')
+    price_per_ton = db.Column(db.Numeric(12, 2))
+    revenue_full = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    revenue_collected = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    manager_revenue_collected = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    customer = db.relationship('Customer')
+    __table_args__ = (
+        db.CheckConstraint('item_order BETWEEN 2 AND 3', name='ck_cargo_item_order'),
+        db.CheckConstraint("payment_method IN ('fixed', 'per_ton')", name='ck_cargo_payment_method'),
+        db.CheckConstraint('revenue_full >= 0 AND revenue_collected >= 0 AND manager_revenue_collected >= 0', name='ck_cargo_nonnegative'),
+    )
+
+    def form_data(self):
+        fields = ('id', 'customer_id', 'cargo_description', 'payment_method', 'cargo_weight_tons',
+                  'price_per_ton', 'revenue_full', 'revenue_collected', 'manager_revenue_collected')
+        return {field: str(getattr(self, field)) if getattr(self, field) is not None else '' for field in fields}
+
 
 class PhoiAttachment(db.Model):
     """Compressed image evidence attached to a phơi or a specific repair expense."""

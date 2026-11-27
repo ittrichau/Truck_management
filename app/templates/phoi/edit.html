@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from 'phoi/_other_expense_fields.html' import other_expense_fields %}
+{% from 'phoi/_cargo_items.html' import cargo_editor with context %}
 {% block title %}Sửa: {{ phoi.phoi_number }}{% endblock %}
 {% block extra_head %}
 <script>
@@ -27,7 +28,7 @@ async function onCustomerChange(select) {
     <div class="alert alert-warning py-2">Đây là bước đối soát của chủ xe. Hãy hoàn tất doanh thu/đơn giá, chi phí, phí công và tiền đã nhận từ chủ hàng trước khi xác nhận cuối cùng.</div>
     {% endif %}
 
-    <form method="POST" id="phoi-form" enctype="multipart/form-data" class="warn-unsaved-changes">
+    <form method="POST" id="phoi-form" enctype="multipart/form-data" class="warn-unsaved-changes" data-cargo-manager="{{ current_user.is_manager_or_admin()|tojson }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <span class="section-title"><i class="bi bi-fuel-pump"></i> Đổ xăng đã gắn ({{ phoi.fuel_logs|length }} lần)</span>
         <div class="card mb-3"><div class="card-body py-2">
@@ -72,7 +73,7 @@ async function onCustomerChange(select) {
             <select class="form-select" name="customer_id" onchange="onCustomerChange(this)">
                 <option value="">-- Chọn (nếu có) --</option>
                 {% for c in customers %}
-                <option value="{{ c.id }}" {% if phoi.customer_id == c.id %}selected{% endif %}>{{ c.name }} ({{ c.cargo_type or '...' }})</option>
+                <option value="{{ c.id }}" data-cargo="{{ c.cargo_type or '' }}" {% if phoi.customer_id == c.id %}selected{% endif %}>{{ c.name }} ({{ c.cargo_type or '...' }})</option>
                 {% endfor %}
             </select>
         </div></div>
@@ -137,6 +138,8 @@ async function onCustomerChange(select) {
             <small class="text-muted per-ton-field d-none">Tiền full chuyến được tự tính từ số tấn × giá 1 tấn.</small>
         </div></div>
 
+        {{ cargo_editor(phoi) }}
+
         <span class="section-title"><i class="bi bi-receipt"></i> Chi phí chuyến</span>
         <div class="card mb-3"><div class="card-body">
             {% set expenses = {} %}
@@ -180,6 +183,7 @@ async function onCustomerChange(select) {
                         <div class="col-12"><label class="form-label">Ảnh phiếu cân</label><input type="file" data-return-ticket-upload name="return_trip_weigh_ticket_images_{{ loop.index0 }}" class="form-control form-control-sm" accept="image/jpeg,image/png,image/webp" multiple><small class="text-muted">Tối đa 5 ảnh; ảnh đã tải xem ở trang chi tiết.</small></div>
                         <div class="col-12" data-payment-calculator><label class="form-label">Cách tính tiền *</label><select name="return_trip_payment_method[]" class="form-select form-select-sm payment-method"><option value="fixed" {% if trip.payment_method != 'per_ton' %}selected{% endif %}>Bao chuyến — tiền cố định</option><option value="per_ton" {% if trip.payment_method == 'per_ton' %}selected{% endif %}>Theo tấn — số tấn × giá/tấn</option></select><div class="row g-2 mt-1"><div class="col-6 fixed-revenue-field"><label class="form-label">Tiền bao chuyến (VNĐ)</label><input type="text" name="return_trip_revenue_full[]" class="form-control form-control-sm currency-input calculated-revenue" inputmode="numeric" value="{{ '{:,.0f}'.format(trip.revenue_full) }}"></div><div class="col-6 per-ton-field d-none"><label class="form-label">Số tấn</label><input type="text" name="return_trip_cargo_weight_tons[]" class="form-control form-control-sm cargo-weight" inputmode="numeric" autocomplete="off" placeholder="Ví dụ: 18.500" value="{{ '{:.3f}'.format(trip.cargo_weight_tons) if trip.cargo_weight_tons is not none else '' }}"><div class="invalid-feedback">Số tấn phải từ 1.000 đến 99.999 tấn (1.000 - 99.999 kg).</div></div><div class="col-6 per-ton-field d-none"><label class="form-label">Giá 1 tấn (VNĐ)</label><input type="text" name="return_trip_price_per_ton[]" class="form-control form-control-sm currency-input price-per-ton" inputmode="numeric" value="{{ '{:,.0f}'.format(trip.price_per_ton or 0) }}"></div></div></div>
                         <div class="col-6"><label class="form-label">Tài xế đã thu (VNĐ)</label><input type="text" name="return_trip_revenue_collected[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="{{ '{:,.0f}'.format(trip.revenue_collected) }}"></div>
+                        {{ cargo_editor(trip, returning=true) }}
                         <div class="col-12"><label class="form-label">Tiền bốc vác <small class="text-muted">(tài xế ứng trước)</small></label><input type="text" name="return_trip_porter_fee[]" class="form-control form-control-sm currency-input" inputmode="numeric" value="{{ '{:,.0f}'.format(trip.porter_fee) }}"></div>
                         {{ other_expense_fields(true, trip.expenses.filter_by(category='other').first()) }}
                         <div class="col-12"><label class="form-label">Ghi chú</label><input type="text" name="return_trip_notes[]" class="form-control form-control-sm" value="{{ trip.notes or '' }}"></div>
@@ -202,11 +206,13 @@ async function onCustomerChange(select) {
             <a href="{{ url_for('phoi.detail', id=phoi.id) }}" class="btn btn-outline-secondary" style="border-radius:12px;">Hủy</a>
         </div>
     </form>
+    <template id="cargo-editor-template">{{ cargo_editor(returning=true) }}</template>
 </div>
 {% endblock %}
 {% block extra_scripts %}
 <script src="{{ url_for('static', filename='js/phoi_driver_advance.js') }}"></script>
 <script src="{{ url_for('static', filename='js/phoi_other_expenses.js') }}"></script>
+<script src="{{ url_for('static', filename='js/phoi_cargo.js') }}"></script>
 <script>
 const defaultDriverByTruck = {
     {% for truck_id, driver in driver_by_truck_id.items() %}

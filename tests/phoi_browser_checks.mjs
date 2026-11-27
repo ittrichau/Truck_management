@@ -212,6 +212,79 @@ try {
         assert.equal(checked, true);
         results.push({form: form.split(/[\\/]/).at(-1), driverAdvance: 'passed'});
     }
+    for (const sample of manifest.cargoForms || []) {
+        for (const width of [390, 1440]) {
+            await page('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: false});
+            await open(sample.html);
+            const checked = await evaluate(`(async () => {
+                const assert = (condition, label) => { if (!condition) throw new Error(label); };
+                const form = document.getElementById('phoi-form');
+                const editor = form.querySelector('[data-cargo-extras]');
+                const primary = form.querySelector('[name="customer_id"]');
+                const ids = [...primary.options].map(option => option.value).filter(Boolean);
+                assert(ids.length === 3, 'Three customer choices');
+                primary.value = ids[0];
+                document.getElementById('cargo_description').value = 'Hàng chính';
+                const primaryRevenue = form.querySelector('[name="revenue_full"]');
+                primaryRevenue.value = '1000000';
+                primaryRevenue.dispatchEvent(new Event('input', {bubbles: true}));
+                const add = editor.querySelector('[data-add-cargo]');
+                if (${sample.saved}) {
+                    assert(editor.querySelectorAll('[data-cargo-row]').length === 2, 'Restore saved cargo');
+                    assert(editor.querySelector('[data-cargo-field="cargo_weight_tons"]').value === '0.500', 'Restore fractional tons');
+                    assert(editor.querySelector('[data-cargo-field="manager_revenue_collected"]').value === '20,000', 'Restore manager collection');
+                } else {
+                    add.click(); add.click(); add.click();
+                }
+                assert(editor.querySelectorAll('[data-cargo-row]').length === 2 && add.disabled, 'Maximum three customers');
+                const rows = [...editor.querySelectorAll('[data-cargo-row]')];
+                const change = (input, value) => { input.value = value; input.dispatchEvent(new Event('change', {bubbles: true})); };
+                rows.forEach((row, index) => change(row.querySelector('select'), ids[index + 1]));
+                change(rows[0].querySelector('.payment-method'), 'per_ton');
+                change(rows[0].querySelector('.cargo-weight'), '0.500');
+                const weight = rows[0].querySelector('.cargo-weight');
+                weight.value = '0.5';
+                weight.dispatchEvent(new Event('input', {bubbles: true}));
+                weight.dispatchEvent(new Event('change', {bubbles: true}));
+                assert(weight.value === '0.500', 'Natural fractional ton entry');
+                change(rows[0].querySelector('.price-per-ton'), '300000');
+                assert(rows[0].querySelector('.calculated-revenue').value === '150,000', 'Separate freight by weight');
+                change(rows[1].querySelector('.payment-method'), 'fixed');
+                change(rows[1].querySelector('.calculated-revenue'), '300000');
+                assert(editor.querySelector('[data-cargo-total]').textContent.includes('1,450,000'), 'Trip total');
+                change(rows[1].querySelector('select'), ids[1]);
+                assert(!rows[1].querySelector('select').checkValidity(), 'Reject duplicate customer');
+                change(rows[1].querySelector('select'), ids[2]);
+                assert(rows[1].querySelector('select').checkValidity(), 'Correct duplicate');
+                const saved = JSON.parse(new FormData(form).get('cargo_items'));
+                assert(saved.length === 2 && saved[0].customer_id === ids[1], 'Serialize correct customer');
+                assert(saved[0].cargo_description === 'Hàng 2' && saved[0].cargo_weight_tons === '0.500', 'Autofill and preserve tons');
+                if (${sample.saved}) assert(saved[0].id && saved[1].id, 'Preserve saved row identity');
+                const preservedId = rows[1].dataset.id;
+                rows[0].querySelector('button').click();
+                assert(!add.disabled && editor.querySelector('[data-cargo-title]').textContent === 'Khách ghép #2', 'Remove and renumber');
+                assert(JSON.parse(new FormData(form).get('cargo_items'))[0].id === preservedId, 'Retain other row after removal');
+                addReturnTrip(); addReturnTrip();
+                await new Promise(resolve => setTimeout(resolve, 30));
+                const trips = [...document.querySelectorAll('.return-trip')];
+                assert(trips.every(trip => trip.querySelector('[data-cargo-extras]')), 'Dynamic return editors');
+                const returning = trips.at(-1);
+                const returnEditor = returning.querySelector('[data-cargo-extras]');
+                change(returning.querySelector('[name="return_trip_customer_id[]"]'), ids[0]);
+                returnEditor.querySelector('[data-add-cargo]').click();
+                const extra = returnEditor.querySelector('[data-cargo-row]');
+                change(extra.querySelector('select'), ids[1]);
+                change(extra.querySelector('.calculated-revenue'), '220000');
+                trips[trips.length - 2].remove(); renumberReturnTrips();
+                const data = new FormData(form);
+                assert(data.getAll('return_trip_cargo_items[]').length === data.getAll('return_trip_origin[]').length, 'Return arrays stay aligned');
+                assert(JSON.parse(data.getAll('return_trip_cargo_items[]').at(-1))[0].customer_id === ids[1], 'Cargo follows its return after removal');
+                return true;
+            })()`);
+            assert.equal(checked, true);
+        }
+        results.push({form: sample.html.split(/[\\/]/).at(-1), sharedCargo: 'passed', widths: [390, 1440]});
+    }
     process.stdout.write(JSON.stringify(results));
 } finally {
     await call('Target.closeTarget', {targetId});

@@ -3,7 +3,7 @@ from flask import abort
 from flask_login import current_user
 from sqlalchemy import or_, select
 
-from app.models import Customer, FuelLog, Phoi, PhoiReturnTrip, Truck, User
+from app.models import Customer, FuelLog, Phoi, PhoiReturnTrip, PhoiCargoItem, Truck, User
 
 
 def actor_or_current(actor=None):
@@ -74,7 +74,8 @@ def customers_query(actor=None, include_history=False):
         owned_phois = phois_query(actor).with_entities(Phoi.id)
         assigned = or_(assigned,
             Customer.id.in_(select(Phoi.customer_id).where(Phoi.id.in_(owned_phois))),
-            Customer.id.in_(select(PhoiReturnTrip.customer_id).where(PhoiReturnTrip.phoi_id.in_(owned_phois))))
+            Customer.id.in_(select(PhoiReturnTrip.customer_id).where(PhoiReturnTrip.phoi_id.in_(owned_phois))),
+            Customer.id.in_(select(PhoiCargoItem.customer_id).where(PhoiCargoItem.phoi_id.in_(owned_phois))))
     return Customer.query.filter(assigned)
 
 
@@ -117,6 +118,7 @@ def has_assignments(user):
 def edit_customers_query(phoi):
     """Keep a transferred trip's original selections without granting its catalog."""
     historical_ids = {phoi.customer_id} | {trip.customer_id for trip in phoi.return_trips.all()}
+    historical_ids.update(row.customer_id for row in phoi.cargo_items.all())
     historical_ids.discard(None)
     available = customers_query().filter_by(is_active=True).with_entities(Customer.id)
     return Customer.query.filter(or_(Customer.id.in_(available), Customer.id.in_(historical_ids)))

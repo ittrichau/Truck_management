@@ -16,7 +16,7 @@ from unittest.mock import patch
 from flask import g
 
 from app import create_app, db
-from app.models import FuelLog, Phoi, PhoiExpense, PhoiReturnTrip, Truck, User
+from app.models import Customer, FuelLog, Phoi, PhoiExpense, PhoiReturnTrip, PhoiCargoItem, Truck, User
 from config import TestingConfig
 
 
@@ -77,7 +77,7 @@ class PrintBrowserTests(unittest.TestCase):
                 ], text=True, capture_output=True, encoding='utf-8', timeout=90)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 checks = json.loads(result.stdout)
-                self.assertEqual(len(checks), len(manifest['prints']) + len(manifest['forms']) + len(manifest['confirmations']))
+                self.assertEqual(len(checks), len(manifest['prints']) + len(manifest['forms']) + len(manifest['confirmations']) + len(manifest['cargoForms']))
                 print('\nBrowser checks:', json.dumps(checks, ensure_ascii=True))
             finally:
                 process.terminate()
@@ -87,7 +87,7 @@ class PrintBrowserTests(unittest.TestCase):
         with patch('app.get_config', return_value=TestingConfig):
             app = create_app('testing')
         app.config.update(SECRET_KEY='print-tests', RATELIMIT_ENABLED=False)
-        manifest = {'prints': [], 'forms': [], 'confirmations': []}
+        manifest = {'prints': [], 'forms': [], 'confirmations': [], 'cargoForms': []}
 
         def save(html, name):
             # Keep local application styles/scripts; prevent CDN/network calls.
@@ -114,6 +114,8 @@ class PrintBrowserTests(unittest.TestCase):
             truck.manager_id = manager.id
             driver.manager_id = manager.id
             driver.current_truck_id = truck.id
+            customers = [Customer(name=f'Khách ghép {n}', cargo_type=f'Hàng {n}', managers=[manager]) for n in range(1, 4)]
+            db.session.add_all(customers)
             db.session.commit()
             client = app.test_client()
 
@@ -125,6 +127,7 @@ class PrintBrowserTests(unittest.TestCase):
 
             login(driver)
             manifest['forms'].append(save(client.get('/phoi/create').get_data(as_text=True), 'create-form'))
+            manifest['cargoForms'].append({'html': manifest['forms'][0], 'saved': False})
             for count, long in ((0, False), (1, False), (3, False), (5, True), (10, True), (20, True)):
                 phoi = Phoi(phoi_number=f'PRINT-{count}', driver_id=driver.id, truck_id=truck.id,
                             departure_date=date(2026, 11, 9), origin='Bến Tre', destination='Tây Ninh',
@@ -184,6 +187,34 @@ class PrintBrowserTests(unittest.TestCase):
                     db.session.add(empty)
                     db.session.commit()
                     manifest['forms'].append(save(client.get(f'/phoi/{empty.id}/edit').get_data(as_text=True), 'edit-form'))
+            shared = Phoi(phoi_number='PRINT-SHARED', driver_id=driver.id, truck_id=truck.id,
+                          customer_id=customers[0].id, departure_date=date(2026, 11, 9),
+                          origin='A', destination='B', cargo_description='Hàng 1', revenue_full=1000000,
+                          revenue_collected=100000, driver_wage=200000, status='draft')
+            db.session.add(shared)
+            db.session.flush()
+            shared_return = PhoiReturnTrip(phoi_id=shared.id, customer_id=customers[0].id, trip_order=1,
+                                          origin='B', destination='A', cargo_description='Hàng về 1',
+                                          revenue_full=700000, revenue_collected=0)
+            db.session.add(shared_return)
+            db.session.flush()
+            for return_id in (None, shared_return.id):
+                for n, customer in enumerate(customers[1:], 2):
+                    db.session.add(PhoiCargoItem(phoi_id=shared.id, return_trip_id=return_id,
+                        item_order=n, customer_id=customer.id, cargo_description=f'Hàng riêng {n}',
+                        payment_method='per_ton' if n == 2 else 'fixed', cargo_weight_tons=Decimal('0.500') if n == 2 else None,
+                        price_per_ton=300000 if n == 2 else None, revenue_full=150000 if n == 2 else 300000,
+                        revenue_collected=50000, manager_revenue_collected=20000))
+            db.session.commit()
+            login(manager)
+            shared_html = save(client.get(f'/phoi/{shared.id}/print').get_data(as_text=True), 'shared-print')
+            manifest['prints'].append({'name': 'shared-print', 'html': shared_html,
+                'pdf': str(artifacts / 'shared-print.pdf'), 'expenseCount': 0,
+                'markers': ['Khách #2: Khách ghép 2', 'Khách #3: Khách ghép 3', '2,600,000 VNĐ'], 'mobile': True})
+            manifest['cargoForms'].append({'html': save(client.get(f'/phoi/{shared.id}/edit').get_data(as_text=True), 'shared-edit'), 'saved': True})
+            shared.status = 'submitted'
+            db.session.commit()
+            manifest['confirmations'].append(save(client.get(f'/phoi/{shared.id}/confirm').get_data(as_text=True), 'shared-confirm'))
             db.session.remove()
             db.drop_all()
             db.engine.dispose()

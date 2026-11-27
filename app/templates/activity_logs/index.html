@@ -94,7 +94,7 @@
                             {% if adjustment %}
                             <details>
                                 <summary>Điều chỉnh tiền thu — {{ adjustment.customer_name }}</summary>
-                                <div>Phơi {{ adjustment.phoi_number }} · {% if adjustment.return_trip_id %}Chuyến về #{{ adjustment.trip_order }}{% else %}Chuyến đi{% endif %}</div>
+                                <div>Phơi {{ adjustment.phoi_number }} · {% if adjustment.return_trip_id %}Chuyến về #{{ adjustment.trip_order }}{% else %}Chuyến đi{% endif %}{% if adjustment.cargo_item_id %} · Hàng ghép{% endif %}</div>
                                 <div>Trước: {{ "{:,.2f}".format(adjustment.old_amount|float) }} đ → Sau: {{ "{:,.2f}".format(adjustment.new_amount|float) }} đ</div>
                                 <div class="text-break">Lý do: {{ adjustment.reason }}</div>
                             </details>

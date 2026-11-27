@@ -2,7 +2,8 @@ from flask import Blueprint, current_app, render_template, redirect, url_for, fl
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 from app import db
-from app.models import ActivityLog, Phoi, PhoiAttachment, PhoiExpense, PhoiReturnTrip, FuelLog, Customer, Truck, User, generate_phoi_number, collection_amount
+from app.models import ActivityLog, Phoi, PhoiAttachment, PhoiExpense, PhoiReturnTrip, PhoiCargoItem, FuelLog, Customer, Truck, User, generate_phoi_number, collection_amount
+from app.phoi_cargo import revenue_from_values, sync_cargo_items, cargo_structure_error
 from app.phoi_attachments import attachment_path, delete_attachment_file, save_phoi_attachment
 from app.phoi_repair_expenses import _sync_standard_expenses, _sync_repair_expenses, _save_repair_receipts
 from app.phoi_other_expenses import sync_other_expense
@@ -31,17 +32,24 @@ def submission_error(phoi):
 
 def financial_confirmation_error(phoi):
     """Return the first missing or inconsistent financial datum needed to finalize a phơi."""
-    trips = [phoi, *phoi.return_trips.all()]
+    error = cargo_structure_error(phoi)
+    if error:
+        return error
+    trips = phoi.all_cargo_rows()
     for index, trip in enumerate(trips):
-        trip_label = 'chuyến đi' if index == 0 else f'chuyến về #{trip.trip_order}'
+        if isinstance(trip, PhoiCargoItem):
+            direction = f'chuyến về #{trip.return_trip.trip_order}' if trip.return_trip else 'chuyến đi'
+            trip_label = f'{direction}, khách {trip.customer.name}'
+        else:
+            trip_label = 'chuyến đi' if index == 0 else f'chuyến về #{trip.trip_order}'
         if trip.payment_method == 'fixed':
             if trip.revenue_full is None or trip.revenue_full <= 0:
                 return f'Vui lòng nhập doanh thu bao chuyến lớn hơn 0 cho {trip_label} trước khi xác nhận.'
         elif trip.payment_method == 'per_ton':
             if trip.cargo_weight_tons is None or trip.cargo_weight_tons <= 0:
                 return f'Vui lòng nhập số tấn lớn hơn 0 cho {trip_label} trước khi xác nhận.'
-            if trip.cargo_weight_tons < Decimal('1.000') or trip.cargo_weight_tons > Decimal('99.999'):
-                return f'Số tấn của {trip_label} phải từ 1.000 đến 99.999 tấn trước khi xác nhận.'
+            if trip.cargo_weight_tons < Decimal('0.001') or trip.cargo_weight_tons > Decimal('99.999'):
+                return f'Số tấn của {trip_label} phải từ 0.001 đến 99.999 tấn trước khi xác nhận.'
             if trip.price_per_ton is None or trip.price_per_ton <= 0:
                 return f'Vui lòng nhập đơn giá mỗi tấn lớn hơn 0 cho {trip_label} trước khi xác nhận.'
         else:
@@ -252,27 +260,7 @@ def _money(value):
 
 def _revenue_from_form(method, fixed_revenue, weight, price_per_ton):
     """Parse revenue while allowing an owner to finalize a per-ton price later."""
-    if method not in ('fixed', 'per_ton'):
-        raise ValueError('Cách tính tiền không hợp lệ.')
-    if method == 'fixed':
-        return _money(fixed_revenue), None, None
-
-    try:
-        raw_weight = str(weight or '').strip().replace(',', '.')
-        tons = Decimal(raw_weight) if raw_weight else None
-    except InvalidOperation:
-        raise ValueError('Số tấn không hợp lệ.')
-    price = _money(price_per_ton) if str(price_per_ton or '').strip() else None
-    if tons is not None:
-        if Decimal('1000') <= tons <= Decimal('99999'):
-            tons = tons / Decimal('1000')
-        if tons < Decimal('1.000') or tons > Decimal('99.999'):
-            raise ValueError('Số tấn chỉ được dao động từ 1.000 đến 99.999 tấn (1.000 - 99.999 kg).')
-        tons = tons.quantize(Decimal('0.001'))
-    if price is not None and price < 0:
-        raise ValueError('Đơn giá mỗi tấn không thể âm.')
-    revenue = tons * price if tons is not None and price is not None else Decimal('0')
-    return revenue, tons, price
+    return revenue_from_values(method, fixed_revenue, weight, price_per_ton)
 
 
 def _save_return_trip_weigh_tickets(phoi, synced_trips, saved_keys):
@@ -319,6 +307,9 @@ def _sync_return_trips(phoi):
         'return_trip_has_other[]', 'return_trip_expense_other[]',
         'return_trip_expense_other_description[]',
     ))
+    cargo_items = request.form.getlist('return_trip_cargo_items[]')
+    if 'return_trip_cargo_items[]' in request.form and len(cargo_items) != len(origins):
+        raise ValueError('Danh sách hàng ghép của các chuyến về không đầy đủ. Vui lòng tải lại biểu mẫu.')
     if has_other_fields and any(len(values) != len(origins) for values in (
         other_flags, other_amounts, other_descriptions,
     )):
@@ -329,6 +320,8 @@ def _sync_return_trips(phoi):
         origin = origin.strip()
         destination = destinations[index].strip() if index < len(destinations) else ''
         if not origin and not destination:
+            if index < len(cargo_items) and cargo_items[index] != '[]':
+                raise ValueError('Chuyến về có hàng ghép phải có đủ điểm đi và điểm đến.')
             if has_other_fields and other_flags[index] != '0':
                 raise ValueError(f'Chuyến về #{index + 1} có chi phí khác phải có đủ điểm đi và điểm đến.')
             continue
@@ -368,10 +361,12 @@ def _sync_return_trips(phoi):
         trip.price_per_ton = price_per_ton
         trip.revenue_full = revenue_full
         trip.revenue_collected = _money(collecteds[index] if index < len(collecteds) else 0)
-        if index < len(manager_collecteds):
+        if current_user.is_manager_or_admin() and index < len(manager_collecteds):
             trip.manager_revenue_collected = _money(manager_collecteds[index])
         trip.porter_fee = _money(porter_fees[index] if index < len(porter_fees) else 0)
         trip.notes = notes[index].strip() if index < len(notes) else ''
+        db.session.flush()
+        sync_cargo_items(trip, cargo_items[index] if index < len(cargo_items) else None, current_user)
         if has_other_fields:
             sync_other_expense(phoi, trip, other_flags[index], other_amounts[index], other_descriptions[index])
         synced_trips.append((index, trip))
@@ -543,8 +538,12 @@ def create():
             db.session.add(phoi)
             db.session.flush()
             _assign_unallocated_fuel_logs(phoi)
+            sync_cargo_items(phoi, request.form.get('cargo_items'), current_user)
             synced_return_trips = _sync_return_trips(phoi)
             db.session.flush()
+            error = cargo_structure_error(phoi)
+            if error:
+                raise ValueError(error)
             _save_return_trip_weigh_tickets(phoi, synced_return_trips, saved_keys)
 
             for attachment_type, field_name, maximum_files in (
@@ -788,8 +787,16 @@ def edit(id):
             if phoi.status in ('draft', 'submitted'):
                 _sync_driver_advance(phoi)
 
+            sync_cargo_items(phoi, request.form.get('cargo_items'), current_user)
             synced_return_trips = _sync_return_trips(phoi)
             db.session.flush()
+            error = cargo_structure_error(phoi)
+            if error:
+                raise ValueError(error)
+            if phoi.status == 'confirmed' and phoi.cargo_items.count():
+                error = financial_confirmation_error(phoi)
+                if error:
+                    raise ValueError(error)
             _save_return_trip_weigh_tickets(phoi, synced_return_trips, saved_keys)
 
             files = [file for file in request.files.getlist('weigh_ticket_images') if file and file.filename]
@@ -1004,6 +1011,14 @@ def confirm(id):
             for trip in phoi.return_trips.all()
         ],
     ]
+    for row in phoi.cargo_items.all():
+        direction = f'Chuyến về #{row.return_trip.trip_order}' if row.return_trip else 'Chuyến đi'
+        trips.append({
+            'kind': 'cargo', 'id': row.id, 'label': f'{direction} · Khách ghép #{row.item_order}',
+            'customer': row.customer, 'revenue_full': row.revenue_full,
+            'revenue_collected': row.revenue_collected,
+            'manager_revenue_collected': row.manager_revenue_collected,
+        })
     if request.method == 'GET':
         return render_template('phoi/confirm.html', phoi=phoi, trips=trips)
 
@@ -1013,6 +1028,10 @@ def confirm(id):
                 status_name = 'outbound_collection_status'
                 amount_name = 'outbound_manager_revenue_collected'
                 target = phoi
+            elif trip['kind'] == 'cargo':
+                status_name = f"cargo_collection_status_{trip['id']}"
+                amount_name = f"cargo_manager_revenue_collected_{trip['id']}"
+                target = phoi.cargo_items.filter_by(id=trip['id']).first_or_404()
             else:
                 status_name = f"return_collection_status_{trip['id']}"
                 amount_name = f"return_manager_revenue_collected_{trip['id']}"

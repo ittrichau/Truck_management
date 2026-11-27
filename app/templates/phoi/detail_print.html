@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'phoi/_cargo_items.html' import cargo_details %}
 {% block title %}{{ phoi.phoi_number }} - In Phơi{% endblock %}
 
 {% block extra_head %}
@@ -93,6 +94,8 @@
 .trip-meta-item { min-width: 0; }
 .print-label { color: #495563; font-size: 9pt; }
 .print-value { font-size: 10.5pt; font-weight: 600; overflow-wrap: anywhere; }
+.cargo-customer-details { grid-column: 1 / -1; font-size: 10pt; overflow-wrap: anywhere; }
+.cargo-customer-details > div { padding: 4px 0; border-top: 1px solid #ddd; break-inside: avoid; }
 .trip-customer { padding-top: 2px; }
 .trip-km { padding-top: 3px; border-top: 1px solid #d5dbe0; }
 .trip-km .trip-meta-item { display: flex; gap: 5px; align-items: baseline; }
@@ -315,14 +318,16 @@
             <div class="return-trip-meta">
                 <div class="return-trip-field"><span class="print-label">Ngày đi:</span> <span class="print-value">{{ phoi.departure_date.strftime('%d/%m/%Y') if phoi.departure_date else '--' }}</span></div>
                 <div class="return-trip-field"><span class="print-label">Ngày về:</span> <span class="print-value">{{ phoi.return_date.strftime('%d/%m/%Y') if phoi.return_date else '--' }}</span></div>
+                {% if not phoi.additional_cargo() %}
                 <div class="return-trip-field"><span class="print-label">Khách hàng:</span> <span class="print-value">{{ phoi.customer.name if phoi.customer else '--' }}</span></div>
                 <div class="return-trip-field"><span class="print-label">Hàng hóa:</span> <span class="print-value">{{ phoi.cargo_description or '--' }}</span></div>
                 <div class="return-trip-field"><span class="print-label">Khối lượng:</span> <span class="print-value">{{ phoi.cargo_weight_tons or '--' }} tấn</span></div>
+                {% endif %}
                 <div class="return-trip-field"><span class="print-label">Phiếu cân:</span> <span class="print-value">{{ phoi.weigh_ticket_number or '--' }}{% if phoi.attachment_count('weigh_ticket') %} · {{ phoi.attachment_count('weigh_ticket') }} ảnh{% endif %}</span></div>
                 <div class="return-trip-field"><span class="print-label">KM đầu:</span> <span class="print-value">{{ phoi.km_start if phoi.km_start is not none else '--' }} km</span></div>
                 <div class="return-trip-field"><span class="print-label">KM cuối:</span> <span class="print-value">{{ phoi.km_end if phoi.km_end is not none else '--' }} km</span></div>
                 <div class="return-trip-field"><span class="print-label">Tổng KM:</span> <span class="print-value">{{ phoi.km_total if phoi.km_total is not none else '--' }} km</span></div>
-                {% if current_user.is_manager_or_admin() %}
+                {% if current_user.is_manager_or_admin() and not phoi.additional_cargo() %}
                 <div class="return-trip-field"><span class="print-label">Doanh thu:</span> <span class="print-value">{{ '{:,.0f}'.format(phoi.revenue_full or 0) }} VNĐ{% if phoi.payment_method == 'per_ton' and phoi.price_per_ton %} ({{ '{:,.0f}'.format(phoi.price_per_ton) }} VNĐ/tấn){% else %} (bao chuyến){% endif %}</span></div>
                 <div class="return-trip-field"><span class="print-label">Tài xế đã thu:</span> <span class="print-value">{{ '{:,.0f}'.format(phoi.revenue_collected or 0) }} VNĐ</span></div>
                 {% if phoi.manager_revenue_collected %}
@@ -331,6 +336,7 @@
                 <div class="return-trip-field"><span class="print-label">Còn phải thu:</span> <span class="print-value">{{ '{:,.0f}'.format(phoi.revenue_full - phoi.revenue_collected - phoi.manager_revenue_collected) }} VNĐ</span></div>
                 {% endif %}
             </div>
+            {{ cargo_details(phoi, current_user.is_manager_or_admin()) }}
             {% for expense in phoi.expenses.filter_by(category='other', return_trip_id=none).all() %}
             <div class="other-expense-print"><strong>Chi phí khác chuyến đi (tài xế ứng): {{ '{:,.0f}'.format(expense.amount) }} VNĐ</strong> · {{ expense.description }}</div>
             {% endfor %}
@@ -344,6 +350,7 @@
             <div class="return-trip-route">Chuyến về #{{ trip.trip_order }}: {{ trip.origin }} → {{ trip.destination }}</div>
             <div class="return-trip-meta">
                 <div class="return-trip-field"><span class="print-label">Ngày về:</span> <span class="print-value">{{ trip.return_date.strftime('%d/%m/%Y') if trip.return_date else '--' }}</span></div>
+                {% if not trip.additional_cargo() %}
                 <div class="return-trip-field"><span class="print-label">Khách hàng:</span> <span class="print-value">{{ trip.customer.name if trip.customer else '--' }}</span></div>
                 <div class="return-trip-field"><span class="print-label">Hàng hóa:</span> <span class="print-value">{{ trip.cargo_description or '--' }}</span></div>
                 <div class="return-trip-field"><span class="print-label">Khối lượng:</span> <span class="print-value">{{ trip.cargo_weight_tons or '--' }} tấn</span></div>
@@ -355,6 +362,8 @@
                 {% endif %}
                 <div class="return-trip-field"><span class="print-label">Còn phải thu:</span> <span class="print-value">{{ '{:,.0f}'.format(trip.revenue_full - trip.revenue_collected - trip.manager_revenue_collected) }} VNĐ</span></div>
                 {% endif %}
+                {% endif %}
+                {{ cargo_details(trip, current_user.is_manager_or_admin()) }}
                 {% if trip.attachment_count('weigh_ticket') %}
                 <div class="return-trip-field"><span class="print-label">Phiếu cân:</span> <span class="print-value">{{ trip.attachment_count('weigh_ticket') }} ảnh</span></div>
                 {% endif %}
@@ -383,11 +392,11 @@
         <h4 class="print-section-title">03 / TỔNG HỢP TÀI CHÍNH <span style="float:right;font-size:9pt;font-weight:400;">Đơn vị: VNĐ</span></h4>
         <div class="finance-columns">
         <table class="phoi-financial-table">
-            <tr><td>Doanh thu chuyến đi</td><td class="amount">{{ '{:,.0f}'.format(phoi.revenue_full) }} VNĐ</td></tr>
-            <tr><td>Doanh thu chuyến về ({{ phoi.return_trips.count() }})</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full() - phoi.revenue_full) }} VNĐ</td></tr>
+            <tr><td>Doanh thu chuyến đi</td><td class="amount">{{ '{:,.0f}'.format(phoi.trip_revenue_full()) }} VNĐ</td></tr>
+            <tr><td>Doanh thu chuyến về ({{ phoi.return_trips.count() }})</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full() - phoi.trip_revenue_full()) }} VNĐ</td></tr>
             <tr class="total-row"><td>TỔNG DOANH THU</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full()) }} VNĐ</td></tr>
             <tr><td>Tài xế đã thu</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_collected()) }} VNĐ</td></tr>
-            {% set manager_collected = phoi.manager_revenue_collected + phoi.return_trips.all()|sum(attribute='manager_revenue_collected') %}
+            {% set manager_collected = phoi.total_manager_revenue_collected() %}
             <tr><td>Quản lý/chủ xe đã thu</td><td class="amount">{{ '{:,.0f}'.format(manager_collected) }} VNĐ</td></tr>
             <tr class="total-row"><td>Công nợ còn lại</td><td class="amount">{{ '{:,.0f}'.format(phoi.total_revenue_full() - phoi.total_revenue_collected() - manager_collected) }} VNĐ</td></tr>
             <tr class="total-row"><td>Công tài xế</td><td class="amount">{{ '{:,.0f}'.format(phoi.driver_wage) }} VNĐ</td></tr>

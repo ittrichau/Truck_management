@@ -1,7 +1,7 @@
 from flask import abort, Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required, current_user
 from app import db
-from app.models import Customer, Phoi, PhoiReturnTrip, User
+from app.models import Customer, Phoi, PhoiReturnTrip, PhoiCargoItem, User
 
 from app.access import customers_query, phois_query, manager_id
 
@@ -80,7 +80,9 @@ def delete(id):
         own_ids = phois_query().with_entities(Phoi.id)
         used_elsewhere = (Phoi.query.filter(Phoi.customer_id == customer.id, ~Phoi.id.in_(own_ids)).first()
             or PhoiReturnTrip.query.filter(PhoiReturnTrip.customer_id == customer.id,
-                                          ~PhoiReturnTrip.phoi_id.in_(own_ids)).first())
+                                          ~PhoiReturnTrip.phoi_id.in_(own_ids)).first()
+            or PhoiCargoItem.query.filter(PhoiCargoItem.customer_id == customer.id,
+                                         ~PhoiCargoItem.phoi_id.in_(own_ids)).first())
         if used_elsewhere or any(manager.id != manager_id() for manager in customer.managers):
             abort(403, description='Chỉ admin được xóa khách hàng đang dùng chung.')
     customer.is_active = False

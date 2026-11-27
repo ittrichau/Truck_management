@@ -7,11 +7,18 @@ from flask_login import current_user, login_required
 from sqlalchemy.exc import SQLAlchemyError
 
 from app import db
-from app.models import Customer, Phoi, PhoiReturnTrip, Truck, adjust_manager_collection, collection_amount
+from app.models import Customer, Phoi, PhoiReturnTrip, PhoiCargoItem, Truck, adjust_manager_collection, collection_amount
 
 from app.access import phois_query, trucks_query, customers_query, can_access_phoi
 
 bp = Blueprint('debts', __name__)
+
+
+def _customer_cargo_items(customer_id):
+    return PhoiCargoItem.query.join(Phoi).filter(
+        PhoiCargoItem.customer_id == customer_id, Phoi.status == 'confirmed',
+        Phoi.id.in_(phois_query().with_entities(Phoi.id)),
+    ).all()
 
 
 @bp.route('/debts')
@@ -85,6 +92,10 @@ def index():
                         return_trip.revenue_collected,
                         return_trip.manager_revenue_collected,
                     )
+        for row in phoi.cargo_items:
+            day = (row.return_trip.return_date if row.return_trip else None) or phoi.departure_date
+            if within_date_range(day) and (not filter_truck_id or phoi.truck_id == filter_truck_id):
+                add_debt(row.customer, row.revenue_full, row.revenue_collected, row.manager_revenue_collected)
 
     debts = []
     for debt in customer_debts.values():
@@ -190,6 +201,16 @@ def customer_detail(customer_id):
             'truck_number': rt.phoi.truck.license_plate if rt.phoi.truck else '',
         })
 
+    for row in _customer_cargo_items(customer_id):
+        collected = (row.revenue_collected or Decimal('0')) + (row.manager_revenue_collected or Decimal('0'))
+        debt_rows.append({
+            'phoi': row.phoi, 'return_trip': row.return_trip, 'cargo_item': row,
+            'revenue_full': row.revenue_full, 'revenue_collected': collected,
+            'outstanding': row.revenue_full - collected,
+            'date': (row.return_trip.return_date if row.return_trip else None) or row.phoi.departure_date,
+            'truck_number': row.phoi.truck.license_plate,
+        })
+
     # Sắp xếp: mới nhất trước
     debt_rows.sort(key=lambda r: (r['date'] or r['phoi'].departure_date), reverse=True)
 
@@ -283,11 +304,18 @@ def collect_payment(customer_id):
         if rf - rc > 0:
             debt_rows.append({'type': 'return_trip', 'obj': rt, 'outstanding': rf - rc})
 
+    for row in _customer_cargo_items(customer_id):
+        outstanding = row.revenue_full - (row.revenue_collected or Decimal('0')) - (row.manager_revenue_collected or Decimal('0'))
+        if outstanding > 0:
+            debt_rows.append({'type': 'cargo_item', 'obj': row, 'outstanding': outstanding})
+
     # Sắp xếp cũ nhất trước
     def row_date(r):
         obj = r['obj']
         if r['type'] == 'phoi':
             return (obj.departure_date, obj.id)
+        if r['type'] == 'cargo_item':
+            return ((obj.return_trip.return_date if obj.return_trip else None) or obj.phoi.departure_date, obj.id)
         return (obj.return_date or obj.phoi.departure_date, obj.id)
 
     debt_rows.sort(key=row_date)
@@ -332,6 +360,12 @@ def adjust_payment(customer_id, trip_type, trip_id):
         target = PhoiReturnTrip.query.join(Phoi).filter(
             PhoiReturnTrip.id == trip_id,
             PhoiReturnTrip.customer_id == customer_id,
+            Phoi.status == 'confirmed',
+        ).first_or_404()
+        phoi = target.phoi
+    elif trip_type == 'cargo_item':
+        target = PhoiCargoItem.query.join(Phoi).filter(
+            PhoiCargoItem.id == trip_id, PhoiCargoItem.customer_id == customer_id,
             Phoi.status == 'confirmed',
         ).first_or_404()
         phoi = target.phoi

@@ -1,0 +1,28 @@
+{% macro cargo_editor(trip=none, returning=false) %}
+<div class="cargo-extras border rounded p-3 mb-3 {{ 'col-12' if returning }}" data-cargo-extras>
+    <input type="hidden" name="{{ 'return_trip_cargo_items[]' if returning else 'cargo_items' }}" value='{{ (trip.cargo_form_data(include_manager=current_user.is_manager_or_admin()) if trip else [])|tojson }}' data-cargo-json>
+    <div class="small text-muted mb-2">Khách thứ nhất nhập ở trên. Mỗi chuyến tối đa 3 khách, mỗi khách một loại hàng và cước riêng.</div>
+    <div data-cargo-list></div>
+    <button type="button" class="btn btn-outline-primary btn-sm" data-add-cargo>+ Thêm khách ghép</button>
+    <div class="small fw-bold mt-2" data-cargo-total aria-live="polite"></div>
+</div>
+{% endmacro %}
+
+{% macro cargo_details(trip, manager=false) %}
+{% if trip.additional_cargo() %}
+<div class="mt-2 cargo-customer-details">
+    {% for row in trip.cargo_rows() %}
+    <div class="border rounded p-2 mb-2">
+        <strong>Khách #{{ loop.index }}: {{ row.customer.name if row.customer else '--' }}</strong>
+        <div>{{ row.cargo_description or '--' }}{% if row.cargo_weight_tons is not none %} · {{ row.cargo_weight_tons }} tấn{% endif %}</div>
+        {% if manager %}
+        <div>Cước: {{ '{:,.0f}'.format(row.revenue_full or 0) }} VNĐ{% if row.payment_method == 'per_ton' %} · {{ '{:,.0f}'.format(row.price_per_ton or 0) }} VNĐ/tấn{% else %} · Cước cố định{% endif %}</div>
+        <div>Tài xế đã thu: {{ '{:,.0f}'.format(row.revenue_collected or 0) }} VNĐ · Quản lý đã thu: {{ '{:,.0f}'.format(row.manager_revenue_collected or 0) }} VNĐ</div>
+        <div>Còn phải thu: {{ '{:,.0f}'.format((row.revenue_full or 0) - (row.revenue_collected or 0) - (row.manager_revenue_collected or 0)) }} VNĐ</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% if manager %}<strong>Tổng cước chuyến: {{ '{:,.0f}'.format(trip.trip_revenue_full()) }} VNĐ</strong>{% endif %}
+</div>
+{% endif %}
+{% endmacro %}

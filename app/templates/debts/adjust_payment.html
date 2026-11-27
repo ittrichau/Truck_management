@@ -10,8 +10,10 @@
         <p class="mb-1"><strong>{{ customer.name }}</strong> — Phơi {{ phoi.phoi_number }}</p>
         <p class="text-muted">
             {{ phoi.truck.license_plate if phoi.truck else '' }} ·
-            {% if trip_type == 'return_trip' %}Chuyến về #{{ target.trip_order }}{% else %}Chuyến đi{% endif %}
-            · {{ target.origin }} → {{ target.destination }}
+            {% set trip = (target.return_trip or phoi) if trip_type == 'cargo_item' else target %}
+            {% if trip != phoi %}Chuyến về #{{ trip.trip_order }}{% else %}Chuyến đi{% endif %}
+            {% if trip_type == 'cargo_item' %} · Khách ghép #{{ target.item_order }}{% endif %}
+            · {{ trip.origin }} → {{ trip.destination }}
         </p>
         <dl class="row">
             <dt class="col-7">Phải thu</dt>
